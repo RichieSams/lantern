@@ -30,23 +30,33 @@ add_subdirectory(libs/embree)
 include_directories(libs/embree/include)
 
 
-
-# Make sure we're using C++11
-if(UNIX)
-	SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
-endif()
-if(APPLE)
-	SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++")
-endif()
-
-
 # Source files
+set(SRC_ROOT
+   source/main.cpp
+)
+source_group(" " FILES ${SRC_ROOT})
+
+set(SRC_COMMON
+)
+source_group("Common" FILES ${SRC_COMMON})
+
+set(SRC_RENDERER
+)
+source_group("Renderer" FILES ${SRC_RENDERER})
+
+set(SRC_VISUALIZER
+)
+source_group("Visualizer" FILES ${SRC_VISUALIZER})
+
+# Link all the sources into one
 set(LANTERN_SRC
-	source/main.cpp)
+   ${SRC_ROOT}
+   ${SRC_COMMON}
+   ${SRC_RENDERER}
+   ${SRC_VISUALIZER}
+)
 
-set(LANTERN_HEADERS
-	)
 
-
+# Create exe
 add_executable(lantern ${LANTERN_SRC})
-target_link_libraries(lantern glfw embree ${GLFW_LIBRARIES})
+target_link_libraries(lantern embree glfw ${GLFW_LIBRARIES})
