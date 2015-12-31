@@ -5,10 +5,10 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake")
 
 
 # Detect CPU and enable available vector units 
-include(OptimizeForArchitecture)
-OptimizeForArchitecture()
+#include(OptimizeForArchitecture)
+#OptimizeForArchitecture()
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${Vc_ARCHITECTURE_FLAGS}")
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${Vc_ARCHITECTURE_FLAGS}")
 
 
 # Add necessary dependencies
