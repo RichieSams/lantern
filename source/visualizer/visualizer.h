@@ -11,20 +11,20 @@
 
 namespace Lantern {
 
-class AtomicFrameBuffer;
+struct GlobalArgs;
 
 
 class Visualizer {
 public:
-	Visualizer(AtomicFrameBuffer *frameBuffer);
+	Visualizer(GlobalArgs *globalArgs);
 	~Visualizer();
 
 private:
-	AtomicFrameBuffer *m_atomicFrameBuffer;
+	GlobalArgs *m_globalArgs;
 	float3 *m_tempFrameBuffer;
 
 private:
-	void CopyAtomicFrameBufferToTemp();
+	void CopyFrameBufferToTemp();
 
 public:
 	void Run();

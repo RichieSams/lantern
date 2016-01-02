@@ -10,21 +10,21 @@
 
 
 namespace Lantern {
-
-class AtomicFrameBuffer;
+struct GlobalArgs;
 
 class Renderer {
 public:
-	Renderer(AtomicFrameBuffer *frameBuffer);
+	Renderer(GlobalArgs *globalArgs);
 	~Renderer();
 
 private:
-	AtomicFrameBuffer *m_frameBuffer;
+	GlobalArgs *m_globalArgs;
 
 	RTCDevice m_device;
 	RTCScene m_scene;
 
 public:
+	void SetScene();
 	void Start();
 
 };
