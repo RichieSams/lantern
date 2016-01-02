@@ -38,6 +38,8 @@ source_group(" " FILES ${SRC_ROOT})
 
 set(SRC_COMMON
    source/common/typedefs.h
+   source/common/atomic_frame_buffer.h
+   source/common/atomic_frame_buffer.cpp
    source/common/mesh_elements.h
    source/common/vector_types.h
 )
