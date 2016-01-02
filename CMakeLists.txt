@@ -13,6 +13,8 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake")
 
 # Add necessary dependencies
 find_package(OpenGL REQUIRED)
+find_package(TBB REQUIRED)
+include_directories(${TBB_INCLUDE_DIRS})
 
 
 # Add third party libs
@@ -70,4 +72,4 @@ include_directories("source")
 
 # Create exe
 add_executable(lantern ${LANTERN_SRC})
-target_link_libraries(lantern embree glfw ${GLFW_LIBRARIES})
+target_link_libraries(lantern embree glfw ${GLFW_LIBRARIES} ${TBB_LIBRARIES})
