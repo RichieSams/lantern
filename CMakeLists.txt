@@ -38,6 +38,7 @@ source_group(" " FILES ${SRC_ROOT})
 
 set(SRC_COMMON
    source/common/typedefs.h
+   source/common/mesh_elements.h
    source/common/vector_types.h
 )
 source_group("Common" FILES ${SRC_COMMON})
