@@ -25,6 +25,8 @@ set( GLFW_BUILD_INSTALL OFF CACHE BOOL  "GLFW lib only" )
 add_subdirectory(libs/glfw)
 include_directories(libs/glfw/include)
 
+add_subdirectory(libs/imgui)
+include_directories(libs/imgui/include)
 
 SET(ENABLE_ISPC_SUPPORT OFF CACHE BOOL "No ISPC support needed atm" )
 SET(ENABLE_TUTORIALS OFF CACHE BOOL "Only build lib" )
@@ -40,12 +42,25 @@ source_group(" " FILES ${SRC_ROOT})
 
 set(SRC_COMMON
    source/common/typedefs.h
-   source/common/atomic_frame_buffer.h
-   source/common/atomic_frame_buffer.cpp
-   source/common/mesh_elements.h
-   source/common/vector_types.h
+   source/common/global_args.h
 )
 source_group("Common" FILES ${SRC_COMMON})
+
+set(SRC_GRAPHICS
+   source/graphics/atomic_frame_buffer.h
+   source/graphics/atomic_frame_buffer.cpp
+)
+source_group("Graphics" FILES ${SRC_GRAPHICS})
+
+set(SRC_MATH
+   source/math/vector_types.h
+)
+source_group("Math" FILES ${SRC_MATH})
+
+set(SRC_SCENE
+   source/scene/mesh_elements.h
+)
+source_group("Scene" FILES ${SRC_SCENE})
 
 set(SRC_RENDERER
    source/renderer/renderer.h
@@ -63,6 +78,9 @@ source_group("Visualizer" FILES ${SRC_VISUALIZER})
 set(LANTERN_SRC
    ${SRC_ROOT}
    ${SRC_COMMON}
+   ${SRC_GRAPHICS}
+   ${SRC_MATH}
+   ${SRC_SCENE}
    ${SRC_RENDERER}
    ${SRC_VISUALIZER}
 )
@@ -72,4 +90,4 @@ include_directories("source")
 
 # Create exe
 add_executable(lantern ${LANTERN_SRC})
-target_link_libraries(lantern embree glfw ${GLFW_LIBRARIES} ${TBB_LIBRARIES})
+target_link_libraries(lantern embree glfw ${GLFW_LIBRARIES} imgui ${TBB_LIBRARIES})

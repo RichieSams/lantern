@@ -6,9 +6,9 @@
 
 #include "renderer/renderer.h"
 
-#include "common/typedefs.h"
-#include "common/mesh_elements.h"
-#include "common/atomic_frame_buffer.h"
+#include "scene/mesh_elements.h"
+
+#include "graphics/atomic_frame_buffer.h"
 
 
 namespace Lantern {

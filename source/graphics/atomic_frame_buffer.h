@@ -8,7 +8,7 @@
 
 #include "common/typedefs.h"
 
-#include "common/vector_types.h"
+#include "math/vector_types.h"
 
 #include <atomic>
 

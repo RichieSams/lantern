@@ -6,7 +6,7 @@
 
 #include "visualizer/visualizer.h"
 
-#include "common/atomic_frame_buffer.h"
+#include "graphics/atomic_frame_buffer.h"
 
 #include <GLFW/glfw3.h>
 

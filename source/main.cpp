@@ -4,14 +4,14 @@
 * Copyright Adrian Astley 2015 - 2016
 */
 
-#include "common/atomic_frame_buffer.h"
+#include "graphics/atomic_frame_buffer.h"
 
 #include "visualizer/visualizer.h"
+
 #include "renderer/renderer.h"
 
 #include <xmmintrin.h>
 #include <pmmintrin.h>
-
 #include <thread>
 
 

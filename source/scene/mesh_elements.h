@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "vector_types.h"
+#include "math/vector_types.h"
 
 
 namespace Lantern {
