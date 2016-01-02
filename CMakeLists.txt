@@ -52,6 +52,8 @@ set(SRC_RENDERER
 source_group("Renderer" FILES ${SRC_RENDERER})
 
 set(SRC_VISUALIZER
+   source/visualizer/visualizer.h
+   source/visualizer/visualizer.cpp
 )
 source_group("Visualizer" FILES ${SRC_VISUALIZER})
 
