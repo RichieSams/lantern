@@ -37,7 +37,7 @@ public:
 
 		m_data[index].X.store(color.X);
 		m_data[index].Y.store(color.Y);
-		m_data[index].Y.store(color.Z);
+		m_data[index].Z.store(color.Z);
 	}
 
 	void GetPixel(uint x, uint y, float3 &pixel) const {
