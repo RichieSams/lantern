@@ -1,67 +1,36 @@
 /* Lantern - A path tracer
 *
 * Lantern is the legal property of Adrian Astley
-* Copyright Adrian Astley 2015
+* Copyright Adrian Astley 2015 - 2016
 */
 
-#include <GLFW/glfw3.h>
+#include "common/atomic_frame_buffer.h"
 
-#include <cstdio>
-#include <exception>
+#include "visualizer/visualizer.h"
+#include "renderer/renderer.h"
+
+#include <xmmintrin.h>
+#include <pmmintrin.h>
+
+#include <thread>
 
 
-static void error_callback(int error, const char *description) {
-	printf("Error %d: %s\n", error, description);
+void StartRendererWrapper(Lantern::Renderer *renderer) {
+	renderer->Start();
 }
 
 
 int main(int argc, const char *argv[]) {
-	// Setup window
-	glfwSetErrorCallback(error_callback);
-	if (!glfwInit()) {
-		glfwTerminate();
-		exit(EXIT_FAILURE);
-	}
+	_MM_SET_FLUSH_ZERO_MODE(_MM_FLUSH_ZERO_ON);
+	_MM_SET_DENORMALS_ZERO_MODE(_MM_DENORMALS_ZERO_ON);
 
-	GLFWwindow* window = glfwCreateWindow(1280, 720, "Lantern", NULL, NULL);
-	glfwMakeContextCurrent(window);
+	Lantern::AtomicFrameBuffer frameBuffer(1280, 720);
+	
+	Lantern::Renderer renderer(&frameBuffer);
+	std::thread renderThread(StartRendererWrapper, &renderer);
 
+	Lantern::Visualizer visualizer(&frameBuffer);
+	visualizer.Run();
 
-	glfwSwapInterval(1);
-	while (!glfwWindowShouldClose(window)) {
-		float ratio;
-		int width, height;
-
-		glfwGetFramebufferSize(window, &width, &height);
-		ratio = width / (float)height;
-
-		glViewport(0, 0, width, height);
-		glClear(GL_COLOR_BUFFER_BIT);
-
-		glMatrixMode(GL_PROJECTION);
-		glLoadIdentity();
-		glOrtho(-ratio, ratio, -1.f, 1.f, 1.f, -1.f);
-		glMatrixMode(GL_MODELVIEW);
-
-		glLoadIdentity();
-		glRotatef((float)glfwGetTime() * 50.f, 0.f, 0.f, 1.f);
-
-		glBegin(GL_TRIANGLES);
-		glColor3f(1.f, 0.f, 0.f);
-		glVertex3f(-0.6f, -0.4f, 0.f);
-		glColor3f(0.f, 1.f, 0.f);
-		glVertex3f(0.6f, -0.4f, 0.f);
-		glColor3f(0.f, 0.f, 1.f);
-		glVertex3f(0.f, 0.6f, 0.f);
-		glEnd();
-
-		glfwSwapBuffers(window);
-		glfwPollEvents();
-	}
-
-
-	glfwDestroyWindow(window);
-
-	// Cleanup
-	glfwTerminate();
+	renderThread.join();
 }
