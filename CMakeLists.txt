@@ -65,6 +65,8 @@ set(LANTERN_SRC
    ${SRC_VISUALIZER}
 )
 
+include_directories("source")
+
 
 # Create exe
 add_executable(lantern ${LANTERN_SRC})
