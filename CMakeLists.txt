@@ -44,6 +44,8 @@ set(SRC_COMMON
 source_group("Common" FILES ${SRC_COMMON})
 
 set(SRC_RENDERER
+   source/renderer/renderer.h
+   source/renderer/renderer.cpp
 )
 source_group("Renderer" FILES ${SRC_RENDERER})
 
