@@ -6,13 +6,16 @@
 
 #pragma once
 
+#include "common/typedefs.h"
+
 #include "math/vector_types.h"
 
+
+struct GLFWwindow;
 
 namespace Lantern {
 
 struct GlobalArgs;
-
 
 class Visualizer {
 public:
@@ -23,11 +26,18 @@ private:
 	GlobalArgs *m_globalArgs;
 	float3 *m_tempFrameBuffer;
 
-private:
-	void CopyFrameBufferToTemp();
+	GLFWwindow *m_window;
+
+	int m_clientWidth;
+	int m_clientHeight;
 
 public:
 	void Run();
+
+private:
+	void Init();
+	void Shutdown();
+	void CopyFrameBufferToGPU();
 };
 
 } // End of namespace Lantern

@@ -12,15 +12,14 @@
 
 #include <GLFW/glfw3.h>
 
+#include <imgui.h>
+#include <imgui_impl_glfw.h>
+
 #include <cstdio>
 #include <cstdlib>
 
 
 namespace Lantern {
-
-static void error_callback(int error, const char *description) {
-	printf("Error %d: %s\n", error, description);
-}
 
 Visualizer::Visualizer(GlobalArgs *globalArgs)
 		: m_globalArgs(globalArgs) {
@@ -31,7 +30,48 @@ Visualizer::~Visualizer() {
 	delete[] m_tempFrameBuffer;
 }
 
+static void error_callback(int error, const char *description) {
+	printf("Error %d: %s\n", error, description);
+}
+
 void Visualizer::Run() {
+	Init();
+
+	glfwSwapInterval(1);
+	while (!glfwWindowShouldClose(m_window)) {
+		glfwWaitEvents();
+		ImGui_ImplGlfw_NewFrame();
+
+		if (m_globalArgs->RenderChanged.load()) {
+			CopyFrameBufferToGPU();
+			m_globalArgs->RenderChanged.store(false);
+		}
+
+		// Render scene
+		glBegin(GL_QUADS);
+			glTexCoord2d(0.0, 1.0);
+			glVertex2d(-1.0, -1.0);
+
+			glTexCoord2d(1.0, 1.0);
+			glVertex2d(1.0, -1.0);
+
+			glTexCoord2d(1.0, 0.0);
+			glVertex2d(1.0, 1.0);
+
+			glTexCoord2d(0.0, 0.0);
+			glVertex2d(-1.0, 1.0);
+		glEnd();
+
+		// Render UI
+		ImGui::Render();
+
+		glfwSwapBuffers(m_window);
+	}
+
+	Shutdown();
+}
+
+void Visualizer::Init() {
 	// Setup window
 	glfwSetErrorCallback(error_callback);
 	if (!glfwInit()) {
@@ -39,34 +79,40 @@ void Visualizer::Run() {
 		exit(EXIT_FAILURE);
 	}
 
-	GLFWwindow* window = glfwCreateWindow(m_globalArgs->FrameBuffer->Width(), m_globalArgs->FrameBuffer->Height(), "Lantern", nullptr, nullptr);
-	glfwMakeContextCurrent(window);
+	glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
+	m_window = glfwCreateWindow(m_globalArgs->FrameBuffer->Width(), m_globalArgs->FrameBuffer->Height(), "Lantern", nullptr, nullptr);
 
-	int width, height;
-	glfwGetFramebufferSize(window, &width, &height);
-	glViewport(0, 0, width, height);
+	// Setup ImGui binding
+	ImGui_ImplGlfw_Init(m_window, true);
 
-	glfwSwapInterval(1);
-	while (!glfwWindowShouldClose(window)) {
-		glfwPollEvents();
+	glfwMakeContextCurrent(m_window);
 
-		if (m_globalArgs->RenderChanged.load()) {
-			CopyFrameBufferToTemp();
-			glDrawPixels(width, height, GL_RGB, GL_FLOAT, m_tempFrameBuffer);
+	glfwGetFramebufferSize(m_window, &m_clientWidth, &m_clientHeight);
+	glViewport(0, 0, m_clientWidth, m_clientHeight);
 
-			m_globalArgs->RenderChanged.store(false);
-			
-			glfwSwapBuffers(window);
-		}
-	}
+	// Create a texture 
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, m_clientWidth, m_clientHeight, 0, GL_RGB, GL_FLOAT, m_tempFrameBuffer);
 
-	glfwDestroyWindow(window);
+	// Set up the texture
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+
+	// Enable textures
+	glEnable(GL_TEXTURE_2D);
+}
+
+void Visualizer::Shutdown() {
+	glfwDestroyWindow(m_window);
 
 	// Cleanup
+	ImGui_ImplGlfw_Shutdown();
 	glfwTerminate();
 }
 
-void Visualizer::CopyFrameBufferToTemp() {
+
+void Visualizer::CopyFrameBufferToGPU() {
 	uint width = m_globalArgs->FrameBuffer->Width();
 	uint height = m_globalArgs->FrameBuffer->Height();
 
@@ -75,6 +121,9 @@ void Visualizer::CopyFrameBufferToTemp() {
 			m_globalArgs->FrameBuffer->GetPixel(x, y, m_tempFrameBuffer[y * width + x]);
 		}
 	}
+
+	// Update Texture
+	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, m_clientWidth, m_clientHeight, GL_RGB, GL_FLOAT, m_tempFrameBuffer);
 }
 
 
