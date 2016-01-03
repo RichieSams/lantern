@@ -84,7 +84,25 @@ void Renderer::Start() {
 
 	for (uint y = 0; y < height; ++y) {
 		for (uint x = 0; x < width; ++x) {
-			float3 color = float3(1.0f, 0.0f, 0.0f);
+			float3 color;
+			if (y >= 0 && y < 100) {
+				color = float3(1.0f, 0.0f, 0.0f);
+			} else if (y >= 100 && y < 200) {
+				color = float3(1.0f, 1.0f, 0.0f);
+			} else if (y >= 200 && y < 300) {
+				color = float3(0.0f, 1.0f, 0.0f);
+			} else if (y >= 300 && y < 400) {
+				color = float3(1.0f, 1.0f, 1.0f);
+			} else if (y >= 400 && y < 500) {
+				color = float3(1.0f, 0.0f, 1.0f);
+			} else if (y >= 500 && y < 600) {
+				color = float3(0.0f, 0.0f, 0.0f);
+			} else if (y >= 600 && y < 700) {
+				color = float3(0.0f, 0.0f, 1.0f);
+			} else {
+				color = float3(0.5f, 1.0f, 0.5f);
+			}
+
 			m_globalArgs->FrameBuffer->SplatPixel(x, y, color);
 		}
 	}
