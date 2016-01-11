@@ -6,9 +6,9 @@
 
 #pragma once
 
-#include "common/typedefs.h"
-
 #include "math/vector_types.h"
+
+#include <imgui_impl.h>
 
 
 struct GLFWwindow;
@@ -30,6 +30,8 @@ private:
 
 	int m_clientWidth;
 	int m_clientHeight;
+
+	ImGui::ImGuiImpl m_imGuiImpl;
 
 public:
 	void Run();

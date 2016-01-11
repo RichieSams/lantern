@@ -13,7 +13,7 @@
 #include <GLFW/glfw3.h>
 
 #include <imgui.h>
-#include <imgui_impl_glfw.h>
+#include <imgui_impl.h>
 
 #include <cstdio>
 #include <cstdlib>
@@ -40,7 +40,7 @@ void Visualizer::Run() {
 	glfwSwapInterval(1);
 	while (!glfwWindowShouldClose(m_window)) {
 		glfwWaitEvents();
-		ImGui_ImplGlfw_NewFrame();
+		m_imGuiImpl.NewFrame();
 
 		if (m_globalArgs->RenderChanged.load()) {
 			CopyFrameBufferToGPU();
@@ -80,14 +80,15 @@ void Visualizer::Init() {
 	}
 
 	glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
-	m_window = glfwCreateWindow(m_globalArgs->FrameBuffer->Width(), m_globalArgs->FrameBuffer->Height(), "Lantern", nullptr, nullptr);
+	GLFWwindow *window = glfwCreateWindow(m_globalArgs->FrameBuffer->Width(), m_globalArgs->FrameBuffer->Height(), "Lantern", nullptr, nullptr);
+	m_window = window;
 
 	// Setup ImGui binding
-	ImGui_ImplGlfw_Init(m_window, true);
+	m_imGuiImpl.InitImpl(window);
 
-	glfwMakeContextCurrent(m_window);
+	glfwMakeContextCurrent(window);
 
-	glfwGetFramebufferSize(m_window, &m_clientWidth, &m_clientHeight);
+	glfwGetFramebufferSize(window, &m_clientWidth, &m_clientHeight);
 	glViewport(0, 0, m_clientWidth, m_clientHeight);
 
 	// Create a texture 
@@ -107,7 +108,7 @@ void Visualizer::Shutdown() {
 	glfwDestroyWindow(m_window);
 
 	// Cleanup
-	ImGui_ImplGlfw_Shutdown();
+	m_imGuiImpl.ShutdownImpl();
 	glfwTerminate();
 }
 
