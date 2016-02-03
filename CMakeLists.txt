@@ -65,6 +65,7 @@ set(SRC_SCENE
    source/scene/mesh_elements.h
    source/scene/camera.h
    source/scene/camera.cpp
+   source/scene/ray.h
 )
 source_group("Scene" FILES ${SRC_SCENE})
 
