@@ -49,6 +49,8 @@ set(SRC_COMMON
 source_group("Common" FILES ${SRC_COMMON})
 
 set(SRC_GRAPHICS
+   source/graphics/frame_buffer.h
+   source/graphics/frame_buffer.cpp
    source/graphics/atomic_frame_buffer.h
    source/graphics/atomic_frame_buffer.cpp
 )
