@@ -63,6 +63,8 @@ source_group("Math" FILES ${SRC_MATH})
 
 set(SRC_SCENE
    source/scene/mesh_elements.h
+   source/scene/camera.h
+   source/scene/camera.cpp
 )
 source_group("Scene" FILES ${SRC_SCENE})
 
