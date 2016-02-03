@@ -15,21 +15,18 @@ struct GLFWwindow;
 
 namespace Lantern {
 
-struct GlobalArgs;
+class Renderer;
 
 class Visualizer {
 public:
-	Visualizer(GlobalArgs *globalArgs);
+	Visualizer(Renderer *renderer);
 	~Visualizer();
 
 private:
-	GlobalArgs *m_globalArgs;
+	Renderer *m_renderer;
 	float3 *m_tempFrameBuffer;
 
 	GLFWwindow *m_window;
-
-	int m_clientWidth;
-	int m_clientHeight;
 
 	ImGui::ImGuiImpl m_imGuiImpl;
 

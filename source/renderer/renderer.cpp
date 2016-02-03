@@ -6,17 +6,15 @@
 
 #include "renderer/renderer.h"
 
-#include "common/global_args.h"
-
 #include "scene/mesh_elements.h"
-
-#include "graphics/atomic_frame_buffer.h"
+#include "scene/ray.h"
 
 
 namespace Lantern {
 
-Renderer::Renderer(GlobalArgs *globalArgs)
-	: m_globalArgs(globalArgs),
+Renderer::Renderer(uint frameWidth, uint frameHeight)
+	: m_frameBuffer(frameWidth, frameHeight),
+	  m_camera(frameWidth, frameHeight),
 	  m_device(rtcNewDevice(nullptr)),
 	  m_scene(nullptr) {
 }
@@ -78,36 +76,44 @@ void Renderer::SetScene() {
 	rtcCommit(m_scene);
 }
 
-void Renderer::Start() {
-	uint width = m_globalArgs->FrameBuffer->Width();
-	uint height = m_globalArgs->FrameBuffer->Height();
+void Renderer::RenderFrame() {
+	uint width = m_frameBuffer.Width;
+	uint height = m_frameBuffer.Height;
 
 	for (uint y = 0; y < height; ++y) {
 		for (uint x = 0; x < width; ++x) {
-			float3 color;
-			if (y >= 0 && y < 100) {
-				color = float3(1.0f, 0.0f, 0.0f);
-			} else if (y >= 100 && y < 200) {
-				color = float3(1.0f, 1.0f, 0.0f);
-			} else if (y >= 200 && y < 300) {
-				color = float3(0.0f, 1.0f, 0.0f);
-			} else if (y >= 300 && y < 400) {
-				color = float3(1.0f, 1.0f, 1.0f);
-			} else if (y >= 400 && y < 500) {
-				color = float3(1.0f, 0.0f, 1.0f);
-			} else if (y >= 500 && y < 600) {
-				color = float3(0.0f, 0.0f, 0.0f);
-			} else if (y >= 600 && y < 700) {
-				color = float3(0.0f, 0.0f, 1.0f);
-			} else {
-				color = float3(0.5f, 1.0f, 0.5f);
+			RTCRay ray = m_camera.CalculateRayFromPixel(x, y);
+			
+			rtcIntersect(m_scene, ray);
+
+			float3a color(0.0f);
+			if (ray.geomID != RTC_INVALID_GEOMETRY_ID) {
+				float3a lightDir = normalize(float3a(-1, -1, -1));
+
+				/* initialize shadow ray */
+				RTCRay shadow;
+				shadow.org = ray.org + ray.tfar * ray.dir;
+				shadow.dir = -lightDir;
+				shadow.tnear = 0.001f;
+				shadow.tfar = embree::inf;
+				shadow.geomID = RTC_INVALID_GEOMETRY_ID;
+				shadow.primID = RTC_INVALID_GEOMETRY_ID;
+				shadow.instID = RTC_INVALID_GEOMETRY_ID;
+				shadow.mask = 0xFFFFFFFF;
+				shadow.time = 0.0f;
+
+				/* trace shadow ray */
+				rtcOccluded(m_scene, shadow);
+
+				/* add light contribution */
+				if (shadow.geomID != 0) {
+					color = float3a(1.0f) * embree::clamp(-dot(lightDir, normalize(ray.Ng)), 0.0f, 1.0f);
+				}
 			}
 
-			m_globalArgs->FrameBuffer->SplatPixel(x, y, color);
+			m_frameBuffer.SplatPixel(x, y, color);
 		}
 	}
-
-	m_globalArgs->RenderChanged.store(true);
 }
 
 } // End of namespace Lantern

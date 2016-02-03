@@ -6,9 +6,7 @@
 
 #include "visualizer/visualizer.h"
 
-#include "common/global_args.h"
-
-#include "graphics/atomic_frame_buffer.h"
+#include "renderer/renderer.h"
 
 #include <GLFW/glfw3.h>
 
@@ -17,13 +15,16 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <chrono>
+#include <random>
 
 
 namespace Lantern {
 
-Visualizer::Visualizer(GlobalArgs *globalArgs)
-		: m_globalArgs(globalArgs) {
-	m_tempFrameBuffer = new float3[globalArgs->FrameBuffer->Width() * globalArgs->FrameBuffer->Height()];
+Visualizer::Visualizer(Renderer *renderer)
+		: m_renderer(renderer),
+		  m_window(nullptr) {
+	m_tempFrameBuffer = new float3[renderer->GetFrameBuffer()->Width * renderer->GetFrameBuffer()->Height];
 }
 
 Visualizer::~Visualizer() {
@@ -37,14 +38,20 @@ static void error_callback(int error, const char *description) {
 void Visualizer::Run() {
 	Init();
 
+	auto lastRender = std::chrono::high_resolution_clock::now();
+	
 	glfwSwapInterval(1);
 	while (!glfwWindowShouldClose(m_window)) {
-		glfwWaitEvents();
+		glfwPollEvents();
 		m_imGuiImpl.NewFrame();
 
-		if (m_globalArgs->RenderChanged.load()) {
+		m_renderer->RenderFrame();
+
+		auto currentTime = std::chrono::high_resolution_clock::now();
+		int delta = std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - lastRender).count();
+		if (delta >= 500) {
 			CopyFrameBufferToGPU();
-			m_globalArgs->RenderChanged.store(false);
+			lastRender = std::chrono::high_resolution_clock::now();
 		}
 
 		// Render scene
@@ -79,8 +86,11 @@ void Visualizer::Init() {
 		exit(EXIT_FAILURE);
 	}
 
+	int width = m_renderer->GetFrameBuffer()->Width;
+	int height = m_renderer->GetFrameBuffer()->Height;
+
 	glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
-	GLFWwindow *window = glfwCreateWindow(m_globalArgs->FrameBuffer->Width(), m_globalArgs->FrameBuffer->Height(), "Lantern", nullptr, nullptr);
+	GLFWwindow *window = glfwCreateWindow(width, height, "Lantern", nullptr, nullptr);
 	m_window = window;
 
 	// Setup ImGui binding
@@ -88,11 +98,11 @@ void Visualizer::Init() {
 
 	glfwMakeContextCurrent(window);
 
-	glfwGetFramebufferSize(window, &m_clientWidth, &m_clientHeight);
-	glViewport(0, 0, m_clientWidth, m_clientHeight);
+	glfwGetFramebufferSize(window, &width, &height);
+	glViewport(0, 0, width, height);
 
 	// Create a texture 
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, m_clientWidth, m_clientHeight, 0, GL_RGB, GL_FLOAT, m_tempFrameBuffer);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_FLOAT, m_tempFrameBuffer);
 
 	// Set up the texture
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -114,17 +124,13 @@ void Visualizer::Shutdown() {
 
 
 void Visualizer::CopyFrameBufferToGPU() {
-	uint width = m_globalArgs->FrameBuffer->Width();
-	uint height = m_globalArgs->FrameBuffer->Height();
+	FrameBuffer *frameBuffer = m_renderer->GetFrameBuffer();
 
-	for (uint y = 0; y < height; ++y) {
-		for (uint x = 0; x < width; ++x) {
-			m_globalArgs->FrameBuffer->GetPixel(x, y, m_tempFrameBuffer[y * width + x]);
-		}
-	}
+	uint width = frameBuffer->Width;
+	uint height = frameBuffer->Height;
 
 	// Update Texture
-	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, m_clientWidth, m_clientHeight, GL_RGB, GL_FLOAT, m_tempFrameBuffer);
+	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, GL_RGB, GL_FLOAT, frameBuffer->GetColorData());
 }
 
 

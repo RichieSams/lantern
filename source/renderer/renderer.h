@@ -6,6 +6,10 @@
 
 #pragma once
 
+#include "graphics/frame_buffer.h"
+
+#include "scene/camera.h"
+
 #include <embree2/rtcore.h>
 
 
@@ -14,18 +18,20 @@ struct GlobalArgs;
 
 class Renderer {
 public:
-	Renderer(GlobalArgs *globalArgs);
+	Renderer(uint frameWidth, uint frameHeight);
 	~Renderer();
 
 private:
-	GlobalArgs *m_globalArgs;
+	FrameBuffer m_frameBuffer;
+	Camera m_camera;
 
 	RTCDevice m_device;
 	RTCScene m_scene;
 
 public:
 	void SetScene();
-	void Start();
+	void RenderFrame();
+	FrameBuffer *GetFrameBuffer() { return &m_frameBuffer; }
 
 };
 
