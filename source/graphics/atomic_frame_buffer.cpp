@@ -10,13 +10,13 @@
 namespace Lantern {
 
 AtomicFrameBuffer::AtomicFrameBuffer(uint width, uint height)
-		: m_width(width),
-		  m_height(height) {
-	m_data = new float3a[width * height * 3];
+		: Width(width),
+		  Height(height) {
+	m_colorData = new float3Atomic[width * height];
 }
 
 AtomicFrameBuffer::~AtomicFrameBuffer() {
-	delete[] m_data;
+	delete[] m_colorData;
 }
 
 } // End of namespace Lantern

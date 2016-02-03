@@ -13,6 +13,7 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake")
 
 # Add necessary dependencies
 find_package(OpenGL REQUIRED)
+
 find_package(TBB REQUIRED)
 include_directories(${TBB_INCLUDE_DIRS})
 
@@ -32,6 +33,7 @@ SET(ENABLE_ISPC_SUPPORT OFF CACHE BOOL "No ISPC support needed atm" )
 SET(ENABLE_TUTORIALS OFF CACHE BOOL "Only build lib" )
 add_subdirectory(libs/embree)
 include_directories(libs/embree/include)
+include_directories(libs/embree/common)
 
 
 # Source files
@@ -90,4 +92,4 @@ include_directories("source")
 
 # Create exe
 add_executable(lantern ${LANTERN_SRC})
-target_link_libraries(lantern embree glfw ${GLFW_LIBRARIES} imgui ${TBB_LIBRARIES})
+target_link_libraries(lantern embree glfw ${GLFW_LIBRARIES} imgui ${TBB_LIBRARIES} ${ILMBASE_LIBRARIES})

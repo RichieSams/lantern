@@ -19,33 +19,32 @@ public:
 	AtomicFrameBuffer(uint width, uint height);
 	~AtomicFrameBuffer();
 
+public:
+	uint Width;
+	uint Height;
+
 private:
-	typedef Vec3<std::atomic<float> > float3a;
+	typedef embree::Vec3<std::atomic<float> > float3Atomic;
 	static_assert(sizeof(std::atomic<float>) == 4, "std::atomic<float> is not a simple type! This will break a lot of things");
 
-	float3a *m_data;
-
-	uint m_width;
-	uint m_height;
+	float3Atomic *m_colorData;
+	float *m_weights;
 
 public:
-	uint Width() const { return m_width; }
-	uint Height() const { return m_height; }
+	void SplatPixel(uint x, uint y, float3a &color) {
+		uint index = y * Width + x;
 
-	void SplatPixel(uint x, uint y, float3 &color) {
-		uint index = y * m_width + x;
-
-		m_data[index].X.store(color.X);
-		m_data[index].Y.store(color.Y);
-		m_data[index].Z.store(color.Z);
+		m_colorData[index].x.store(color.x);
+		m_colorData[index].y.store(color.y);
+		m_colorData[index].z.store(color.z);
 	}
 
 	void GetPixel(uint x, uint y, float3 &pixel) const {
-		uint index = y * m_width + x;
+		uint index = y * Width + x;
 
-		pixel.X = m_data[index].X.load();
-		pixel.Y = m_data[index].Y.load();
-		pixel.Z = m_data[index].Z.load();
+		pixel.x = m_colorData[index].x.load();
+		pixel.y = m_colorData[index].y.load();
+		pixel.z = m_colorData[index].z.load();
 	}
 };
 
