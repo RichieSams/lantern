@@ -33,14 +33,14 @@ void Renderer::SetScene() {
 	uint id = rtcNewTriangleMesh(m_scene, RTC_GEOMETRY_STATIC, 12, 8);
 
 	Vertex *vertices = (Vertex *)rtcMapBuffer(m_scene, id, RTC_VERTEX_BUFFER);
-	vertices[0].X = -1; vertices[0].Y = -1; vertices[0].Z = -1;
-	vertices[1].X = -1; vertices[1].Y = -1; vertices[1].Z = +1;
-	vertices[2].X = -1; vertices[2].Y = +1; vertices[2].Z = -1;
-	vertices[3].X = -1; vertices[3].Y = +1; vertices[3].Z = +1;
-	vertices[4].X = +1; vertices[4].Y = -1; vertices[4].Z = -1;
-	vertices[5].X = +1; vertices[5].Y = -1; vertices[5].Z = +1;
-	vertices[6].X = +1; vertices[6].Y = +1; vertices[6].Z = -1;
-	vertices[7].X = +1; vertices[7].Y = +1; vertices[7].Z = +1;
+	vertices[0].x = -1; vertices[0].y = -1; vertices[0].z = -1;
+	vertices[1].x = -1; vertices[1].y = -1; vertices[1].z = +1;
+	vertices[2].x = -1; vertices[2].y = +1; vertices[2].z = -1;
+	vertices[3].x = -1; vertices[3].y = +1; vertices[3].z = +1;
+	vertices[4].x = +1; vertices[4].y = -1; vertices[4].z = -1;
+	vertices[5].x = +1; vertices[5].y = -1; vertices[5].z = +1;
+	vertices[6].x = +1; vertices[6].y = +1; vertices[6].z = -1;
+	vertices[7].x = +1; vertices[7].y = +1; vertices[7].z = +1;
 	rtcUnmapBuffer(m_scene, id, RTC_VERTEX_BUFFER);
 
 
