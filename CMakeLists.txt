@@ -64,9 +64,9 @@ set(SRC_MATH
 source_group("Math" FILES ${SRC_MATH})
 
 set(SRC_SCENE
+   source/scene/thin_lens_camera.h
+   source/scene/thin_lens_camera.cpp
    source/scene/mesh_elements.h
-   source/scene/camera.h
-   source/scene/camera.cpp
    source/scene/ray.h
 )
 source_group("Scene" FILES ${SRC_SCENE})
