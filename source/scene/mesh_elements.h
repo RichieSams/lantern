@@ -8,6 +8,8 @@
 
 #include "math/vector_types.h"
 
+#include <vector>
+
 
 namespace Lantern {
 
@@ -15,6 +17,11 @@ typedef float4 Vertex;
 
 struct Triangle {
 	int V0, V1, V2;
+};
+
+struct Mesh {
+	std::vector<Vertex> Vertices;
+	std::vector<Triangle> Triangles;
 };
 
 } // End of namespace Lantern
