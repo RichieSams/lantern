@@ -8,6 +8,8 @@
 
 #include "renderer/renderer.h"
 
+#include "scene/scene.h"
+
 #include <GLFW/glfw3.h>
 
 #include <imgui.h>
@@ -21,10 +23,17 @@
 
 namespace Lantern {
 
-Visualizer::Visualizer(Renderer *renderer)
+// Needed for message pump callbacks
+Visualizer *g_visualizer;
+
+Visualizer::Visualizer(Renderer *renderer, Scene *scene)
 		: m_renderer(renderer),
-		  m_window(nullptr) {
-	m_tempFrameBuffer = new float3[renderer->GetFrameBuffer()->Width * renderer->GetFrameBuffer()->Height];
+		  m_scene(scene),
+		  m_window(nullptr),
+		  m_leftMouseCaptured(false),
+		  m_middleMouseCaptured(false) {
+	m_tempFrameBuffer = new float3[scene->Camera.FrameBuffer.Width * scene->Camera.FrameBuffer.Height];
+	g_visualizer = this;
 }
 
 Visualizer::~Visualizer() {
@@ -39,8 +48,8 @@ void Visualizer::Run() {
 	Init();
 
 	auto lastRender = std::chrono::high_resolution_clock::now();
-	
-	glfwSwapInterval(1);
+
+	glfwSwapInterval(0);
 	while (!glfwWindowShouldClose(m_window)) {
 		glfwPollEvents();
 		m_imGuiImpl.NewFrame();
@@ -49,24 +58,30 @@ void Visualizer::Run() {
 
 		auto currentTime = std::chrono::high_resolution_clock::now();
 		int delta = std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - lastRender).count();
-		if (delta >= 500) {
+
+		ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiSetCond_FirstUseEver);
+		ImGui::Begin("Frame Stats", nullptr, ImVec2(0, 0), -1.0f, ImGuiWindowFlags_AlwaysAutoResize);
+		ImGui::Text("%d ms/frame (%.1f FPS)", delta, 1.0f / delta * 1000.0f);
+		ImGui::End();
+
+		if (delta >= 0) {
 			CopyFrameBufferToGPU();
 			lastRender = std::chrono::high_resolution_clock::now();
 		}
 
 		// Render scene
 		glBegin(GL_QUADS);
-			glTexCoord2d(0.0, 1.0);
-			glVertex2d(-1.0, -1.0);
+		glTexCoord2d(0.0, 1.0);
+		glVertex2d(-1.0, -1.0);
 
-			glTexCoord2d(1.0, 1.0);
-			glVertex2d(1.0, -1.0);
+		glTexCoord2d(1.0, 1.0);
+		glVertex2d(1.0, -1.0);
 
-			glTexCoord2d(1.0, 0.0);
-			glVertex2d(1.0, 1.0);
+		glTexCoord2d(1.0, 0.0);
+		glVertex2d(1.0, 1.0);
 
-			glTexCoord2d(0.0, 0.0);
-			glVertex2d(-1.0, 1.0);
+		glTexCoord2d(0.0, 0.0);
+		glVertex2d(-1.0, 1.0);
 		glEnd();
 
 		// Render UI
@@ -78,6 +93,54 @@ void Visualizer::Run() {
 	Shutdown();
 }
 
+void Visualizer::MouseButtonCallback(GLFWwindow *window, int button, int action, int mods) {
+	if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS && mods == GLFW_MOD_ALT) {
+		glfwGetCursorPos(window, &g_visualizer->m_lastMousePosX, &g_visualizer->m_lastMousePosY);
+		g_visualizer->m_leftMouseCaptured = true;
+	} else if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE && mods == GLFW_MOD_ALT) {
+		g_visualizer->m_leftMouseCaptured = false;
+	} else if (button == GLFW_MOUSE_BUTTON_MIDDLE && action == GLFW_PRESS && mods == GLFW_MOD_ALT) {
+		glfwGetCursorPos(window, &g_visualizer->m_lastMousePosX, &g_visualizer->m_lastMousePosY);
+		g_visualizer->m_middleMouseCaptured = true;
+	} else if (button == GLFW_MOUSE_BUTTON_MIDDLE && action == GLFW_RELEASE && mods == GLFW_MOD_ALT) {
+		g_visualizer->m_middleMouseCaptured = false;
+	}
+
+	g_visualizer->m_imGuiImpl.MouseButtonCallback(window, button, action, mods);
+}
+
+void Visualizer::CursorPosCallback(GLFWwindow *window, double xpos, double ypos) {
+	if (g_visualizer->m_leftMouseCaptured) {
+		double oldX = g_visualizer->m_lastMousePosX;
+		double oldY = g_visualizer->m_lastMousePosY;
+		glfwGetCursorPos(window, &g_visualizer->m_lastMousePosX, &g_visualizer->m_lastMousePosY);
+
+		g_visualizer->m_scene->Camera.Rotate((float)(oldY - g_visualizer->m_lastMousePosY) / 300,
+		                                     (float)(oldX - g_visualizer->m_lastMousePosX) / 300);
+	} else if (g_visualizer->m_middleMouseCaptured) {
+		double oldX = g_visualizer->m_lastMousePosX;
+		double oldY = g_visualizer->m_lastMousePosY;
+		glfwGetCursorPos(window, &g_visualizer->m_lastMousePosX, &g_visualizer->m_lastMousePosY);
+
+		g_visualizer->m_scene->Camera.Pan((float)(g_visualizer->m_lastMousePosX - oldX) * 0.01,
+		                                  (float)(g_visualizer->m_lastMousePosY - oldY) * 0.01);
+	}
+}
+
+void Visualizer::ScrollCallback(GLFWwindow *window, double xoffset, double yoffset) {
+	g_visualizer->m_scene->Camera.Zoom(yoffset);
+
+	g_visualizer->m_imGuiImpl.ScrollCallback(window, xoffset, yoffset);
+}
+
+void Visualizer::KeyCallback(GLFWwindow *window, int key, int scancode, int action, int mods) {
+	g_visualizer->m_imGuiImpl.KeyCallback(window, key, scancode, action, mods);
+}
+
+void Visualizer::CharCallback(GLFWwindow *window, uint c) {
+	g_visualizer->m_imGuiImpl.CharCallback(window, c);
+}
+
 void Visualizer::Init() {
 	// Setup window
 	glfwSetErrorCallback(error_callback);
@@ -86,8 +149,8 @@ void Visualizer::Init() {
 		exit(EXIT_FAILURE);
 	}
 
-	int width = m_renderer->GetFrameBuffer()->Width;
-	int height = m_renderer->GetFrameBuffer()->Height;
+	int width = m_scene->Camera.FrameBuffer.Width;
+	int height = m_scene->Camera.FrameBuffer.Height;
 
 	glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
 	GLFWwindow *window = glfwCreateWindow(width, height, "Lantern", nullptr, nullptr);
@@ -96,15 +159,20 @@ void Visualizer::Init() {
 	// Setup ImGui binding
 	m_imGuiImpl.InitImpl(window);
 
-	glfwMakeContextCurrent(window);
+	// Bind callbacks
+	glfwSetMouseButtonCallback(window, MouseButtonCallback);
+	glfwSetCursorPosCallback(window, CursorPosCallback);
+	glfwSetScrollCallback(window, ScrollCallback);
+	glfwSetKeyCallback(window, KeyCallback);
+	glfwSetCharCallback(window, CharCallback);
 
+	// Set up the framebuffer
+	glfwMakeContextCurrent(window);
 	glfwGetFramebufferSize(window, &width, &height);
 	glViewport(0, 0, width, height);
 
-	// Create a texture 
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_FLOAT, m_tempFrameBuffer);
-
-	// Set up the texture
+	// Create a texture
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_FLOAT, nullptr);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
@@ -124,7 +192,7 @@ void Visualizer::Shutdown() {
 
 
 void Visualizer::CopyFrameBufferToGPU() {
-	FrameBuffer *frameBuffer = m_renderer->GetFrameBuffer();
+	FrameBuffer *frameBuffer = &m_scene->Camera.FrameBuffer;
 
 	uint width = frameBuffer->Width;
 	uint height = frameBuffer->Height;

@@ -6,32 +6,33 @@
 
 #pragma once
 
-#include "graphics/frame_buffer.h"
-
-#include "scene/camera.h"
-
-#include <embree2/rtcore.h>
+#include "common/typedefs.h"
 
 
 namespace Lantern {
-struct GlobalArgs;
+
+class UniformSampler;
+class Scene;
 
 class Renderer {
 public:
-	Renderer(uint frameWidth, uint frameHeight);
-	~Renderer();
+	Renderer(Scene *scene)
+		: m_scene(scene),
+		  m_frameNumber(0u) {
+	};
 
 private:
-	FrameBuffer m_frameBuffer;
-	Camera m_camera;
+	static const uint kTileSize = 8;
 
-	RTCDevice m_device;
-	RTCScene m_scene;
+	Scene *m_scene;
+	uint m_frameNumber;
 
 public:
-	void SetScene();
 	void RenderFrame();
-	FrameBuffer *GetFrameBuffer() { return &m_frameBuffer; }
+
+private:
+	void RenderTile(uint index, uint width, uint height, uint numTilesX, uint numTilesY);
+	void RenderPixel(uint x, uint y, UniformSampler *sampler);
 
 };
 
