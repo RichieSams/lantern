@@ -59,6 +59,7 @@ set(SRC_GRAPHICS
 source_group("Graphics" FILES ${SRC_GRAPHICS})
 
 set(SRC_MATH
+   source/math/uniform_sampler.h
    source/math/vector_types.h
 )
 source_group("Math" FILES ${SRC_MATH})
