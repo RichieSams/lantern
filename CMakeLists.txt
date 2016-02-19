@@ -72,6 +72,8 @@ set(SRC_SCENE
    source/scene/lambert_material.h
    source/scene/mesh_elements.h
    source/scene/ray.h
+   source/scene/scene.h
+   source/scene/scene.cpp
 )
 source_group("Scene" FILES ${SRC_SCENE})
 
