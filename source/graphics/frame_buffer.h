@@ -27,20 +27,16 @@ private:
 	float *m_weights;
 
 public:
-	void SplatPixel(uint x, uint y, float3a &color) {
+	void SplatPixel(uint x, uint y, float3 &color) {
 		uint index = y * Width + x;
 
-		m_colorData[index].x = color.x;
-		m_colorData[index].y = color.y;
-		m_colorData[index].z = color.z;
+		m_colorData[index] = color;
 	}
 
 	void GetPixel(uint x, uint y, float3 &pixel) const {
 		uint index = y * Width + x;
 
-		pixel.x = m_colorData[index].x;
-		pixel.y = m_colorData[index].y;
-		pixel.z = m_colorData[index].z;
+		pixel = m_colorData[index];
 	}
 
 	float3 *GetColorData() { return m_colorData; }
