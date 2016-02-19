@@ -29,6 +29,9 @@ include_directories(libs/glfw/include)
 add_subdirectory(libs/imgui)
 include_directories(libs/imgui/include)
 
+add_subdirectory(libs/par)
+include_directories(libs/par/include)
+
 SET(ENABLE_ISPC_SUPPORT OFF CACHE BOOL "No ISPC support needed atm" )
 SET(ENABLE_TUTORIALS OFF CACHE BOOL "Only build lib" )
 add_subdirectory(libs/embree)
@@ -96,4 +99,4 @@ include_directories("source")
 
 # Create exe
 add_executable(lantern ${LANTERN_SRC})
-target_link_libraries(lantern embree glfw ${GLFW_LIBRARIES} imgui ${TBB_LIBRARIES} ${ILMBASE_LIBRARIES})
+target_link_libraries(lantern embree glfw ${GLFW_LIBRARIES} par imgui ${TBB_LIBRARIES})
