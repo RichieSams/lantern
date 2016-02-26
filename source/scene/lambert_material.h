@@ -61,7 +61,7 @@ public:
 		}
 
 		// Use majorAxis to create a coordinate system relative to world space
-		float3 u = normalize(cross(majorAxis, normal));
+		float3 u = normalize(cross(normal, majorAxis));
 		float3 v = cross(normal, u);
 		float3 w = normal;
 
@@ -69,7 +69,7 @@ public:
 		// Transform from local coordinates to world coordinates
 		float3 direction =  normalize(u * x +
 		                              v * y +
-		                              w * std::sqrtf(std::fmaxf(0.0f, 1.0f - rand)));
+		                              w * std::sqrtf(1.0f - x * x - y * y));
 
 		*pdf = dot(direction, normal) * M_1_PI;
 		return direction;
