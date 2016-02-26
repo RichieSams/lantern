@@ -117,6 +117,8 @@ void Visualizer::CursorPosCallback(GLFWwindow *window, double xpos, double ypos)
 
 		g_visualizer->m_scene->Camera.Rotate((float)(oldY - g_visualizer->m_lastMousePosY) / 300,
 		                                     (float)(oldX - g_visualizer->m_lastMousePosX) / 300);
+
+		g_visualizer->m_scene->Camera.FrameBuffer.Reset();
 	} else if (g_visualizer->m_middleMouseCaptured) {
 		double oldX = g_visualizer->m_lastMousePosX;
 		double oldY = g_visualizer->m_lastMousePosY;
@@ -124,11 +126,14 @@ void Visualizer::CursorPosCallback(GLFWwindow *window, double xpos, double ypos)
 
 		g_visualizer->m_scene->Camera.Pan((float)(g_visualizer->m_lastMousePosX - oldX) * 0.01,
 		                                  (float)(g_visualizer->m_lastMousePosY - oldY) * 0.01);
+
+		g_visualizer->m_scene->Camera.FrameBuffer.Reset();
 	}
 }
 
 void Visualizer::ScrollCallback(GLFWwindow *window, double xoffset, double yoffset) {
 	g_visualizer->m_scene->Camera.Zoom(yoffset);
+	g_visualizer->m_scene->Camera.FrameBuffer.Reset();
 
 	g_visualizer->m_imGuiImpl.ScrollCallback(window, xoffset, yoffset);
 }
@@ -197,8 +202,15 @@ void Visualizer::CopyFrameBufferToGPU() {
 	uint width = frameBuffer->Width;
 	uint height = frameBuffer->Height;
 
+	float3 *colorData = frameBuffer->GetColorData();
+	float *weights = frameBuffer->GetWeights();
+
+	for (uint i = 0; i < width * height; ++i) {
+		m_tempFrameBuffer[i] = colorData[i] / weights[i];
+	}
+
 	// Update Texture
-	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, GL_RGB, GL_FLOAT, frameBuffer->GetColorData());
+	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, GL_RGB, GL_FLOAT, m_tempFrameBuffer);
 }
 
 

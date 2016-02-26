@@ -10,13 +10,15 @@
 namespace Lantern {
 
 FrameBuffer::FrameBuffer(uint width, uint height)
-	: Width(width),
-	Height(height) {
+		: Width(width),
+		  Height(height) {
 	m_colorData = new float3[width * height];
+	m_weights = new float[width * height];
 }
 
 FrameBuffer::~FrameBuffer() {
 	delete[] m_colorData;
+	delete[] m_weights;
 }
 
 } // End of namespace Lantern
