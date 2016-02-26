@@ -74,10 +74,10 @@ void Renderer::RenderTile(uint index, uint width, uint height, uint numTilesX, u
 
 	uint hash = 0u;
 	hash = HashMix(hash, index);
-	HashMix(hash, m_frameNumber);
-	HashFinalize(hash);
+	hash = HashMix(hash, m_frameNumber);
+	hash = HashFinalize(hash);
 	
-	UniformSampler sampler(hash);
+	UniformSampler sampler(hash, m_frameNumber);
 
 	for (uint y = y0; y < y1; ++y) {
 		for (uint x = x0; x < x1; ++x) {
