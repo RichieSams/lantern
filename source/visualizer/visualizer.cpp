@@ -97,12 +97,12 @@ void Visualizer::MouseButtonCallback(GLFWwindow *window, int button, int action,
 	if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS && mods == GLFW_MOD_ALT) {
 		glfwGetCursorPos(window, &g_visualizer->m_lastMousePosX, &g_visualizer->m_lastMousePosY);
 		g_visualizer->m_leftMouseCaptured = true;
-	} else if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE && mods == GLFW_MOD_ALT) {
+	} else if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE) {
 		g_visualizer->m_leftMouseCaptured = false;
 	} else if (button == GLFW_MOUSE_BUTTON_MIDDLE && action == GLFW_PRESS && mods == GLFW_MOD_ALT) {
 		glfwGetCursorPos(window, &g_visualizer->m_lastMousePosX, &g_visualizer->m_lastMousePosY);
 		g_visualizer->m_middleMouseCaptured = true;
-	} else if (button == GLFW_MOUSE_BUTTON_MIDDLE && action == GLFW_RELEASE && mods == GLFW_MOD_ALT) {
+	} else if (button == GLFW_MOUSE_BUTTON_MIDDLE && action == GLFW_RELEASE) {
 		g_visualizer->m_middleMouseCaptured = false;
 	}
 
