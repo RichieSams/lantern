@@ -108,10 +108,11 @@ void Renderer::RenderPixel(uint x, uint y, UniformSampler *sampler) {
 			// Get the new ray direction
 			// Choose the direction based on the material
 			float pdf;
-			float3a wi = material->Sample(ray.Ng, sampler, &pdf);
+			float3a normal = normalize(ray.Ng);
+			float3a wi = material->Sample(normal, sampler, &pdf);
 
 			// Accumulate the diffuse/specular weight
-			weights = weights * material->Eval(wi, ray.dir, normalize(ray.Ng)) / pdf;
+			weights = weights * material->Eval(wi, normalize(ray.dir), normal) / pdf;
 
 			// Russian Roulette
 			if (bounces > 3) {
