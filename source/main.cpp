@@ -21,10 +21,17 @@ int main(int argc, const char *argv[]) {
 	_MM_SET_DENORMALS_ZERO_MODE(_MM_DENORMALS_ZERO_ON);
 
 	Lantern::Scene scene;
-	Lantern::Mesh mesh;
-	Lantern::CreateCube(1.0f, &mesh);
-	Lantern::LambertMaterial *material = new Lantern::LambertMaterial(float3(1.0f, 0.0f, 0.0f), float3(0.0f));
-	scene.AddMesh(&mesh, material);
+	Lantern::Mesh cube;
+	Lantern::CreateBox(4.0f, 4.0f, 4.0f, &cube);
+	Lantern::TranslateMesh(float3(0.0f, -2.0f, 0.0f), &cube);
+
+	Lantern::Mesh sphere;
+	Lantern::CreateGeosphere(1.0f, 3u, &sphere);
+	Lantern::TranslateMesh(float3(0.0f, 1.0f, 0.0f), &sphere);
+
+	Lantern::LambertMaterial *grayMaterial = new Lantern::LambertMaterial(float3(0.5f, 0.5f, 0.5f), float3(0.0f));
+	scene.AddMesh(&cube, grayMaterial);
+	scene.AddMesh(&sphere, grayMaterial);
 	scene.Commit();
 
 	Lantern::Renderer renderer(&scene);
@@ -37,4 +44,6 @@ int main(int argc, const char *argv[]) {
 	} else {
 		// renderer.Run();
 	}
+
+	delete grayMaterial;
 }

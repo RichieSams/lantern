@@ -24,15 +24,15 @@ Scene::~Scene() {
 }
 
 void Scene::AddMesh(Mesh *mesh, Material *material) {
-	uint meshId = rtcNewTriangleMesh(m_scene, RTC_GEOMETRY_STATIC, mesh->Triangles.size(), mesh->Vertices.size());
+	uint meshId = rtcNewTriangleMesh(m_scene, RTC_GEOMETRY_STATIC, mesh->Indices.size() / 3, mesh->Vertices.size());
 	m_meshes[meshId] = material;
 
 	Vertex *vertices = (Vertex *)rtcMapBuffer(m_scene, meshId, RTC_VERTEX_BUFFER);
 	memcpy(vertices, &mesh->Vertices[0], mesh->Vertices.size() * sizeof(Vertex));
 	rtcUnmapBuffer(m_scene, meshId, RTC_VERTEX_BUFFER);
 
-	Triangle* triangles = (Triangle*)rtcMapBuffer(m_scene, meshId, RTC_INDEX_BUFFER);
-	memcpy(triangles, &mesh->Triangles[0], mesh->Triangles.size() * sizeof(Triangle));
+	uint *indices = (uint *)rtcMapBuffer(m_scene, meshId, RTC_INDEX_BUFFER);
+	memcpy(indices, &mesh->Indices[0], mesh->Indices.size() * sizeof(int));
 	rtcUnmapBuffer(m_scene, meshId, RTC_INDEX_BUFFER);
 }
 

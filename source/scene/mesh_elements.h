@@ -15,13 +15,12 @@ namespace Lantern {
 
 typedef float4 Vertex;
 
-struct Triangle {
-	int V0, V1, V2;
-};
-
 struct Mesh {
 	std::vector<Vertex> Vertices;
-	std::vector<Triangle> Triangles;
+	std::vector<float3> Normals;
+	std::vector<float3> Tangents;
+	std::vector<float2> TexCoords;
+	std::vector<int> Indices;
 };
 
 } // End of namespace Lantern
