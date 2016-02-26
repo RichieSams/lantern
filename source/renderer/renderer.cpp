@@ -131,7 +131,7 @@ void Renderer::RenderPixel(uint x, uint y, UniformSampler *sampler) {
 
 			// Reset the other ray properties
 			ray.dir = wi;
-			ray.tnear = 0.0f;
+			ray.tnear = 0.001f;
 			ray.tfar = embree::inf;
 			ray.geomID = RTC_INVALID_GEOMETRY_ID;
 			ray.primID = RTC_INVALID_GEOMETRY_ID;
