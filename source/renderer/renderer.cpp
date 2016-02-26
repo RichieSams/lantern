@@ -93,12 +93,12 @@ void Renderer::RenderPixel(uint x, uint y, UniformSampler *sampler) {
 	float3 weights(1.0f);
 
 	// Bounce the ray around the scene
-	for (uint bounces = 0; bounces < 1; ++bounces) {
+	for (uint bounces = 0; bounces < 10; ++bounces) {
 		m_scene->Intersect(ray);
 
 		if (ray.geomID != RTC_INVALID_GEOMETRY_ID) {
 			// We hit an object
-
+			
 			// Fetch the material
 			Material *material = m_scene->GetMaterial(ray.geomID);
 
