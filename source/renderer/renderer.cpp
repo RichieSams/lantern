@@ -140,10 +140,13 @@ void Renderer::RenderPixel(uint x, uint y, UniformSampler *sampler) {
 			ray.time = 0.0f;
 
 		} else {
-			color = float3a(0.846f, 0.933f, 0.949f);
+			// We didn't hit anything, return the sky color
+			color += weights * float3(0.846f, 0.933f, 0.949f);
+
+			break;
 		}
 	}
-
+	
 	m_scene->Camera.FrameBuffer.SplatPixel(x, y, color);
 }
 
