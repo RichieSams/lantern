@@ -49,6 +49,7 @@ public:
 
 		float x = r * std::cosf(theta);
 		float y = r * std::sinf(theta);
+		float z = std::sqrtf(std::fmax(0.0f, 1.0f - rand));
 
 		// Find an axis that is not parallel to normal
 		float3 majorAxis;
@@ -69,7 +70,7 @@ public:
 		// Transform from local coordinates to world coordinates
 		float3 direction =  normalize(u * x +
 		                              v * y +
-		                              w * std::sqrtf(1.0f - x * x - y * y));
+		                              w * z);
 
 		*pdf = dot(direction, normal) * M_1_PI;
 		return direction;
