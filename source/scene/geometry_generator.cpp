@@ -20,110 +20,103 @@ namespace Lantern {
 
 void CreateBox(float width, float height, float depth, Mesh *mesh) {
 	// Create the vertex data
-	Vertex pos[24];
-	float3 normal[24];
-	float3 tangent[24];
-	float2 texCoord[24];
+	mesh->Vertices.resize(24);
+	mesh->Normals.resize(24);
+	mesh->Tangents.resize(24);
+	mesh->TexCoords.resize(24);
 
 	float w2 = 0.5f * width;
 	float h2 = 0.5f * height;
 	float d2 = 0.5f * depth;
 
 	// Fill in the front face vertex data.
-	pos[0] = Vertex(-w2, -h2, +d2, 1.0f); normal[0] = float3(0.0f, 0.0f, 1.0f); tangent[0] = float3(1.0f, 0.0f, 0.0f); texCoord[0] = float2(0.0f, 1.0f);
-	pos[1] = Vertex(-w2, +h2, +d2, 1.0f); normal[1] = float3(0.0f, 0.0f, 1.0f); tangent[1] = float3(1.0f, 0.0f, 0.0f); texCoord[1] = float2(0.0f, 0.0f);
-	pos[2] = Vertex(+w2, +h2, +d2, 1.0f); normal[2] = float3(0.0f, 0.0f, 1.0f); tangent[2] = float3(1.0f, 0.0f, 0.0f); texCoord[2] = float2(1.0f, 0.0f);
-	pos[3] = Vertex(+w2, -h2, +d2, 1.0f); normal[3] = float3(0.0f, 0.0f, 1.0f); tangent[3] = float3(1.0f, 0.0f, 0.0f); texCoord[3] = float2(1.0f, 1.0f);
+	mesh->Vertices[0] = Vertex(-w2, -h2, +d2, 1.0f); mesh->Normals[0] = float3(0.0f, 0.0f, 1.0f); mesh->Tangents[0] = float3(1.0f, 0.0f, 0.0f); mesh->TexCoords[0] = float2(0.0f, 1.0f);
+	mesh->Vertices[1] = Vertex(-w2, +h2, +d2, 1.0f); mesh->Normals[1] = float3(0.0f, 0.0f, 1.0f); mesh->Tangents[1] = float3(1.0f, 0.0f, 0.0f); mesh->TexCoords[1] = float2(0.0f, 0.0f);
+	mesh->Vertices[2] = Vertex(+w2, +h2, +d2, 1.0f); mesh->Normals[2] = float3(0.0f, 0.0f, 1.0f); mesh->Tangents[2] = float3(1.0f, 0.0f, 0.0f); mesh->TexCoords[2] = float2(1.0f, 0.0f);
+	mesh->Vertices[3] = Vertex(+w2, -h2, +d2, 1.0f); mesh->Normals[3] = float3(0.0f, 0.0f, 1.0f); mesh->Tangents[3] = float3(1.0f, 0.0f, 0.0f); mesh->TexCoords[3] = float2(1.0f, 1.0f);
 
 
 	// Fill in the back face vertex data.
-	pos[4] = Vertex(-w2, -h2, -d2, 1.0f); normal[4] = float3(0.0f, 0.0f, -1.0f); tangent[4] = float3(-1.0f, 0.0f, 0.0f); texCoord[4] = float2(1.0f, 1.0f);
-	pos[5] = Vertex(+w2, -h2, -d2, 1.0f); normal[5] = float3(0.0f, 0.0f, -1.0f); tangent[5] = float3(-1.0f, 0.0f, 0.0f); texCoord[5] = float2(0.0f, 1.0f);
-	pos[6] = Vertex(+w2, +h2, -d2, 1.0f); normal[6] = float3(0.0f, 0.0f, -1.0f); tangent[6] = float3(-1.0f, 0.0f, 0.0f); texCoord[6] = float2(0.0f, 0.0f);
-	pos[7] = Vertex(-w2, +h2, -d2, 1.0f); normal[7] = float3(0.0f, 0.0f, -1.0f); tangent[7] = float3(-1.0f, 0.0f, 0.0f); texCoord[7] = float2(1.0f, 0.0f);
+	mesh->Vertices[4] = Vertex(-w2, -h2, -d2, 1.0f); mesh->Normals[4] = float3(0.0f, 0.0f, -1.0f); mesh->Tangents[4] = float3(-1.0f, 0.0f, 0.0f); mesh->TexCoords[4] = float2(1.0f, 1.0f);
+	mesh->Vertices[5] = Vertex(+w2, -h2, -d2, 1.0f); mesh->Normals[5] = float3(0.0f, 0.0f, -1.0f); mesh->Tangents[5] = float3(-1.0f, 0.0f, 0.0f); mesh->TexCoords[5] = float2(0.0f, 1.0f);
+	mesh->Vertices[6] = Vertex(+w2, +h2, -d2, 1.0f); mesh->Normals[6] = float3(0.0f, 0.0f, -1.0f); mesh->Tangents[6] = float3(-1.0f, 0.0f, 0.0f); mesh->TexCoords[6] = float2(0.0f, 0.0f);
+	mesh->Vertices[7] = Vertex(-w2, +h2, -d2, 1.0f); mesh->Normals[7] = float3(0.0f, 0.0f, -1.0f); mesh->Tangents[7] = float3(-1.0f, 0.0f, 0.0f); mesh->TexCoords[7] = float2(1.0f, 0.0f);
 
 	// Fill in the top face vertex data.
-	pos[8] = Vertex(-w2, +h2, +d2, 1.0f); normal[8] = float3(0.0f, 1.0f, 0.0f); tangent[8] = float3(1.0f, 0.0f, 0.0f); texCoord[8] = float2(0.0f, 1.0f);
-	pos[9] = Vertex(-w2, +h2, -d2, 1.0f); normal[9] = float3(0.0f, 1.0f, 0.0f); tangent[9] = float3(1.0f, 0.0f, 0.0f); texCoord[9] = float2(0.0f, 0.0f);
-	pos[10] = Vertex(+w2, +h2, -d2, 1.0f); normal[10] = float3(0.0f, 1.0f, 0.0f); tangent[10] = float3(1.0f, 0.0f, 0.0f); texCoord[10] = float2(1.0f, 0.0f);
-	pos[11] = Vertex(+w2, +h2, +d2, 1.0f); normal[11] = float3(0.0f, 1.0f, 0.0f); tangent[11] = float3(1.0f, 0.0f, 0.0f); texCoord[11] = float2(1.0f, 1.0f);
+	mesh->Vertices[8] = Vertex(-w2, +h2, +d2, 1.0f); mesh->Normals[8] = float3(0.0f, 1.0f, 0.0f); mesh->Tangents[8] = float3(1.0f, 0.0f, 0.0f); mesh->TexCoords[8] = float2(0.0f, 1.0f);
+	mesh->Vertices[9] = Vertex(-w2, +h2, -d2, 1.0f); mesh->Normals[9] = float3(0.0f, 1.0f, 0.0f); mesh->Tangents[9] = float3(1.0f, 0.0f, 0.0f); mesh->TexCoords[9] = float2(0.0f, 0.0f);
+	mesh->Vertices[10] = Vertex(+w2, +h2, -d2, 1.0f); mesh->Normals[10] = float3(0.0f, 1.0f, 0.0f); mesh->Tangents[10] = float3(1.0f, 0.0f, 0.0f); mesh->TexCoords[10] = float2(1.0f, 0.0f);
+	mesh->Vertices[11] = Vertex(+w2, +h2, +d2, 1.0f); mesh->Normals[11] = float3(0.0f, 1.0f, 0.0f); mesh->Tangents[11] = float3(1.0f, 0.0f, 0.0f); mesh->TexCoords[11] = float2(1.0f, 1.0f);
 
 	// Fill in the bottom face vertex data.
-	pos[12] = Vertex(-w2, -h2, +d2, 1.0f); normal[12] = float3(0.0f, -1.0f, 0.0f); tangent[12] = float3(-1.0f, 0.0f, 0.0f); texCoord[12] = float2(1.0f, 1.0f);
-	pos[13] = Vertex(+w2, -h2, +d2, 1.0f); normal[13] = float3(0.0f, -1.0f, 0.0f); tangent[13] = float3(-1.0f, 0.0f, 0.0f); texCoord[13] = float2(0.0f, 1.0f);
-	pos[14] = Vertex(+w2, -h2, -d2, 1.0f); normal[14] = float3(0.0f, -1.0f, 0.0f); tangent[14] = float3(-1.0f, 0.0f, 0.0f); texCoord[14] = float2(0.0f, 0.0f);
-	pos[15] = Vertex(-w2, -h2, -d2, 1.0f); normal[15] = float3(0.0f, -1.0f, 0.0f); tangent[15] = float3(-1.0f, 0.0f, 0.0f); texCoord[15] = float2(1.0f, 0.0f);
+	mesh->Vertices[12] = Vertex(-w2, -h2, +d2, 1.0f); mesh->Normals[12] = float3(0.0f, -1.0f, 0.0f); mesh->Tangents[12] = float3(-1.0f, 0.0f, 0.0f); mesh->TexCoords[12] = float2(1.0f, 1.0f);
+	mesh->Vertices[13] = Vertex(+w2, -h2, +d2, 1.0f); mesh->Normals[13] = float3(0.0f, -1.0f, 0.0f); mesh->Tangents[13] = float3(-1.0f, 0.0f, 0.0f); mesh->TexCoords[13] = float2(0.0f, 1.0f);
+	mesh->Vertices[14] = Vertex(+w2, -h2, -d2, 1.0f); mesh->Normals[14] = float3(0.0f, -1.0f, 0.0f); mesh->Tangents[14] = float3(-1.0f, 0.0f, 0.0f); mesh->TexCoords[14] = float2(0.0f, 0.0f);
+	mesh->Vertices[15] = Vertex(-w2, -h2, -d2, 1.0f); mesh->Normals[15] = float3(0.0f, -1.0f, 0.0f); mesh->Tangents[15] = float3(-1.0f, 0.0f, 0.0f); mesh->TexCoords[15] = float2(1.0f, 0.0f);
 
 	// Fill in the left face vertex data.
-	pos[16] = Vertex(-w2, -h2, -d2, 1.0f); normal[16] = float3(-1.0f, 0.0f, 0.0f); tangent[16] = float3(0.0f, 0.0f, 1.0f); texCoord[16] = float2(0.0f, 1.0f);
-	pos[17] = Vertex(-w2, +h2, -d2, 1.0f); normal[17] = float3(-1.0f, 0.0f, 0.0f); tangent[17] = float3(0.0f, 0.0f, 1.0f); texCoord[17] = float2(0.0f, 0.0f);
-	pos[18] = Vertex(-w2, +h2, +d2, 1.0f); normal[18] = float3(-1.0f, 0.0f, 0.0f); tangent[18] = float3(0.0f, 0.0f, 1.0f); texCoord[18] = float2(1.0f, 0.0f);
-	pos[19] = Vertex(-w2, -h2, +d2, 1.0f); normal[19] = float3(-1.0f, 0.0f, 0.0f); tangent[19] = float3(0.0f, 0.0f, 1.0f); texCoord[19] = float2(1.0f, 1.0f);
+	mesh->Vertices[16] = Vertex(-w2, -h2, -d2, 1.0f); mesh->Normals[16] = float3(-1.0f, 0.0f, 0.0f); mesh->Tangents[16] = float3(0.0f, 0.0f, 1.0f); mesh->TexCoords[16] = float2(0.0f, 1.0f);
+	mesh->Vertices[17] = Vertex(-w2, +h2, -d2, 1.0f); mesh->Normals[17] = float3(-1.0f, 0.0f, 0.0f); mesh->Tangents[17] = float3(0.0f, 0.0f, 1.0f); mesh->TexCoords[17] = float2(0.0f, 0.0f);
+	mesh->Vertices[18] = Vertex(-w2, +h2, +d2, 1.0f); mesh->Normals[18] = float3(-1.0f, 0.0f, 0.0f); mesh->Tangents[18] = float3(0.0f, 0.0f, 1.0f); mesh->TexCoords[18] = float2(1.0f, 0.0f);
+	mesh->Vertices[19] = Vertex(-w2, -h2, +d2, 1.0f); mesh->Normals[19] = float3(-1.0f, 0.0f, 0.0f); mesh->Tangents[19] = float3(0.0f, 0.0f, 1.0f); mesh->TexCoords[19] = float2(1.0f, 1.0f);
 
 	// Fill in the right face vertex data.
-	pos[20] = Vertex(+w2, -h2, +d2, 1.0f); normal[20] = float3(1.0f, 0.0f, 0.0f); tangent[20] = float3(0.0f, 0.0f, -1.0f); texCoord[20] = float2(0.0f, 1.0f);
-	pos[21] = Vertex(+w2, +h2, +d2, 1.0f); normal[21] = float3(1.0f, 0.0f, 0.0f); tangent[21] = float3(0.0f, 0.0f, -1.0f); texCoord[21] = float2(0.0f, 0.0f);
-	pos[22] = Vertex(+w2, +h2, -d2, 1.0f); normal[22] = float3(1.0f, 0.0f, 0.0f); tangent[22] = float3(0.0f, 0.0f, -1.0f); texCoord[22] = float2(1.0f, 0.0f);
-	pos[23] = Vertex(+w2, -h2, -d2, 1.0f); normal[23] = float3(1.0f, 0.0f, 0.0f); tangent[23] = float3(0.0f, 0.0f, -1.0f); texCoord[23] = float2(1.0f, 1.0f);
-
-	mesh->Vertices.assign(&pos[0], &pos[24]);
-	mesh->Normals.assign(&normal[0], &normal[24]);
-	mesh->Tangents.assign(&tangent[0], &tangent[24]);
-	mesh->TexCoords.assign(&texCoord[0], &texCoord[24]);
+	mesh->Vertices[20] = Vertex(+w2, -h2, +d2, 1.0f); mesh->Normals[20] = float3(1.0f, 0.0f, 0.0f); mesh->Tangents[20] = float3(0.0f, 0.0f, -1.0f); mesh->TexCoords[20] = float2(0.0f, 1.0f);
+	mesh->Vertices[21] = Vertex(+w2, +h2, +d2, 1.0f); mesh->Normals[21] = float3(1.0f, 0.0f, 0.0f); mesh->Tangents[21] = float3(0.0f, 0.0f, -1.0f); mesh->TexCoords[21] = float2(0.0f, 0.0f);
+	mesh->Vertices[22] = Vertex(+w2, +h2, -d2, 1.0f); mesh->Normals[22] = float3(1.0f, 0.0f, 0.0f); mesh->Tangents[22] = float3(0.0f, 0.0f, -1.0f); mesh->TexCoords[22] = float2(1.0f, 0.0f);
+	mesh->Vertices[23] = Vertex(+w2, -h2, -d2, 1.0f); mesh->Normals[23] = float3(1.0f, 0.0f, 0.0f); mesh->Tangents[23] = float3(0.0f, 0.0f, -1.0f); mesh->TexCoords[23] = float2(1.0f, 1.0f);
 
 
 	// Create the index data
-	int i[36];
+	mesh->Indices.resize(36);
 
 	// Fill in the front face index data
-	i[0] = 0;
-	i[1] = 1;
-	i[2] = 2;
-	i[3] = 0;
-	i[4] = 2;
-	i[5] = 3;
+	mesh->Indices[0] = 0;
+	mesh->Indices[1] = 1;
+	mesh->Indices[2] = 2;
+	mesh->Indices[3] = 0;
+	mesh->Indices[4] = 2;
+	mesh->Indices[5] = 3;
 
 	// Fill in the back face index data
-	i[6] = 4;
-	i[7] = 5;
-	i[8] = 6;
-	i[9] = 4;
-	i[10] = 6;
-	i[11] = 7;
+	mesh->Indices[6] = 4;
+	mesh->Indices[7] = 5;
+	mesh->Indices[8] = 6;
+	mesh->Indices[9] = 4;
+	mesh->Indices[10] = 6;
+	mesh->Indices[11] = 7;
 
 	// Fill in the top face index data
-	i[12] = 8;
-	i[13] = 9;
-	i[14] = 10;
-	i[15] = 8;
-	i[16] = 10;
-	i[17] = 11;
+	mesh->Indices[12] = 8;
+	mesh->Indices[13] = 9;
+	mesh->Indices[14] = 10;
+	mesh->Indices[15] = 8;
+	mesh->Indices[16] = 10;
+	mesh->Indices[17] = 11;
 
 	// Fill in the bottom face index data
-	i[18] = 12;
-	i[19] = 13;
-	i[20] = 14;
-	i[21] = 12;
-	i[22] = 14;
-	i[23] = 15;
+	mesh->Indices[18] = 12;
+	mesh->Indices[19] = 13;
+	mesh->Indices[20] = 14;
+	mesh->Indices[21] = 12;
+	mesh->Indices[22] = 14;
+	mesh->Indices[23] = 15;
 
 	// Fill in the left face index data
-	i[24] = 16;
-	i[25] = 17;
-	i[26] = 18;
-	i[27] = 16;
-	i[28] = 18;
-	i[29] = 19;
+	mesh->Indices[24] = 16;
+	mesh->Indices[25] = 17;
+	mesh->Indices[26] = 18;
+	mesh->Indices[27] = 16;
+	mesh->Indices[28] = 18;
+	mesh->Indices[29] = 19;
 
 	// Fill in the right face index data
-	i[30] = 20;
-	i[31] = 21;
-	i[32] = 22;
-	i[33] = 20;
-	i[34] = 22;
-	i[35] = 23;
-
-	mesh->Indices.assign(&i[0], &i[36]);
+	mesh->Indices[30] = 20;
+	mesh->Indices[31] = 21;
+	mesh->Indices[32] = 22;
+	mesh->Indices[33] = 20;
+	mesh->Indices[34] = 22;
+	mesh->Indices[35] = 23;
 }
 
 void CreateSphere(float radius, uint sliceCount, uint stackCount, Mesh *mesh) {
