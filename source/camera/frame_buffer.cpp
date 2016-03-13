@@ -4,7 +4,7 @@
 * Copyright Adrian Astley 2015 - 2016
 */
 
-#include "graphics/frame_buffer.h"
+#include "camera/frame_buffer.h"
 
 
 namespace Lantern {

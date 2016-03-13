@@ -4,7 +4,7 @@
 * Copyright Adrian Astley 2015 - 2016
 */
 
-#include "scene/thin_lens_camera.h"
+#include "camera/thin_lens_camera.h"
 
 #include <embree2/rtcore.h>
 

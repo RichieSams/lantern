@@ -8,7 +8,8 @@
 
 #include "scene/scene.h"
 #include "scene/ray.h"
-#include "scene/material.h"
+
+#include "materials/material.h"
 
 #include "math/uniform_sampler.h"
 

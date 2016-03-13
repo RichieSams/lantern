@@ -6,8 +6,9 @@
 
 #include "scene/scene.h"
 #include "scene/geometry_generator.h"
-#include "scene/lambert_material.h"
-#include "scene/mirror.h"
+
+#include "materials/lambert_material.h"
+#include "materials/mirror.h"
 
 #include "visualizer/visualizer.h"
 
@@ -40,7 +41,7 @@ int main(int argc, const char *argv[]) {
 
 	// Create the 9 spheres
 	Lantern::Mesh sphere;
-	Lantern::CreateGeosphere(2.0f, 2u, &sphere);
+	Lantern::CreateGeosphere(2.0f, 7u, &sphere);
 
 	scene.AddMesh(&sphere, &whiteEmmisive);
 

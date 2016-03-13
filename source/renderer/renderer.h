@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "common/typedefs.h"
+#include "math/int_types.h"
 
 
 namespace Lantern {

@@ -6,13 +6,12 @@
 
 #pragma once
 
-#include "common/typedefs.h"
-
+#include "math/int_types.h"
 #include "math/vector_types.h"
 
 #include "scene/ray.h"
 
-#include "graphics/frame_buffer.h"
+#include "camera/frame_buffer.h"
 
 
 namespace Lantern {

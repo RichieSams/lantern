@@ -6,9 +6,9 @@
 
 #pragma once
 
-#include "common/typedefs.h"
+#include "math/int_types.h"
 
-#include "scene/thin_lens_camera.h"
+#include "camera/thin_lens_camera.h"
 
 #include <embree2/rtcore.h>
 

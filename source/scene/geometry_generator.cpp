@@ -8,7 +8,7 @@
 * Copyright Adrian Astley 2015 - 2016
 */
 
-#include "common/typedefs.h"
+#include "math/int_types.h"
 
 #include "scene/geometry_generator.h"
 
