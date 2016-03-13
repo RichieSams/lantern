@@ -31,6 +31,7 @@ include_directories(libs/imgui/include)
 
 SET(ENABLE_ISPC_SUPPORT OFF CACHE BOOL "No ISPC support needed atm" )
 SET(ENABLE_TUTORIALS OFF CACHE BOOL "Only build lib" )
+SET(ENABLE_TESTS OFF CACHE BOOL "Only build lib")
 add_subdirectory(libs/embree)
 include_directories(libs/embree/include)
 include_directories(libs/embree/common)

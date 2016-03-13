@@ -109,6 +109,11 @@ namespace embree
     /*! called if geometry is switching from enabled to disabled state */
     virtual void disabling() = 0;
 
+    /*! sets constant tessellation rate for the geometry */
+    virtual void setTessellationRate(float N) {
+      throw_RTCError(RTC_INVALID_OPERATION,"operation not supported for this geometry"); 
+    }
+
     /*! Set user data pointer. */
     virtual void setUserData (void* ptr);
       
@@ -118,13 +123,13 @@ namespace embree
     }
 
     /*! interpolates user data to the specified u/v location */
-    virtual void interpolate(unsigned primID, float u, float v, RTCBufferType buffer, float* P, float* dPdu, float* dPdv, size_t numFloats) {
+    virtual void interpolate(unsigned primID, float u, float v, RTCBufferType buffer, float* P, float* dPdu, float* dPdv, float* ddPdudu, float* ddPdvdv, float* ddPdudv, size_t numFloats) {
       throw_RTCError(RTC_INVALID_OPERATION,"operation not supported for this geometry"); 
     }
 
     /*! interpolates user data to the specified u/v locations */
     virtual void interpolateN(const void* valid_i, const unsigned* primIDs, const float* u, const float* v, size_t numUVs, 
-                              RTCBufferType buffer, float* P, float* dPdu, float* dPdv, size_t numFloats);
+                              RTCBufferType buffer, float* P, float* dPdu, float* dPdv, float* ddPdudu, float* ddPdvdv, float* ddPdudv, size_t numFloats);
 
     /*! for subdivision surfaces only */
   public:
@@ -189,7 +194,7 @@ namespace embree
   public:
     
     /*! Sets transformation of the instance */
-    virtual void setTransform(const AffineSpace3fa& transform) {
+    virtual void setTransform(const AffineSpace3fa& transform, size_t timeStep) {
       throw_RTCError(RTC_INVALID_OPERATION,"operation not supported for this geometry"); 
     }
 

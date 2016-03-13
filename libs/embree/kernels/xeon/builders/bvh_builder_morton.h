@@ -389,7 +389,10 @@ namespace embree
         {
           SPAWN_BEGIN;
           for (size_t i=0; i<numChildren; i++) {
-            SPAWN(([&,i]{ bounds[i] = recurse(children[i],nullptr,true); }));
+            SPAWN(([&,i]{ 
+                  bounds[i] = recurse(children[i],nullptr,true);
+                  _mm_mfence(); // to allow non-temporal stores during build
+                }));
           }
           SPAWN_END;
         }
@@ -416,6 +419,7 @@ namespace embree
         MortonBuildRecord<NodeRef> br(0,numPrimitives,&root,1);
         
         const BBox3fa bounds = recurse(br, nullptr, true);
+        _mm_mfence(); // to allow non-temporal stores during build
         return std::make_pair(root,bounds);
       }
       
@@ -538,7 +542,6 @@ namespace embree
       
       return bvh_builder_morton_internal<NodeRef>(
         createAllocator,identity,allocNode,setBounds,createLeaf,calculateBounds,progressMonitor,
-        //temp,src,numPrimitives,branchingFactor,maxDepth,minLeafSize,maxLeafSize);
         src,temp,numPrimitives,branchingFactor,maxDepth,minLeafSize,maxLeafSize);
 
     }

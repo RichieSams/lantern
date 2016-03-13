@@ -130,12 +130,12 @@ namespace embree
     DEFINE_SYMBOL2(Accel::Intersector16,BVH8Quad4iIntersector16HybridPluecker);
     DEFINE_SYMBOL2(Accel::Intersector16,BVH8Quad4iIntersector16HybridPlueckerNoFilter);
     DEFINE_SYMBOL2(Accel::Intersector16,BVH8Quad4iMBIntersector16HybridPluecker);
-
-    DEFINE_SYMBOL2(Accel::Intersector16,BVH8Quad4vIntersector16HybridMoeller2);
-    DEFINE_SYMBOL2(Accel::Intersector16,BVH8Quad4vIntersector16HybridMoellerNoFilter2);
-    DEFINE_SYMBOL2(Accel::Intersector16,BVH8Triangle4Intersector16HybridMoeller2);
-    DEFINE_SYMBOL2(Accel::Intersector16,BVH8Triangle4Intersector16HybridMoellerNoFilter2);
     
+    DEFINE_SYMBOL2(Accel::IntersectorN,BVH8Triangle4StreamIntersector);
+    DEFINE_SYMBOL2(Accel::IntersectorN,BVH8Triangle4StreamIntersectorNoFilter);
+    DEFINE_SYMBOL2(Accel::IntersectorN,BVH8Quad4vStreamIntersector);
+    DEFINE_SYMBOL2(Accel::IntersectorN,BVH8Quad4vStreamIntersectorNoFilter);
+
     DEFINE_BUILDER2(void,Scene,size_t,BVH8Bezier1vBuilder_OBB_New);
     DEFINE_BUILDER2(void,Scene,size_t,BVH8Bezier1iBuilder_OBB_New);
     DEFINE_BUILDER2(void,Scene,size_t,BVH8Bezier1iMBBuilder_OBB_New);

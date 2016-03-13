@@ -65,6 +65,13 @@ namespace embree
     typedef void (*IntersectFunc16)(const void* valid, /*!< pointer to valid mask */
                                     void* ptr,         /*!< pointer to user data */
                                     RTCRay16& ray      /*!< ray packet to intersect */);
+
+    /*! Type of intersect function pointer for ray packets of size N. */
+    typedef void (*IntersectFuncN)(void* ptr,           /*!< pointer to user data */
+                                   RTCRay** ray,        /*!< ray stream to intersect */
+                                   const size_t N,      /*!< number of rays in stream */
+                                   const size_t flags   /*!< layout flags */);
+    
     
     /*! Type of occlusion function pointer for single rays. */
     typedef void (*OccludedFunc) (void* ptr,           /*!< pointer to user data */ 
@@ -84,7 +91,12 @@ namespace embree
     typedef void (*OccludedFunc16) (const void* valid, /*! pointer to valid mask */
                                     void* ptr,         /*!< pointer to user data */
                                     RTCRay16& ray      /*!< Ray packet to test occlusion. */);
-  
+
+    /*! Type of intersect function pointer for ray packets of size N. */
+    typedef void (*OccludedFuncN)(void* ptr,           /*!< pointer to user data */
+                                  RTCRay** ray,        /*!< ray stream to intersect */
+                                  const size_t N,      /*!< number of rays in stream */
+                                  const size_t flags   /*!< layout flags */);
     typedef void (*ErrorFunc) ();
 
     struct Intersector1
@@ -155,13 +167,30 @@ namespace embree
       OccludedFunc16 occluded;
     };
 
+     struct IntersectorN 
+    {
+      IntersectorN (ErrorFunc error = nullptr) 
+      : intersect((IntersectFuncN)error), occluded((OccludedFuncN)error), name(nullptr) {}
+
+      IntersectorN (IntersectFuncN intersect, OccludedFuncN occluded, const char* name)
+      : intersect(intersect), occluded(occluded), name(name) {}
+
+      operator bool() const { return name; }
+      
+    public:
+      static const char* type;
+      const char* name;
+      IntersectFuncN intersect;
+      OccludedFuncN occluded;
+    };
+   
     struct Intersectors 
     {
       Intersectors() 
         : ptr(nullptr) {}
 
       Intersectors (ErrorFunc error) 
-        : ptr(nullptr), intersector1(error), intersector4(error), intersector8(error), intersector16(error) {}
+      : ptr(nullptr), intersector1(error), intersector4(error), intersector8(error), intersector16(error),intersectorN(error) {}
 
       void print(size_t ident) 
       {
@@ -181,9 +210,13 @@ namespace embree
           for (size_t i=0; i<ident; i++) std::cout << " ";
           std::cout << "intersector16 = " << intersector16.name << std::endl;
         }
+        if (intersectorN.name) {
+          for (size_t i=0; i<ident; i++) std::cout << " ";
+          std::cout << "intersectorN = " << intersectorN.name << std::endl;
+        }        
       }
 
-      void select(bool filter4, bool filter8, bool filter16)
+      void select(bool filter4, bool filter8, bool filter16, bool filterN)
       {
 	if (intersector4_filter) {
 	  if (filter4) intersector4 = intersector4_filter;
@@ -197,6 +230,11 @@ namespace embree
 	  if (filter16) intersector16 = intersector16_filter;
 	  else          intersector16 = intersector16_nofilter;
 	}
+	if (intersectorN_filter) {
+	  if (filterN) intersectorN = intersectorN_filter;
+	  else         intersectorN = intersectorN_nofilter;
+	}
+        
       }
 
     public:
@@ -211,6 +249,9 @@ namespace embree
       Intersector16 intersector16;
       Intersector16 intersector16_filter;
       Intersector16 intersector16_nofilter;
+      IntersectorN intersectorN;
+      IntersectorN intersectorN_filter;
+      IntersectorN intersectorN_nofilter;      
     };
   
   public:
@@ -256,6 +297,17 @@ namespace embree
       intersectors.intersector16.intersect(valid,intersectors.ptr,ray);
     }
 
+    /*! Intersects a packet of N rays in SOA layout with the scene. */
+    __forceinline void intersectN (RTCRay **rayN, const size_t N, const size_t flags) {
+      //assert(intersectors.intersectorN.intersect);
+      if (likely(intersectors.intersectorN.intersect))
+        intersectors.intersectorN.intersect(intersectors.ptr,rayN, N, flags);
+      else
+        /* fallback path */
+        for (size_t i=0;i<N;i++)
+          intersect(*rayN[i]);
+    }
+
     /*! Tests if single ray is occluded by the scene. */
     __forceinline void occluded (RTCRay& ray) {
       assert(intersectors.intersector1.occluded);
@@ -278,6 +330,17 @@ namespace embree
     __forceinline void occluded16 (const void* valid, RTCRay16& ray) {
       assert(intersectors.intersector16.occluded);
       intersectors.intersector16.occluded(valid,intersectors.ptr,ray);
+    }
+
+    /*! Tests if a packet of N rays in SOA layout is occluded by the scene. */
+    __forceinline void occludedN (RTCRay** rayN, const size_t N, const size_t flags) {
+      //assert(intersectors.intersectorN.occluded);
+      if(likely(intersectors.intersectorN.occluded))
+        intersectors.intersectorN.occluded(intersectors.ptr,rayN, N, flags);
+      else
+        /* fallback path */
+        for (size_t i=0;i<N;i++)
+          occluded(*rayN[i]);
     }
 
   public:
@@ -303,4 +366,10 @@ namespace embree
   Accel::Intersector16 symbol((Accel::IntersectFunc16)intersector::intersect, \
                               (Accel::OccludedFunc16)intersector::occluded,\
                               TOSTRING(isa) "::" TOSTRING(symbol));
+
+#define DEFINE_INTERSECTORN(symbol,intersector)                         \
+  Accel::IntersectorN symbol((Accel::IntersectFuncN)intersector::intersect, \
+                              (Accel::OccludedFuncN)intersector::occluded,\
+                              TOSTRING(isa) "::" TOSTRING(symbol));
+ 
 }

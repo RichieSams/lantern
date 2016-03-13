@@ -90,12 +90,13 @@ namespace embree
     void unmap(RTCBufferType type);
     void update ();
     void updateBuffer (RTCBufferType type);
+    void setTessellationRate(float N);
     void immutable ();
     bool verify ();
     void setDisplacementFunction (RTCDisplacementFunc func, RTCBounds* bounds);
-    void interpolate(unsigned primID, float u, float v, RTCBufferType buffer, float* P, float* dPdu, float* dPdv, size_t numFloats);
+    void interpolate(unsigned primID, float u, float v, RTCBufferType buffer, float* P, float* dPdu, float* dPdv, float* ddPdudu, float* ddPdvdv, float* ddPdudv, size_t numFloats);
     void interpolateN(const void* valid_i, const unsigned* primIDs, const float* u, const float* v, size_t numUVs, 
-                      RTCBufferType buffer, float* P, float* dPdu, float* dPdv, size_t numFloats);
+                      RTCBufferType buffer, float* P, float* dPdu, float* dPdv, float* ddPdudu, float* ddPdvdv, float* ddPdudv, size_t numFloats);
 
   public:
 
@@ -145,6 +146,13 @@ namespace embree
      /* check for simple edge level update */
     __forceinline bool checkLevelUpdate() const { return levelUpdate; }
 
+    /* returns tessellation level of edge */
+    __forceinline float getEdgeLevel(const size_t i) const
+    {
+      if (levels) return clamp(levels[i],1.0f,4096.0f); // FIXME: do we want to limit edge level?
+      else return clamp(tessellationRate,1.0f,4096.0f); // FIXME: do we want to limit edge level?
+    }
+
   public:
     RTCDisplacementFunc displFunc;    //!< displacement function
     BBox3fa             displBounds;  //!< bounds for maximal displacement 
@@ -184,6 +192,7 @@ namespace embree
 
     /*! subdivision level for each half edge of the vertexIndices buffer */
     BufferT<float> levels;
+    float tessellationRate;  // constant rate that is used when levels is not set
 
     /*! buffer that marks specific faces as holes */
     BufferT<unsigned> holes;
@@ -249,12 +258,12 @@ namespace embree
     SubdivMeshAVX (Scene* parent, RTCGeometryFlags flags, size_t numFaces, size_t numEdges, size_t numVertices, 
                   size_t numCreases, size_t numCorners, size_t numHoles, size_t numTimeSteps);
 
-    void interpolate(unsigned primID, float u, float v, RTCBufferType buffer, float* P, float* dPdu, float* dPdv, size_t numFloats);
+    void interpolate(unsigned primID, float u, float v, RTCBufferType buffer, float* P, float* dPdu, float* dPdv, float* ddPdudu, float* ddPdvdv, float* ddPdudv, size_t numFloats);
     void interpolateN(const void* valid_i, const unsigned* primIDs, const float* u, const float* v, size_t numUVs, 
-                      RTCBufferType buffer, float* P, float* dPdu, float* dPdv, size_t numFloats);
+                      RTCBufferType buffer, float* P, float* dPdu, float* dPdv, float* ddPdudu, float* ddPdvdv, float* ddPdudv, size_t numFloats);
 
     template<typename vbool, typename vint, typename vfloat>
       void interpolateHelper(const vbool& valid1, const vint& primID, const vfloat& uu, const vfloat& vv, size_t numUVs, 
-                             RTCBufferType buffer, float* P, float* dPdu, float* dPdv, size_t numFloats);
+                             RTCBufferType buffer, float* P, float* dPdu, float* dPdv, float* ddPdudu, float* ddPdvdv, float* ddPdudv, size_t numFloats);
   };
 };

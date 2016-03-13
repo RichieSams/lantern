@@ -23,13 +23,14 @@ namespace embree
   /*! Instanced geometry */
   struct GeometryInstance : public Geometry
   {
+    ALIGNED_STRUCT;
   public:
     GeometryInstance (Scene* parent, Geometry* geom); 
     virtual void build(size_t threadIndex, size_t threadCount) {}
     virtual void enabling ();
     virtual void disabling();
     virtual void setMask (unsigned mask);
-    virtual void setTransform(const AffineSpace3fa& local2world);
+    virtual void setTransform(const AffineSpace3fa& local2world, size_t timeStep);
     
     void count(ssize_t f);
   public:

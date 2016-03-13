@@ -15,17 +15,17 @@
 ## ======================================================================== ##
 
 SET(EMBREE_VERSION_MAJOR 2)
-SET(EMBREE_VERSION_MINOR 8)
+SET(EMBREE_VERSION_MINOR 9)
 SET(EMBREE_VERSION_PATCH 0)
 SET(EMBREE_VERSION_NOTE "")
 SET(EMBREE_VERSION ${EMBREE_VERSION_MAJOR}.${EMBREE_VERSION_MINOR}.${EMBREE_VERSION_PATCH})
 MATH(EXPR EMBREE_VERSION_NUMBER "10000*${EMBREE_VERSION_MAJOR} + 100*${EMBREE_VERSION_MINOR} + ${EMBREE_VERSION_PATCH}")
 SET(CPACK_RPM_PACKAGE_RELEASE 1)
 
+
 PROJECT(embree${EMBREE_VERSION_MAJOR})
 
 CMAKE_MINIMUM_REQUIRED(VERSION 2.8.11)
-
 CONFIGURE_FILE(
   "${PROJECT_SOURCE_DIR}/kernels/version.h.in"
   "${PROJECT_BINARY_DIR}/version.h"
@@ -52,6 +52,8 @@ MARK_AS_ADVANCED(CLEAR CMAKE_CXX_COMPILER)
 MARK_AS_ADVANCED(GLUT_cocoa_LIBRARY)
 
 SET(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/common/cmake ${CMAKE_MODULE_PATH})
+
+INCLUDE(test)
 
 ##############################################################
 # Create Binary Packages
@@ -84,6 +86,9 @@ IF (ENABLE_XEON_PHI_SUPPORT)
   SET(ENABLE_ISPC_SUPPORT ON CACHE BOOL "Build Embree with support for ISPC applications." FORCE)
 ENDIF ()
 
+##############################################################################
+# Configurations (add configurations also to common/cmake/embree-config-default.cmake)
+
 OPTION(RTCORE_RAY_MASK "Enables ray mask support.")
 OPTION(RTCORE_STAT_COUNTERS "Enables statistic counters.")
 OPTION(RTCORE_BACKFACE_CULLING "Enables backface culling.")
@@ -95,9 +100,12 @@ OPTION(RTCORE_EXPORT_ALL_SYMBOLS "Lets Embree library export all symbols.")
 OPTION(RTCORE_ENABLE_RAYSTREAM_LOGGER "Enables ray stream logger.")
 OPTION(RTCORE_IGNORE_INVALID_RAYS "Ignores invalid rays." OFF) # FIXME: enable by default?
 OPTION(RTCORE_RAY_PACKETS "Enabled support for ray packets." ON)
+OPTION(RTCORE_MEMKIND_ALLOCATOR "Enables memory allocation through the memkind library." OFF)
 
 SET(RTCORE_TASKING_SYSTEM "TBB" CACHE STRING "Selects tasking system")
 SET_PROPERTY(CACHE RTCORE_TASKING_SYSTEM PROPERTY STRINGS TBB INTERNAL)
+
+###############################################################################
 
 IF (RTCORE_TASKING_SYSTEM STREQUAL "TBB")
   SET(TASKING_TBB ON)
@@ -271,6 +279,7 @@ ADD_SUBDIRECTORY(kernels)
 
 IF (ENABLE_TUTORIALS)
   ADD_SUBDIRECTORY(tutorials)
+ENDIF()
 
   SET (__XEON__ 1)
   ADD_SUBDIRECTORY(tests)
@@ -279,7 +288,6 @@ IF (ENABLE_TUTORIALS)
     SET (__XEON__ 0)
     ADD_SUBDIRECTORY(tests tests_xeonphi)
   ENDIF ()
-ENDIF()
 
 ##############################################################
 # Uninstall

@@ -18,7 +18,7 @@
 #include "scene.h"
 
 #if defined(__INTEL_COMPILER)
-#pragma warning (disable: 1478) // warning: function was declared deprecated
+#pragma warning (disable: 1478)   // warning: function was declared deprecated
 #elif defined(_MSC_VER)
 #pragma warning (disable: 4996) // warning: function was declared deprecated
 #elif defined(__clang__)
@@ -52,8 +52,16 @@ namespace embree
     rtcSetParameter1i(parm,val);
   }
 
+  extern "C" ssize_t ispcGetParameter1i(const RTCParameter parm) {
+    return rtcGetParameter1i(parm);
+  }
+
   extern "C" void ispcDeviceSetParameter1i(RTCDevice device, const RTCParameter parm, ssize_t val) {
     rtcDeviceSetParameter1i(device,parm,val);
+  }
+
+  extern "C" ssize_t ispcDeviceGetParameter1i(RTCDevice device, const RTCParameter parm) {
+    return rtcDeviceGetParameter1i(device,parm);
   }
 
   extern "C" RTCError ispcGetError() {
@@ -100,12 +108,16 @@ namespace embree
     return rtcSetProgressMonitorFunction(scene,(RTCProgressMonitorFunc)func,ptr);
   }
 
-  extern "C" void ispcCommitScene (RTCScene scene) {
+  extern "C" void ispcCommit (RTCScene scene) {
     return rtcCommit(scene);
   }
 
-  extern "C" void ispcCommitSceneThread (RTCScene scene, unsigned int threadID, unsigned int numThreads) {
+  extern "C" void ispcCommitThread (RTCScene scene, unsigned int threadID, unsigned int numThreads) {
     return rtcCommitThread(scene,threadID,numThreads);
+  }
+
+  extern "C" void ispcGetBounds(RTCScene scene, RTCBounds& bounds_o) {
+    rtcGetBounds(scene,bounds_o);
   }
   
   extern "C" void ispcIntersect1 (RTCScene scene, RTCRay& ray) {
@@ -123,6 +135,16 @@ namespace embree
   extern "C" void ispcIntersect16 (const void* valid, RTCScene scene, RTCRay16& ray) {
     rtcIntersect16(valid,scene,ray);
   }
+
+  extern "C" void ispcIntersectN (RTCScene scene, void* rayN, const size_t N, const size_t stride, const size_t flags)
+  {
+    rtcIntersectN(scene,(RTCRay*)rayN,N,stride,flags);
+  }
+
+  extern "C" void ispcIntersectN_SOA (RTCScene scene,  RTCRaySOA& rayN, const  size_t N, const  size_t streams, const  size_t offset, const  size_t flags)
+  {
+    rtcIntersectN_SOA(scene,rayN,N,streams,offset,flags);
+  }
   
   extern "C" void ispcOccluded1 (RTCScene scene, RTCRay& ray) {
     rtcOccluded(scene,ray);
@@ -139,6 +161,16 @@ namespace embree
   extern "C" void ispcOccluded16 (const void* valid, RTCScene scene, RTCRay16& ray) {
     rtcOccluded16(valid,scene,ray);
   }
+
+  extern "C" void ispcOccludedN (RTCScene scene, void*  rayN, const  size_t N, const  size_t stride, const  size_t flags)
+  {
+    rtcOccludedN(scene,(RTCRay*)rayN,N,stride,flags);
+  }
+
+  extern "C" void ispcOccludedN_SOA (RTCScene scene,  RTCRaySOA& rayN, const  size_t N, const  size_t streams, const  size_t offset, const  size_t flags)
+  {
+    rtcOccludedN_SOA(scene,rayN,N,streams,offset,flags);
+  }
   
   extern "C" void ispcDeleteScene (RTCScene scene) {
     rtcDeleteScene(scene);
@@ -147,6 +179,10 @@ namespace embree
   extern "C" unsigned ispcNewInstance (RTCScene target, RTCScene source) {
     return rtcNewInstance(target,source);
   }
+  
+  extern "C" unsigned ispcNewInstance2 (RTCScene target, RTCScene source, size_t numTimeSteps) {
+    return rtcNewInstance2(target,source,numTimeSteps);
+  }
 
   /*extern "C" unsigned ispcNewGeometryInstance (RTCScene scene, unsigned geomID) {
     return rtcNewGeometryInstance(scene,geomID);
@@ -154,6 +190,10 @@ namespace embree
   
   extern "C" void ispcSetTransform (RTCScene scene, unsigned geomID, RTCMatrixType layout, const float* xfm) {
     return rtcSetTransform(scene,geomID,layout,xfm);
+  }
+
+  extern "C" void ispcSetTransform2 (RTCScene scene, unsigned geomID, RTCMatrixType layout, const float* xfm, size_t timeStep) {
+    return rtcSetTransform2(scene,geomID,layout,xfm,timeStep);
   }
   
   extern "C" unsigned ispcNewUserGeometry (RTCScene scene, size_t numItems) {
@@ -224,6 +264,10 @@ namespace embree
   
   extern "C" void ispcDeleteGeometry (RTCScene scene, unsigned geomID) {
     rtcDeleteGeometry(scene,geomID);
+  }
+
+  extern "C" void ispcSetTessellationRate (RTCScene hscene, unsigned geomID, float tessellationRate) {
+    rtcSetTessellationRate(hscene,geomID,tessellationRate);
   }
     
   extern "C" void ispcSetUserData (RTCScene hscene, unsigned geomID, void* ptr) 
@@ -451,6 +495,14 @@ namespace embree
   {
     rtcInterpolateN(scene,geomID,valid,primIDs,u,v,numUVs,buffer,P,dPdu,dPdv,numFloats);
   }
+
+  extern "C" void ispcInterpolateN2(RTCScene scene, unsigned int geomID, 
+                                    const void* valid, const unsigned int* primIDs, const float* u, const float* v, size_t numUVs, 
+                                    RTCBufferType buffer, 
+                                    float* P, float* dPdu, float* dPdv,
+                                    float* ddPdudu, float* ddPdvdv, float* ddPdudv,
+                                    size_t numFloats)
+  {
+    rtcInterpolateN2(scene,geomID,valid,primIDs,u,v,numUVs,buffer,P,dPdu,dPdv,ddPdudu,ddPdvdv,ddPdudv,numFloats);
+  }
 }
-
-

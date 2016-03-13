@@ -55,6 +55,7 @@ namespace embree
     __forceinline vint            ( int  a, int  b, int  c, int  d, int  e, int  f, int  g, int  h) : v(_mm256_set_epi32(h, g, f, e, d, c, b, a)) {}
 
     __forceinline explicit vint( const __m256 a ) : v(_mm256_cvtps_epi32(a)) {}
+    __forceinline explicit vint( const vboolf8 &a ) : v(_mm256_castps_si256((__m256)a)) {}
 
     ////////////////////////////////////////////////////////////////////////////////
     /// Constants
@@ -151,6 +152,9 @@ namespace embree
 
   __forceinline const vint8 operator <<( const vint8& a, const int n ) { return _mm256_slli_epi32(a.v, n); }
   __forceinline const vint8 operator >>( const vint8& a, const int n ) { return _mm256_srai_epi32(a.v, n); }
+
+  __forceinline const vint8 operator <<( const vint8& a, const vint8& n ) { return _mm256_sllv_epi32(a.v, n); }
+  __forceinline const vint8 operator >>( const vint8& a, const vint8& n ) { return _mm256_srav_epi32(a.v, n); }
 
   __forceinline const vint8 sra ( const vint8& a, const int b ) { return _mm256_srai_epi32(a.v, b); }
   __forceinline const vint8 srl ( const vint8& a, const int b ) { return _mm256_srli_epi32(a.v, b); }
@@ -278,6 +282,12 @@ namespace embree
   __forceinline vint8 shuffle(const vint8& a, const __m256i& index) {
     return _mm256_castps_si256(_mm256_permutevar_ps(_mm256_castsi256_ps(a),index));
   }
+
+  template<int i>
+  __forceinline vint8 align_shift_right(const vint8 &a, const vint8 &b) {
+    return _mm256_alignr_epi8(a, b, i);
+  }  
+
 
   ////////////////////////////////////////////////////////////////////////////////
   /// Reductions

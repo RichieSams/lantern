@@ -81,21 +81,23 @@ ELSE()
   SET(EMBREE_CONFIG_VERSION ${EMBREE_VERSION_MAJOR})
 ENDIF()
 
+IF (APPLE AND NOT RTCORE_ZIP_MODE)
+  CONFIGURE_FILE(scripts/install_macosx/uninstall.command uninstall.command @ONLY)
+  INSTALL(PROGRAMS "${PROJECT_BINARY_DIR}/uninstall.command" DESTINATION ${CMAKE_INSTALL_BINDIR}/.. COMPONENT lib)
+ENDIF()
+
 IF (WIN32)
   CONFIGURE_FILE(common/cmake/embree-config-windows.cmake embree-config.cmake @ONLY)
 ELSEIF (APPLE)
   CONFIGURE_FILE(common/cmake/embree-config-macosx.cmake embree-config.cmake @ONLY)
-  IF (NOT RTCORE_ZIP_MODE)
-    CONFIGURE_FILE(scripts/install_macosx/uninstall.command uninstall.command @ONLY)
-    INSTALL(PROGRAMS "${PROJECT_BINARY_DIR}/uninstall.command" DESTINATION ${CMAKE_INSTALL_BINDIR}/.. COMPONENT lib)
-  ENDIF()
 ELSE()
   CONFIGURE_FILE(common/cmake/embree-config-linux.cmake embree-config.cmake @ONLY)
 ENDIF()
-
+CONFIGURE_FILE(common/cmake/embree-config-default.cmake embree-config-default.cmake @ONLY)
 CONFIGURE_FILE(common/cmake/embree-config-version.cmake embree-config-version.cmake @ONLY)
 
-INSTALL(FILES "${PROJECT_BINARY_DIR}/embree-config.cmake" DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/embree-${EMBREE_VERSION}" COMPONENT devel)
+INSTALL(FILES "${PROJECT_BINARY_DIR}/embree-config.cmake"         DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/embree-${EMBREE_VERSION}" COMPONENT devel)
+INSTALL(FILES "${PROJECT_BINARY_DIR}/embree-config-default.cmake" DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/embree-${EMBREE_VERSION}" COMPONENT devel)
 INSTALL(FILES "${PROJECT_BINARY_DIR}/embree-config-version.cmake" DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/embree-${EMBREE_VERSION}" COMPONENT devel)
 
 ##############################################################
@@ -106,7 +108,7 @@ SET(CPACK_PACKAGE_NAME "Embree")
 SET(CPACK_PACKAGE_FILE_NAME "embree-${EMBREE_VERSION}")
 #SET(CPACK_PACKAGE_ICON ${PROJECT_SOURCE_DIR}/embree-doc/images/icon.png)
 #SET(CPACK_PACKAGE_RELOCATABLE TRUE)
-#SET(CPACK_STRIP_FILES TRUE)
+#SET(CPACK_STRIP_FILES TRUE) # keep symbols, useful for bug reports
 
 SET(CPACK_PACKAGE_VERSION_MAJOR ${EMBREE_VERSION_MAJOR})
 SET(CPACK_PACKAGE_VERSION_MINOR ${EMBREE_VERSION_MINOR})
@@ -133,8 +135,10 @@ SET(CPACK_COMPONENT_EXAMPLES_XEONPHI_DESCRIPTION "${CPACK_COMPONENT_EXAMPLES_DES
 
 # dependencies between components
 SET(CPACK_COMPONENT_LIB_XEONPHI_DEPENDS lib)
+SET(CPACK_COMPONENT_DEVEL_DEPENDS lib)
 SET(CPACK_COMPONENT_EXAMPLES_DEPENDS lib)
 SET(CPACK_COMPONENT_EXAMPLES_XEONPHI_DEPENDS lib_xeonphi)
+SET(CPACK_COMPONENT_LIB_REQUIRED ON) # always install the libs
 
 # point to readme and license files
 SET(CPACK_RESOURCE_FILE_README ${PROJECT_SOURCE_DIR}/README.md)

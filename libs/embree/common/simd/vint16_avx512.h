@@ -136,16 +136,17 @@ namespace embree
       return _mm512_load_si512(addr);
     }
 
-    static __forceinline void store(void* addr, const vint16& v2) {
-      _mm512_extstore_epi32(addr,v2,_MM_DOWNCONV_EPI32_NONE,_MM_HINT_NONE);
+    static __forceinline void store(void* ptr, const vint16& v) {
+      //_mm512_extstore_epi32(addr,v2,_MM_DOWNCONV_EPI32_NONE,_MM_HINT_NONE);
+      _mm512_store_si512(ptr,v);
     }
 
-    static __forceinline void storeu(void* ptr, const vint16& f ) {
+    static __forceinline void storeu(void* ptr, const vint16& v ) {
 #if defined(__AVX512F__)
-      _mm512_storeu_si512(ptr,f);
+      _mm512_storeu_si512(ptr,v);
 #else
-      _mm512_extpackstorelo_ps((int*)ptr+0  ,_mm512_castsi512_ps(f), _MM_DOWNCONV_PS_NONE , 0);
-      _mm512_extpackstorehi_ps((int*)ptr+16 ,_mm512_castsi512_ps(f), _MM_DOWNCONV_PS_NONE , 0);
+      _mm512_extpackstorelo_ps((int*)ptr+0  ,_mm512_castsi512_ps(v), _MM_DOWNCONV_PS_NONE , 0);
+      _mm512_extpackstorehi_ps((int*)ptr+16 ,_mm512_castsi512_ps(v), _MM_DOWNCONV_PS_NONE , 0);
 #endif
     }
 
@@ -176,6 +177,16 @@ namespace embree
 #endif
     }
 
+    static __forceinline void storeu_compact_single(const vboolf16 mask,void * addr, const vint16 reg) {
+#if defined(__AVX512F__)
+      //_mm512_mask_compressstoreu_epi32(addr,mask,reg);
+      *(float*)addr = _mm512_cvtss_f32(_mm512_mask_compress_ps(_mm512_castsi512_ps(reg),mask,_mm512_castsi512_ps(reg)));
+#else
+      _mm512_mask_extpackstorelo_epi32((int*)addr+0  ,mask, reg, _MM_DOWNCONV_EPI32_NONE, _MM_HINT_NONE);
+#endif
+    }
+
+
 #if defined(__AVX512F__)
     static __forceinline vint16 compact64bit(const vboolf16& mask, vint16 &v) {
       return _mm512_mask_compress_epi64(v,mask,v);
@@ -193,14 +204,19 @@ namespace embree
       return _mm512_set1_epi64(v);
     }
 
-    static __forceinline size_t extract64bit(const vint16& v)
+    static __forceinline size_t extracti64bit(const vint16& v)
     {
       return _mm_cvtsi128_si64(_mm512_castsi512_si128(v));
     }
 
-    static __forceinline vint4 extract128bit(const vint16& v)
+    static __forceinline vint4 extracti128bit(const vint16& v)
     {
       return _mm512_castsi512_si128(v);
+    }
+
+    static __forceinline vint8 extracti256bit(const vint16& v)
+    {
+      return _mm512_castsi512_si256(v);
     }
 
 #endif
@@ -347,6 +363,13 @@ namespace embree
   
   __forceinline vboolf16 le(                     const vint16& a, const vint16& b) { return _mm512_cmp_epi32_mask(a,b,_MM_CMPINT_LE); }
   __forceinline vboolf16 le(const vboolf16 mask, const vint16& a, const vint16& b) { return _mm512_mask_cmp_epi32_mask(mask,a,b,_MM_CMPINT_LE); }
+
+
+  __forceinline vboolf16 uint_le(                     const vint16& a, const vint16& b) { return _mm512_cmp_epu32_mask(a,b,_MM_CMPINT_LE); }
+  __forceinline vboolf16 uint_le(const vboolf16 mask, const vint16& a, const vint16& b) { return _mm512_mask_cmp_epu32_mask(mask,a,b,_MM_CMPINT_LE); }
+
+  __forceinline vboolf16 uint_gt(                     const vint16& a, const vint16& b) { return _mm512_cmp_epu32_mask(a,b,_MM_CMPINT_GT); }
+  __forceinline vboolf16 uint_gt(const vboolf16 mask, const vint16& a, const vint16& b) { return _mm512_mask_cmp_epu32_mask(mask,a,b,_MM_CMPINT_GT); }
     
  
   __forceinline const vint16 select( const vboolf16& m, const vint16& t, const vint16& f ) {
@@ -616,6 +639,36 @@ namespace embree
   }
 #endif
 
+
+  __forceinline vint16 sortNetwork(const vint16& v)
+  {
+    const vint16 a0 = v;
+    const vint16 b0 = shuffle<1,0,3,2>(a0);
+    const vint16 c0 = umin(a0,b0);
+    const vint16 d0 = umax(a0,b0);
+    const vint16 a1 = select(0x99 /* 0b10011001 */,c0,d0);
+    const vint16 b1 = shuffle<2,3,0,1>(a1);
+    const vint16 c1 = umin(a1,b1);
+    const vint16 d1 = umax(a1,b1);
+    const vint16 a2 = select(0xc3 /* 0b11000011 */,c1,d1);
+    const vint16 b2 = shuffle<1,0,3,2>(a2);
+    const vint16 c2 = umin(a2,b2);
+    const vint16 d2 = umax(a2,b2);
+    const vint16 a3 = select(0xa5 /* 0b10100101 */,c2,d2);
+    const vint16 b3 = shuffle4<1,0,1,0>(a3);
+    const vint16 c3 = umin(a3,b3);
+    const vint16 d3 = umax(a3,b3);
+    const vint16 a4 = select(0xf /* 0b00001111 */,c3,d3);
+    const vint16 b4 = shuffle<2,3,0,1>(a4);
+    const vint16 c4 = umin(a4,b4);
+    const vint16 d4 = umax(a4,b4);
+    const vint16 a5 = select(0x33 /* 0b00110011 */,c4,d4);
+    const vint16 b5 = shuffle<1,0,3,2>(a5);
+    const vint16 c5 = umin(a5,b5);
+    const vint16 d5 = umax(a5,b5);
+    const vint16 a6 = select(0x55 /* 0b01010101 */,c5,d5);
+    return a6;
+  }
   
   ////////////////////////////////////////////////////////////////////////////////
   /// Output Operators

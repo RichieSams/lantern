@@ -38,7 +38,8 @@ namespace embree
       boundary(RTC_BOUNDARY_EDGE_ONLY),
       displFunc(nullptr), 
       displBounds(empty),
-      levelUpdate(false)
+      levelUpdate(false),
+      tessellationRate(2.0f)
   {
     for (size_t i=0; i<numTimeSteps; i++)
       vertices[i].init(parent->device,numVertices,sizeof(Vec3fa));
@@ -229,6 +230,15 @@ namespace embree
     else        this->displBounds = empty;
   }
 
+  void SubdivMesh::setTessellationRate(float N)
+  {
+    if (parent->isStatic() && parent->isBuild()) 
+      throw_RTCError(RTC_INVALID_OPERATION,"static geometries cannot get modified");
+
+    tessellationRate = N;
+    levels.setModified(true);
+  }
+
   void SubdivMesh::immutable () 
   {
     const bool freeIndices = !parent->needSubdivIndices;
@@ -294,17 +304,13 @@ namespace embree
 	  const unsigned int endVertex = vertexIndices[e + nextIndex]; 
 	  const uint64_t key = SubdivMesh::Edge(startVertex,endVertex);
 	  
-	  float edge_level = 1.0f;
-	  if (levels) edge_level = levels[e+de];
-	  edge_level = clamp(edge_level,1.0f,4096.0f); // FIXME: do we want to limit edge level?
-	  
 	  edge->vtx_index              = startVertex;
 	  edge->next_half_edge_ofs     = (de == (N-1)) ? -(N-1) : +1;
 	  edge->prev_half_edge_ofs     = (de ==     0) ? +(N-1) : -1;
 	  edge->opposite_half_edge_ofs = 0;
 	  edge->edge_crease_weight     = edgeCreaseMap.lookup(key,0.0f);
 	  edge->vertex_crease_weight   = vertexCreaseMap.lookup(startVertex,0.0f);
-	  edge->edge_level             = edge_level;
+	  edge->edge_level             = getEdgeLevel(e+de);
           edge->patch_type             = HalfEdge::COMPLEX_PATCH; // type gets updated below
           edge->vertex_type            = HalfEdge::REGULAR_VERTEX;
 
@@ -411,11 +417,8 @@ namespace embree
 	HalfEdge& edge = halfEdges[i];
 	const unsigned int startVertex = edge.vtx_index;
  
-	if (updateLevels) {
-	  float edge_level = 1.0f;
-	  if (levels) edge_level = levels[i];
-	  edge.edge_level = clamp(edge_level,1.0f,4096.0f); // FIXME: do we want to limit edge levels?
-	}
+	if (updateLevels)
+	  edge.edge_level = getEdgeLevel(i); 
         
 	if (updateEdgeCreases) {
 	  const unsigned int endVertex   = edge.next()->vtx_index;
@@ -580,7 +583,7 @@ namespace embree
     return true;
   }
 
-  void SubdivMesh::interpolate(unsigned primID, float u, float v, RTCBufferType buffer, float* P, float* dPdu, float* dPdv, size_t numFloats) 
+  void SubdivMesh::interpolate(unsigned primID, float u, float v, RTCBufferType buffer, float* P, float* dPdu, float* dPdv, float* ddPdudu, float* ddPdvdv, float* ddPdudv, size_t numFloats) 
   {
     /* test if interpolation is enabled */
 #if defined(DEBUG) 
@@ -613,18 +616,40 @@ namespace embree
 
     for (size_t i=0; i<numFloats; i+=4)
     {
-      vfloat4 Pt, dPdut, dPdvt;
+      vfloat4 Pt, dPdut, dPdvt, ddPdudut, ddPdvdvt, ddPdudvt;
       isa::PatchEval<vfloat4,vfloat4_t>(baseEntry->at(interpolationSlot(primID,i/4,stride)),parent->commitCounterSubdiv,
-                                      getHalfEdge(primID),src+i*sizeof(float),stride,u,v,P ? &Pt : nullptr, dPdu ? &dPdut : nullptr, dPdv ? &dPdvt : nullptr);
+                                        getHalfEdge(primID),src+i*sizeof(float),stride,u,v,
+                                        P ? &Pt : nullptr, 
+                                        dPdu ? &dPdut : nullptr, 
+                                        dPdv ? &dPdvt : nullptr,
+                                        ddPdudu ? &ddPdudut : nullptr, 
+                                        ddPdvdv ? &ddPdvdvt : nullptr, 
+                                        ddPdudv ? &ddPdudvt : nullptr);
 
-      if (P   ) for (size_t j=i; j<min(i+4,numFloats); j++) P[j] = Pt[j-i];
-      if (dPdu) for (size_t j=i; j<min(i+4,numFloats); j++) dPdu[j] = dPdut[j-i];
-      if (dPdv) for (size_t j=i; j<min(i+4,numFloats); j++) dPdv[j] = dPdvt[j-i];
+      if (P) {
+        for (size_t j=i; j<min(i+4,numFloats); j++) 
+          P[j] = Pt[j-i];
+      }
+      if (dPdu) 
+      {
+        for (size_t j=i; j<min(i+4,numFloats); j++) {
+          dPdu[j] = dPdut[j-i];
+          dPdv[j] = dPdvt[j-i];
+        }
+      }
+      if (ddPdudu) 
+      {
+        for (size_t j=i; j<min(i+4,numFloats); j++) {
+          ddPdudu[j] = ddPdudut[j-i];
+          ddPdvdv[j] = ddPdvdvt[j-i];
+          ddPdudv[j] = ddPdudvt[j-i];
+        }
+      }
     }
   }
 
   void SubdivMesh::interpolateN(const void* valid_i, const unsigned* primIDs, const float* u, const float* v, size_t numUVs, 
-                                RTCBufferType buffer, float* P, float* dPdu, float* dPdv, size_t numFloats)
+                                RTCBufferType buffer, float* P, float* dPdu, float* dPdv, float* ddPdudu, float* ddPdvdv, float* ddPdudv, size_t numFloats)
   {
     /* test if interpolation is enabled */
 #if defined(DEBUG)
@@ -668,8 +693,14 @@ namespace embree
         {
           const size_t M = min(size_t(4),numFloats-j);
           isa::PatchEvalSimd<vbool16,vint16,vfloat16,Vec3fa,Vec3fa_t>(baseEntry->at(interpolationSlot(primID,j/4,stride)),parent->commitCounterSubdiv,
-                                                                   getHalfEdge(primID),src+j*sizeof(float),stride,valid1,uu,vv,
-                                                                   P ? P+j*numUVs+i : nullptr,dPdu ? dPdu+j*numUVs+i : nullptr,dPdv ? dPdv+j*numUVs+i : nullptr,numUVs,M);
+                                                                      getHalfEdge(primID),src+j*sizeof(float),stride,valid1,uu,vv,
+                                                                      P ? P+j*numUVs+i : nullptr,
+                                                                      dPdu ? dPdu+j*numUVs+i : nullptr,
+                                                                      dPdv ? dPdv+j*numUVs+i : nullptr,
+                                                                      ddPdudu ? ddPdudu+j*numUVs+i : nullptr,
+                                                                      ddPdvdv ? ddPdvdv+j*numUVs+i : nullptr,
+                                                                      ddPdudv ? ddPdudv+j*numUVs+i : nullptr,
+                                                                      numUVs,M);
         }
       });
     }
@@ -690,8 +721,14 @@ namespace embree
         {
           const size_t M = min(size_t(4),numFloats-j);
           isa::PatchEvalSimd<vbool4,vint4,vfloat4,vfloat4>(baseEntry->at(interpolationSlot(primID,j/4,stride)),parent->commitCounterSubdiv,
-                                                       getHalfEdge(primID),src+j*sizeof(float),stride,valid1,uu,vv,
-                                                       P ? P+j*numUVs+i : nullptr,dPdu ? dPdu+j*numUVs+i : nullptr,dPdv ? dPdv+j*numUVs+i : nullptr,numUVs,M);
+                                                           getHalfEdge(primID),src+j*sizeof(float),stride,valid1,uu,vv,
+                                                           P ? P+j*numUVs+i : nullptr,
+                                                           dPdu ? dPdu+j*numUVs+i : nullptr,
+                                                           dPdv ? dPdv+j*numUVs+i : nullptr,
+                                                           ddPdudu ? ddPdudu+j*numUVs+i : nullptr,
+                                                           ddPdvdv ? ddPdvdv+j*numUVs+i : nullptr,
+                                                           ddPdudv ? ddPdudv+j*numUVs+i : nullptr,
+                                                           numUVs,M);
         }
       });
     }

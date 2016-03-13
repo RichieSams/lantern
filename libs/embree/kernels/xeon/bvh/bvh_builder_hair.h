@@ -71,7 +71,9 @@ namespace embree
        
       /*! entry point into builder */
       NodeRef operator() (const PrimInfo& pinfo) {
-        return recurse(1,pinfo,nullptr,true);
+        NodeRef root = recurse(1,pinfo,nullptr,true);
+        _mm_mfence(); // to allow non-temporal stores during build
+        return root;
       }
       
     private:
@@ -251,7 +253,10 @@ namespace embree
           {
             SPAWN_BEGIN;
             for (size_t i=0; i<numChildren; i++) 
-              SPAWN(([&,i] { node->child(i) = recurse(depth+1,children[i],nullptr,true); }));
+              SPAWN(([&,i] { 
+                    node->child(i) = recurse(depth+1,children[i],nullptr,true); 
+                    _mm_mfence(); // to allow non-temporal stores during build
+                  }));
             SPAWN_END;
           }
           /* ... continue sequential */
@@ -272,7 +277,10 @@ namespace embree
           {
             SPAWN_BEGIN;
             for (size_t i=0; i<numChildren; i++) 
-              SPAWN(([&,i] { node->child(i) = recurse(depth+1,children[i],nullptr,true); }));
+              SPAWN(([&,i] { 
+                    node->child(i) = recurse(depth+1,children[i],nullptr,true);
+                    _mm_mfence(); // to allow non-temporal stores during build
+                  }));
             SPAWN_END;
           }
           /* ... continue sequentially */
