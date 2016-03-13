@@ -9,8 +9,6 @@ SetSourceGroup(NAME Camera
 	             camera/thin_lens_camera.cpp
 	             camera/frame_buffer.h
 	             camera/frame_buffer.cpp
-	             camera/atomic_frame_buffer.h
-	             camera/atomic_frame_buffer.cpp
 )
 
 SetSourceGroup(NAME Math
