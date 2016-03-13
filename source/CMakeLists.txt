@@ -9,6 +9,8 @@ SetSourceGroup(NAME Camera
 	             camera/thin_lens_camera.cpp
 	             camera/frame_buffer.h
 	             camera/frame_buffer.cpp
+	             camera/reconstruction_filter.h
+	             camera/reconstruction_filter.cpp
 )
 
 SetSourceGroup(NAME Math

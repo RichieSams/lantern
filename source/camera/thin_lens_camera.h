@@ -8,10 +8,12 @@
 
 #include "math/int_types.h"
 #include "math/vector_types.h"
+#include "math/uniform_sampler.h"
 
 #include "scene/ray.h"
 
 #include "camera/frame_buffer.h"
+#include "camera/reconstruction_filter.h"
 
 
 namespace Lantern {
@@ -19,15 +21,14 @@ namespace Lantern {
 class ThinLensCamera {
 public:
 	ThinLensCamera();
-	ThinLensCamera(float phi, float theta, float radius, float clientWidth, float clientHeight, float fov = M_PI_2);
+	ThinLensCamera(float phi, float theta, float radius, float clientWidth, float clientHeight, float fov = M_PI_2, ReconstructionFilter::Type filterType = ReconstructionFilter::Type::Tent);
 
 public:
 	// Frame Data
 	FrameBuffer FrameBuffer;
 
 private:
-	// Frame Data
-
+	ReconstructionFilter m_filter;
 
 	// Spherical data
 	float m_phi;
@@ -88,7 +89,7 @@ public:
 	 * @param x         The x coordinate of the pixel
 	 * @param y         The y coordinate of the pixel
 	 */
-	RTCRay CalculateRayFromPixel(uint x, uint y) const;
+	RTCRay CalculateRayFromPixel(uint x, uint y, UniformSampler *sampler) const;
 
 private:
 	/**

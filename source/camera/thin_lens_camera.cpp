@@ -19,13 +19,14 @@ ThinLensCamera::ThinLensCamera()
 		  m_target(0.0f, 0.0f, 0.0f),
 		  m_tanFovXDiv2(0.5773503f /* tan(60 degrees / 2) */),
 		  m_tanFovYDiv2(std::tanf(0.5235f /* 60 degrees / 2 */ * 720 / 1280)),
-		  FrameBuffer(1280, 720) {
+		  FrameBuffer(1280, 720),
+		  m_filter(ReconstructionFilter::Type::Tent) {
 	UpdateOrigin();
 	UpdateCartesianCoordSystem();
 	FrameBuffer.Reset();
 }
 
-ThinLensCamera::ThinLensCamera(float phi, float theta, float radius, float clientWidth, float clientHeight, float fov)
+ThinLensCamera::ThinLensCamera(float phi, float theta, float radius, float clientWidth, float clientHeight, float fov, ReconstructionFilter::Type filterType)
 		: m_phi(phi),
 		  m_theta(theta),
 		  m_radius(radius),
@@ -33,7 +34,8 @@ ThinLensCamera::ThinLensCamera(float phi, float theta, float radius, float clien
 		  m_target(0.0f, 0.0f, 0.0f),
 		  m_tanFovXDiv2(std::tanf(fov * 0.5f)),
 		  m_tanFovYDiv2(std::tanf(fov * 0.5f * clientHeight / clientWidth)),
-		  FrameBuffer(clientWidth, clientHeight) {
+		  FrameBuffer(clientWidth, clientHeight),
+		  m_filter(filterType) {
 	UpdateOrigin();
 	UpdateCartesianCoordSystem();
 	FrameBuffer.Reset();
@@ -85,7 +87,7 @@ void ThinLensCamera::Pan(float dx, float dy) {
 	UpdateOrigin();
 }
 
-RTCRay ThinLensCamera::CalculateRayFromPixel(uint x, uint y) const {
+RTCRay ThinLensCamera::CalculateRayFromPixel(uint x, uint y, UniformSampler *sampler) const {
 	RTCRay ray;
 
 	ray.org = m_origin;
@@ -98,8 +100,11 @@ RTCRay ThinLensCamera::CalculateRayFromPixel(uint x, uint y) const {
 	ray.mask = 0xFFFFFFFF;
 	ray.time = 0.0f;
 
-	float3a viewVector((((x + 0.5f) / FrameBuffer.Width) * 2.0f - 1.0f) * m_tanFovXDiv2,
-	                   -(((y + 0.5f) / FrameBuffer.Height) * 2.0f - 1.0f) * m_tanFovYDiv2,
+	float u = m_filter.Sample(sampler->NextFloat());
+	float v = m_filter.Sample(sampler->NextFloat());
+	
+	float3a viewVector((((x + 0.5f + u) / FrameBuffer.Width) * 2.0f - 1.0f) * m_tanFovXDiv2,
+	                   -(((y + 0.5f + v) / FrameBuffer.Height) * 2.0f - 1.0f) * m_tanFovYDiv2,
 	                   -1.0f);
 
 	// Matrix multiply

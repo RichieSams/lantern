@@ -88,7 +88,7 @@ void Renderer::RenderTile(uint index, uint width, uint height, uint numTilesX, u
 }
 
 void Renderer::RenderPixel(uint x, uint y, UniformSampler *sampler) {
-	RTCRay ray = m_scene->Camera.CalculateRayFromPixel(x, y);
+	RTCRay ray = m_scene->Camera.CalculateRayFromPixel(x, y, sampler);
 
 	float3 color(0.0f);
 	float3 weights(1.0f);
