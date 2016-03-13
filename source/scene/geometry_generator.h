@@ -14,6 +14,7 @@ namespace Lantern {
 void CreateBox(float width, float height, float depth, Mesh *mesh);
 void CreateSphere(float radius, uint sliceCount, uint stackCount, Mesh *mesh);
 void CreateGeosphere(float radius, uint numSubdivisions, Mesh *mesh);
+void CreateGrid(float width, float depth, uint m, uint n, Mesh *mesh);
 
 inline void ScaleMesh(float scale, Mesh *mesh) {
 	for (auto &vertex : mesh->Vertices) {

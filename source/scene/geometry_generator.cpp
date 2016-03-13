@@ -528,99 +528,58 @@ void CreateGeosphere(float radius, uint numSubdivisions, Mesh *mesh) {
 //		mesh.Indices.push_back(baseIndex + i + 1);
 //	}
 //}
-//
-//void CreateGrid(float width, float depth, uint m, uint n, mesh& mesh) {
-//	uint VertexCount = m*n;
-//	uint faceCount = (m - 1)*(n - 1) * 2;
-//
-//	//
-//	// Create the vertices.
-//	//
-//
-//	float halfWidth = 0.5f*width;
-//	float halfDepth = 0.5f*depth;
-//
-//	float dx = width / (n - 1);
-//	float dz = depth / (m - 1);
-//
-//	float du = 1.0f / (n - 1);
-//	float dv = 1.0f / (m - 1);
-//
-//	mesh.Vertices.resize(VertexCount);
-//	for (uint i = 0; i < m; ++i) {
-//		float z = halfDepth - i*dz;
-//		for (uint j = 0; j < n; ++j) {
-//			float x = -halfWidth + j*dx;
-//
-//			mesh.Vertices[i*n + j].Position = Vertex(x, 0.0f, z);
-//			mesh.Vertices[i*n + j].Normal = Vertex(0.0f, 1.0f, 0.0f);
-//			mesh.Vertices[i*n + j].TangentU = Vertex(1.0f, 0.0f, 0.0f);
-//
-//			// Stretch texture over grid.
-//			mesh.Vertices[i*n + j].TexC.x = j*du;
-//			mesh.Vertices[i*n + j].TexC.y = i*dv;
-//		}
-//	}
-//
-//	//
-//	// Create the indices.
-//	//
-//
-//	mesh.Indices.resize(faceCount * 3); // 3 indices per face
-//
-//											// Iterate over each quad and compute indices.
-//	uint k = 0;
-//	for (uint i = 0; i < m - 1; ++i) {
-//		for (uint j = 0; j < n - 1; ++j) {
-//			mesh.Indices[k] = i*n + j;
-//			mesh.Indices[k + 1] = i*n + j + 1;
-//			mesh.Indices[k + 2] = (i + 1)*n + j;
-//
-//			mesh.Indices[k + 3] = (i + 1)*n + j;
-//			mesh.Indices[k + 4] = i*n + j + 1;
-//			mesh.Indices[k + 5] = (i + 1)*n + j + 1;
-//
-//			k += 6; // next quad
-//		}
-//	}
-//}
-//
-//void CreateFullscreenQuad(mesh& mesh) {
-//	mesh.Vertices.resize(4);
-//	mesh.Indices.resize(6);
-//
-//	// Position coordinates specified in NDC space.
-//	mesh.Vertices[0] = Vertex(
-//		-1.0f, -1.0f, 0.0f,
-//		0.0f, 0.0f, -1.0f,
-//		1.0f, 0.0f, 0.0f,
-//		0.0f, 1.0f);
-//
-//	mesh.Vertices[1] = Vertex(
-//		-1.0f, +1.0f, 0.0f,
-//		0.0f, 0.0f, -1.0f,
-//		1.0f, 0.0f, 0.0f,
-//		0.0f, 0.0f);
-//
-//	mesh.Vertices[2] = Vertex(
-//		+1.0f, +1.0f, 0.0f,
-//		0.0f, 0.0f, -1.0f,
-//		1.0f, 0.0f, 0.0f,
-//		1.0f, 0.0f);
-//
-//	mesh.Vertices[3] = Vertex(
-//		+1.0f, -1.0f, 0.0f,
-//		0.0f, 0.0f, -1.0f,
-//		1.0f, 0.0f, 0.0f,
-//		1.0f, 1.0f);
-//
-//	mesh.Indices[0] = 0;
-//	mesh.Indices[1] = 1;
-//	mesh.Indices[2] = 2;
-//
-//	mesh.Indices[3] = 0;
-//	mesh.Indices[4] = 2;
-//	mesh.Indices[5] = 3;
-//}
+
+void CreateGrid(float width, float depth, uint m, uint n, Mesh *mesh) {
+	uint vertexCount = m * n;
+	uint faceCount = (m - 1) * (n - 1) * 2;
+
+	// Create the vertices.
+	float halfWidth = 0.5f * width;
+	float halfDepth = 0.5f * depth;
+
+	float dx = width / (n - 1);
+	float dz = depth / (m - 1);
+
+	float du = 1.0f / (n - 1);
+	float dv = 1.0f / (m - 1);
+
+	mesh->Vertices.resize(vertexCount);
+	mesh->Normals.resize(vertexCount);
+	mesh->Tangents.resize(vertexCount);
+	mesh->TexCoords.resize(vertexCount);
+
+	for (uint i = 0; i < m; ++i) {
+		float z = halfDepth - i * dz;
+		for (uint j = 0; j < n; ++j) {
+			float x = -halfWidth + j * dx;
+
+			mesh->Vertices[i * n + j] = Vertex(x, 0.0f, -z, 1.0f);
+			mesh->Normals[i * n + j] = float3(0.0f, 1.0f, 0.0f);
+			mesh->Tangents[i * n + j] = float3(1.0f, 0.0f, 0.0f);
+
+			// Stretch texture over grid.
+			mesh->TexCoords[i * n + j] = float2(j * du, i * dv);
+		}
+	}
+
+	// Create the indices.
+	mesh->Indices.resize(faceCount * 3); // 3 indices per face
+
+	// Iterate over each quad and compute indices.
+	uint k = 0;
+	for (uint i = 0; i < m - 1; ++i) {
+		for (uint j = 0; j < n - 1; ++j) {
+			mesh->Indices[k] = i * n + j;
+			mesh->Indices[k + 1] = i * n + j + 1;
+			mesh->Indices[k + 2] = (i + 1) * n + j;
+
+			mesh->Indices[k + 3] = (i + 1) * n + j;
+			mesh->Indices[k + 4] = i * n + j + 1;
+			mesh->Indices[k + 5] = (i + 1) * n + j + 1;
+
+			k += 6; // next quad
+		}
+	}
+}
 
 } // End of namespace Lantern
