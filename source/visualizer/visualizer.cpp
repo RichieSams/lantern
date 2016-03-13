@@ -124,7 +124,7 @@ void Visualizer::CursorPosCallback(GLFWwindow *window, double xpos, double ypos)
 		double oldY = g_visualizer->m_lastMousePosY;
 		glfwGetCursorPos(window, &g_visualizer->m_lastMousePosX, &g_visualizer->m_lastMousePosY);
 
-		g_visualizer->m_scene->Camera.Pan((float)(g_visualizer->m_lastMousePosX - oldX) * 0.01,
+		g_visualizer->m_scene->Camera.Pan((float)(oldX - g_visualizer->m_lastMousePosX) * 0.01,
 		                                  (float)(g_visualizer->m_lastMousePosY - oldY) * 0.01);
 
 		g_visualizer->m_scene->Camera.FrameBuffer.Reset();
