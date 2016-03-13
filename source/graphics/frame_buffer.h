@@ -10,21 +10,22 @@
 
 #include "math/vector_types.h"
 
+#include <vector>
+
 
 namespace Lantern {
 
 class FrameBuffer {
 public:
 	FrameBuffer(uint width, uint height);
-	~FrameBuffer();
 
 public:
 	uint Width;
 	uint Height;
 
 private:
-	float3 *m_colorData;
-	float *m_weights;
+	std::vector<float3> m_colorData;
+	std::vector<float> m_weights;
 
 public:
 	void SplatPixel(uint x, uint y, float3 &color) {
@@ -40,13 +41,13 @@ public:
 		pixel = m_colorData[index];
 	}
 
-	float3 *GetColorData() { return m_colorData; }
-	float *GetWeights() { return m_weights; }
+	float3 *GetColorData() { return &m_colorData[0]; }
+	float *GetWeights() { return &m_weights[0]; }
 
 	void Reset() {
 		// We rely on the fact that 0x0000 == 0.0f
-		memset(m_colorData, 0, Width * Height * sizeof(float3));
-		memset(m_weights, 0, Width * Height * sizeof(float));
+		memset(&m_colorData[0], 0, Width * Height * sizeof(float3));
+		memset(&m_weights[0], 0, Width * Height * sizeof(float));
 	}
 };
 
