@@ -22,6 +22,7 @@ ThinLensCamera::ThinLensCamera()
 		  FrameBuffer(1280, 720) {
 	UpdateOrigin();
 	UpdateCartesianCoordSystem();
+	FrameBuffer.Reset();
 }
 
 ThinLensCamera::ThinLensCamera(float phi, float theta, float radius, float clientWidth, float clientHeight, float fov)
@@ -35,6 +36,7 @@ ThinLensCamera::ThinLensCamera(float phi, float theta, float radius, float clien
 		  FrameBuffer(clientWidth, clientHeight) {
 	UpdateOrigin();
 	UpdateCartesianCoordSystem();
+	FrameBuffer.Reset();
 }
 
 void ThinLensCamera::Rotate(float dPhi, float dTheta) {
