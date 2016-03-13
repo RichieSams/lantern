@@ -7,6 +7,7 @@
 #include "scene/scene.h"
 #include "scene/geometry_generator.h"
 #include "scene/lambert_material.h"
+#include "scene/mirror.h"
 
 #include "visualizer/visualizer.h"
 
@@ -21,17 +22,52 @@ int main(int argc, const char *argv[]) {
 	_MM_SET_DENORMALS_ZERO_MODE(_MM_DENORMALS_ZERO_ON);
 
 	Lantern::Scene scene;
-	Lantern::Mesh cube;
-	Lantern::CreateBox(4.0f, 4.0f, 4.0f, &cube);
-	Lantern::TranslateMesh(float3(0.0f, -2.0f, 0.0f), &cube);
+	scene.SetCamera(M_PI_2, 0.0f, 20.0f, 1280.0f, 720.0f);
 
+	// Create the materials
+	Lantern::LambertMaterial gray(float3(0.9f, 0.9f, 0.9f), float3(0.0f));
+	Lantern::LambertMaterial green(float3(0.408f, 0.741f, 0.467f), float3(0.0f));
+	Lantern::LambertMaterial blue(float3(0.392f, 0.584f, 0.929f), float3(0.0f));
+	Lantern::LambertMaterial orange(float3(1.0f, 0.498f, 0.314f), float3(0.0f));
+	Lantern::LambertMaterial whiteEmmisive(float3(1.0f, 1.0f, 1.0f), float3(3.0f));
+	Lantern::MirrorMaterial mirror(float3(0.95f, 0.95f, 0.95f));
+
+	// Create the floor
+	Lantern::Mesh floorMesh;
+	Lantern::CreateGrid(50.0f, 50.0f, 2u, 2u, &floorMesh);
+	Lantern::TranslateMesh(float3(0.0f, -6.0f, 0.0f), &floorMesh);
+	scene.AddMesh(&floorMesh, &gray);
+
+	// Create the 9 spheres
 	Lantern::Mesh sphere;
-	Lantern::CreateGeosphere(1.0f, 3u, &sphere);
-	Lantern::TranslateMesh(float3(0.0f, 1.0f, 0.0f), &sphere);
+	Lantern::CreateGeosphere(2.0f, 2u, &sphere);
 
-	Lantern::LambertMaterial *grayMaterial = new Lantern::LambertMaterial(float3(0.5f, 0.5f, 0.5f), float3(0.0f));
-	scene.AddMesh(&cube, grayMaterial);
-	scene.AddMesh(&sphere, grayMaterial);
+	scene.AddMesh(&sphere, &whiteEmmisive);
+
+	Lantern::TranslateMesh(float3(-4.0f, -4.0f, -4.0f), &sphere);
+	scene.AddMesh(&sphere, &green);
+
+	Lantern::TranslateMesh(float3(0.0f, 0.0f, 8.0f), &sphere);
+	scene.AddMesh(&sphere, &blue);
+
+	Lantern::TranslateMesh(float3(0.0f, 8.0f, 0.0f), &sphere);
+	scene.AddMesh(&sphere, &mirror);
+
+	Lantern::TranslateMesh(float3(0.0f, 0.0f, -8.0f), &sphere);
+	scene.AddMesh(&sphere, &orange);
+
+	Lantern::TranslateMesh(float3(8.0f, 0.0f, 0.0f), &sphere);
+	scene.AddMesh(&sphere, &blue);
+
+	Lantern::TranslateMesh(float3(0.0f, 0.0f, 8.0f), &sphere);
+	scene.AddMesh(&sphere, &green);
+
+	Lantern::TranslateMesh(float3(0.0f, -8.0f, 0.0f), &sphere);
+	scene.AddMesh(&sphere, &orange);
+
+	Lantern::TranslateMesh(float3(0.0f, 0.0f, -8.0f), &sphere);
+	scene.AddMesh(&sphere, &mirror);
+
 	scene.Commit();
 
 	Lantern::Renderer renderer(&scene);
@@ -44,6 +80,4 @@ int main(int argc, const char *argv[]) {
 	} else {
 		// renderer.Run();
 	}
-
-	delete grayMaterial;
 }
