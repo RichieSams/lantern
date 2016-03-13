@@ -68,6 +68,7 @@ set(SRC_SCENE
    source/scene/geometry_generator.cpp
    source/scene/material.h
    source/scene/lambert_material.h
+   source/scene/mirror.h
    source/scene/mesh_elements.h
    source/scene/ray.h
    source/scene/scene.h

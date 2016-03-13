@@ -36,12 +36,13 @@ public:
 	*
 	* Based on http://www.rorydriscoll.com/2009/01/07/better-sampling/
 	*
+	* @param wi         The direction of the incoming light
 	* @param normal     The normal that defines the hemisphere
 	*
 	* @param sampler    The sampler to use for internal random number generation
 	* @return           A cosine weighted random direction in the hemisphere
 	*/
-	float3a Sample(float3a normal, UniformSampler *sampler, float *pdf) override {
+	float3a Sample(float3a wi, float3a normal, UniformSampler *sampler, float *pdf) override {
 		// Create random coordinates in the local coordinate system
 		float rand = sampler->NextFloat();
 		float r = std::sqrtf(rand);
@@ -49,7 +50,7 @@ public:
 
 		float x = r * std::cosf(theta);
 		float y = r * std::sinf(theta);
-		float z = std::sqrtf(std::fmax(0.0f, 1.0f - rand));
+		float z = std::sqrtf(std::fmax(0.0f, 1.0f - x * x - y * y));
 
 		// Find an axis that is not parallel to normal
 		float3 majorAxis;
