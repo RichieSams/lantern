@@ -48,6 +48,7 @@ void Visualizer::Run() {
 	Init();
 
 	auto lastRender = std::chrono::high_resolution_clock::now();
+	auto startTime = lastRender;
 
 	glfwSwapInterval(0);
 	while (!glfwWindowShouldClose(m_window)) {
@@ -62,6 +63,11 @@ void Visualizer::Run() {
 		ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiSetCond_FirstUseEver);
 		ImGui::Begin("Frame Stats", nullptr, ImVec2(0, 0), -1.0f, ImGuiWindowFlags_AlwaysAutoResize);
 		ImGui::Text("%d ms/frame (%.1f FPS)", delta, 1.0f / delta * 1000.0f);
+		
+		auto runTime = currentTime - startTime;
+		int minutes = std::chrono::duration_cast<std::chrono::minutes>(runTime).count();
+		int seconds = std::chrono::duration_cast<std::chrono::seconds>(runTime).count() - minutes * 60;
+		ImGui::Text("Run time - %d:%d (min:sec)", minutes, seconds);
 		ImGui::End();
 
 		if (delta >= 0) {
