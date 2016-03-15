@@ -50,7 +50,7 @@ public:
 
 		float x = r * std::cosf(theta);
 		float y = r * std::sinf(theta);
-		float z = std::sqrtf(std::fmax(0.0f, 1.0f - x * x - y * y));
+		float z = std::sqrtf(1.0f - x * x - y * y);
 
 		// Find an axis that is not parallel to normal
 		float3 majorAxis;
