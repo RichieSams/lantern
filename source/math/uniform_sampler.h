@@ -39,11 +39,25 @@ public:
 
 	float NextFloat() {
 		uint32 temp = NextUInt();
-		return std::ldexp(temp, -32);
+		// 2x-5x faster than i/float(UINT_MAX)
+		return UintBitsToFloat((temp >> 9u) | 0x3F800000u) - 1.0f;
 	}
 
 	float2 NextFloat2() {
 		return float2(NextFloat(), NextFloat());
+	}
+
+private:
+	// Note: Could replace this with memcpy, which gcc optimizes to the same assembly
+	// as the code below. I'm not sure how other compiler treat it though, since it's
+	// really part of the C runtime. The union seems to be portable enough.
+	static float UintBitsToFloat(uint32 i) {
+		union {
+			float f;
+			uint32 i;
+		} unionHack;
+		unionHack.i = i;
+		return unionHack.f;
 	}
 };
 
