@@ -21,6 +21,8 @@ struct Mesh {
 	std::vector<float3> Tangents;
 	std::vector<float2> TexCoords;
 	std::vector<int> Indices;
+
+	float4 BoundingSphere;
 };
 
 } // End of namespace Lantern

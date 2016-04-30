@@ -26,11 +26,12 @@ int main(int argc, const char *argv[]) {
 	scene.SetCamera(M_PI_2, 0.0f, 20.0f, 1280.0f, 720.0f);
 
 	// Create the materials
-	Lantern::LambertMaterial gray(float3(0.9f, 0.9f, 0.9f), float3(0.0f));
-	Lantern::LambertMaterial green(float3(0.408f, 0.741f, 0.467f), float3(0.0f));
-	Lantern::LambertMaterial blue(float3(0.392f, 0.584f, 0.929f), float3(0.0f));
-	Lantern::LambertMaterial orange(float3(1.0f, 0.498f, 0.314f), float3(0.0f));
-	Lantern::LambertMaterial whiteEmmisive(float3(1.0f, 1.0f, 1.0f), float3(3.0f));
+	Lantern::LambertMaterial gray(float3(0.9f, 0.9f, 0.9f));
+	Lantern::LambertMaterial green(float3(0.408f, 0.741f, 0.467f));
+	Lantern::LambertMaterial blue(float3(0.392f, 0.584f, 0.929f));
+	Lantern::LambertMaterial orange(float3(1.0f, 0.498f, 0.314f));
+	Lantern::LambertMaterial white(float3(1.0f));
+	Lantern::LambertMaterial black(float3(0.0f));
 	Lantern::MirrorMaterial mirror(float3(0.95f, 0.95f, 0.95f));
 
 	// Create the floor
@@ -41,18 +42,19 @@ int main(int argc, const char *argv[]) {
 
 	// Create the 9 spheres
 	Lantern::Mesh sphere;
-	Lantern::CreateGeosphere(2.0f, 7u, &sphere);
+	Lantern::CreateGeosphere(2.0f, 2u, &sphere);
 
-	scene.AddMesh(&sphere, &whiteEmmisive);
+	Lantern::TranslateMesh(float3(0.0f, 20.0f, 0.0f), &sphere);
+	scene.AddMesh(&sphere, &white, float3(1.0f), 8000.0f);
 
-	Lantern::TranslateMesh(float3(-4.0f, -4.0f, -4.0f), &sphere);
+	Lantern::TranslateMesh(float3(-4.0f, -24.0f, -4.0f), &sphere);
 	scene.AddMesh(&sphere, &green);
 
 	Lantern::TranslateMesh(float3(0.0f, 0.0f, 8.0f), &sphere);
 	scene.AddMesh(&sphere, &blue);
 
 	Lantern::TranslateMesh(float3(0.0f, 8.0f, 0.0f), &sphere);
-	scene.AddMesh(&sphere, &mirror);
+	scene.AddMesh(&sphere, &gray);
 
 	Lantern::TranslateMesh(float3(0.0f, 0.0f, -8.0f), &sphere);
 	scene.AddMesh(&sphere, &orange);
@@ -67,7 +69,7 @@ int main(int argc, const char *argv[]) {
 	scene.AddMesh(&sphere, &orange);
 
 	Lantern::TranslateMesh(float3(0.0f, 0.0f, -8.0f), &sphere);
-	scene.AddMesh(&sphere, &mirror);
+	scene.AddMesh(&sphere, &gray);
 
 	scene.Commit();
 

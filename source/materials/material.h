@@ -15,13 +15,18 @@ class UniformSampler;
 
 class Material {
 public:
-	Material() {}
+	Material(float3 albedo)
+		: m_albedo(albedo) {
+	}
 	virtual ~Material() {}
 
+protected:
+	float3 m_albedo;
+
 public:
-	virtual float3 EmissiveColor() = 0;
-	virtual float3 Eval(float3a wi, float3a wo, float3a normal) = 0;
-	virtual float3a Sample(float3a wi, float3a normal, UniformSampler *sampler, float *pdf) = 0;
+	virtual float3 Eval(float3a &wi, float3a &wo, float3a &normal) const = 0;
+	virtual float3a Sample(float3a &wo, float3a &normal, UniformSampler *sampler) const = 0;
+	virtual float Pdf(float3a &wi, float3a &normal) const = 0;
 };
 
 } // End of namespace Lantern

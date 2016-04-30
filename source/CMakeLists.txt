@@ -14,14 +14,20 @@ SetSourceGroup(NAME Camera
 )
 
 SetSourceGroup(NAME Math
-	SOURCE_FILES math/uniform_sampler.h
+	SOURCE_FILES math/sampling.h
+	             math/uniform_sampler.h
 	             math/vector_types.h
+	             math/vector_math.h
+	             math/vector_math.cpp
 	             math/int_types.h
 )
 
 SetSourceGroup(NAME Scene
-	SOURCE_FILES scene/geometry_generator.h
+	SOURCE_FILES scene/area_light.h
+	             scene/area_light.cpp
+	             scene/geometry_generator.h
 	             scene/geometry_generator.cpp
+	             scene/light.h
 	             scene/mesh_elements.h
 	             scene/ray.h
 	             scene/scene.h

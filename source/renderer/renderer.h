@@ -7,12 +7,15 @@
 #pragma once
 
 #include "math/int_types.h"
+#include "math/vector_types.h"
 
 
 namespace Lantern {
 
 class UniformSampler;
 class Scene;
+class Material;
+class Light;
 
 class Renderer {
 public:
@@ -33,7 +36,8 @@ public:
 private:
 	void RenderTile(uint index, uint width, uint height, uint numTilesX, uint numTilesY);
 	void RenderPixel(uint x, uint y, UniformSampler *sampler);
-
+	float3 SampleOneLight(UniformSampler *sampler, float3a &surfacePos, float3a &surfaceNormal, float3a &wo, Material *material, Light *hitLight) const;
+	float3 EstimateDirect(Light *light, UniformSampler *sampler, float3a &surfacePos, float3a &surfaceNormal, float3a &wo, Material *material) const;
 };
 
 } // End of namespace Lantern

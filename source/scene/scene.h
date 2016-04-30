@@ -10,6 +10,8 @@
 
 #include "camera/thin_lens_camera.h"
 
+#include "scene/light.h"
+
 #include <embree2/rtcore.h>
 
 #include <unordered_map>
@@ -32,7 +34,9 @@ public:
 	ThinLensCamera Camera;
 
 private:
-	std::unordered_map<uint, Material *> m_meshes;
+	std::unordered_map<uint, Material *> m_materials;
+	std::vector<Light *> m_lightList;
+	std::unordered_map<uint, Light *> m_lightMap;
 
 	RTCDevice m_device;
 	RTCScene m_scene;
@@ -43,10 +47,27 @@ public:
 	}
 
 	void AddMesh(Mesh *mesh, Material *material);
-	Material *GetMaterial(uint meshId) { return m_meshes[meshId]; }
+	void AddMesh(Mesh *mesh, Material *material, float3 color, float radiantPower);
 	void Commit() { rtcCommit(m_scene);	}
 
+	Material *GetMaterial(uint meshId) {
+		return m_materials[meshId];
+	}
+	Light *GetLight(uint meshId) {
+		auto iter = m_lightMap.find(meshId);
+		if (iter != m_lightMap.end()) {
+			return iter->second;
+		} else {
+			return nullptr;
+		}
+	}
+	std::size_t NumLights() { return m_lightList.size(); }
+	Light *RandomOneLight(UniformSampler *sampler);
+
 	void Intersect(RTCRay &ray) const { rtcIntersect(m_scene, ray); }
+
+private:
+	uint AddMeshInternal(Mesh *mesh, Material *material);
 };
 
 } // End of namespace Lantern
