@@ -95,7 +95,7 @@ float ReconstructionFilter::Evaluate(float x) const {
 	case Type::Gaussian: 
 		{
 			float alpha = 2.0f;
-			std::exp(-alpha * x * x) - std::exp(-alpha * m_width * m_width);
+			return std::exp(-alpha * x * x) - std::exp(-alpha * m_width * m_width);
 		}
 	case Type::Dirac:
 	default: 
