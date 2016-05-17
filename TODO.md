@@ -1,0 +1,57 @@
+TODO List
+====================
+
+- **Re-add support for specular materials - Medium**
+	- Removed when I switched to direct light sampling
+- **Create a OpenGL renderer view - Easy/Medium**
+	- Start with just being able to switch between path tracing and OpenGL
+	- Need to decide whether to use "modern" OpenGL, or fixed pipeline
+		- Leaning towards modern, since custom shaders might be useful in the future
+		- In addition, I am more familiar with the modern model, since it is more similar to DX11
+- **Be able to debug parts of the render - Hard**
+	- I'm envisioning something like RenderDoc
+	- So you press a button to "Record the next frame". 
+	- Then it records all the rays that are shot, etc.
+		- This will be diffucult to cleanly implement
+			- We will need to come up with a way to serialize different types of 'events'
+				- Perhaps some kind of polymorphism
+				- With base member values, like pixel pos, and path number, to help sort/bin the events
+		- Since it will somehow require instrumenting a lot of the code base, and passing around a 'logger' object, (per thread)
+		- If possible, I would prefer if the instrumentation could be compiled out with pre-processor type logic
+			- So in full release builds, the logging code doesn't exist
+		- Initial ideas:
+			- Pass the logger in as a dependency for functions
+			- Surround logger code with a macro or #ifdef guards
+			- If logging is disabled, the logger dependency might be removed in dead code elimination
+				- It wouldn't be the end of the world if it didn't, since the logger param will just be a pointer
+	- After the record, it switches to OpenGL view, where you can view the results
+		- The interface for this is going to be one of the hardest parts
+		- I would like it to be something like RenderDoc, where you can 'pick' a pixel, and see all the paths drawn
+		- It would be very nice to be able to visualize the sampling. 
+			- For example, to draw the disc and ray chosen for general area light shapes
+- **Implement other BRDFs - Medium**
+	- Some of the more complex BRDFs require more data than Material::Eval() is currently being passed
+		- We should consider whether to switch to some kind of struct for holding all the relavant data
+			- IE. Tungstun and PBRT's SurfaceInteraction struct
+- **Implement normal/UV interpolation - Easy**
+	- Embree has functions for vertex data interpolation
+	- However, last time I tried, it was outputting garbage numbers.
+- **Implement JSON scene loading - Medium**
+	- Two popular libaries are RapidJSON and nlohmann/json
+		- https://github.com/miloyip/rapidjson
+		- https://github.com/nlohmann/json
+	- RapidJSON is slightly faster
+	- nlohmann/json seems to be a bit nicer to use (Iterating, etc.) but pretty minor overall
+- **Implement using textures for material properties - Medium**
+	- First, implement UV interpolation
+	- Then using that to get real triangle UVs, implement the others
+	- https://github.com/syoyo/tinyexr and/or https://github.com/nothings/stb/blob/master/stb_image.h could be really nice drop-ins for the actual reading of the texture data
+- **Create a nice test render scene - Medium/Hard**
+	- Start purusing some free 3D model sites
+	- And free PBR texture sites
+		- https://forums.unrealengine.com/showthread.php?90245-Free-PBR-Texture-Vol-01
+		- http://opengameart.org/content/yughues-free-pbr-metal-plates
+		- http://freepbr.com/
+	- I have access to Quixel Suite, but I won't be able to re-distribute them
+	- But, on that note, I probably won't share the scenes in git, since they will be quite large
+		- Perhaps, for the scenes that *are* redistributable, I can upload them to my site
