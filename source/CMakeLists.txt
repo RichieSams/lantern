@@ -33,6 +33,8 @@ SetSourceGroup(NAME Scene
 	             scene/ray.h
 	             scene/scene.h
 	             scene/scene.cpp
+	             scene/obj_loader.h
+	             scene/obj_loader.cpp
 )
 
 SetSourceGroup(NAME Materials
@@ -51,6 +53,15 @@ SetSourceGroup(NAME Visualizer
 	             visualizer/visualizer.cpp
 )
 
+# For header-only / single file libraries, it's easier to just compile them
+# directly, rather than creating a seperate lib and linking
+SetSourceGroup(NAME "Third Party"
+	SOURCE_FILES ../third_party/tiny_obj_loader/include/tiny_obj_loader/tiny_obj_loader.h
+	             ../third_party/tiny_obj_loader/tiny_obj_loader.cpp
+)
+include_directories(../third_party/tiny_obj_loader/include)
+
+
 # Link all the sources into one
 set(LANTERN_SRC
 	${SRC_ROOT}
@@ -60,6 +71,7 @@ set(LANTERN_SRC
 	${SRC_MATERIALS}
 	${SRC_RENDERER}
 	${SRC_VISUALIZER}
+	${SRC_THIRD_PARTY}
 )
 
 

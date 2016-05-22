@@ -6,6 +6,7 @@
 
 #include "scene/scene.h"
 #include "scene/geometry_generator.h"
+#include "scene/obj_loader.h"
 
 #include "materials/lambert_material.h"
 #include "materials/mirror.h"
@@ -19,6 +20,8 @@
 
 
 void SetScene(Lantern::Scene &scene);
+void LoadObjScene(Lantern::Scene &scene);
+void LoadBallsScene(Lantern::Scene &scene);
 
 int main(int argc, const char *argv[]) {
 	_MM_SET_FLUSH_ZERO_MODE(_MM_FLUSH_ZERO_ON);
@@ -40,16 +43,40 @@ int main(int argc, const char *argv[]) {
 }
 
 void SetScene(Lantern::Scene &scene) {
-	scene.SetCamera(M_PI_2, 0.0f, 20.0f, 1280.0f, 720.0f);
 	scene.BackgroundColor = float3(0.846f, 0.933f, 0.949f);
 
+	#if 1
+		LoadObjScene(scene);
+	#else
+		LoadBallsScene(scene);
+	#endif
+
+	scene.Commit();
+}
+
+void LoadObjScene(Lantern::Scene &scene) {
+	scene.SetCamera(M_PI_2, 0.0f, 1.25f, 1280.0f, 720.0f);
+
+	Lantern::LambertMaterial *green = new Lantern::LambertMaterial(float3(0.408f, 0.741f, 0.467f));
+	
+	// Create Buddha
+	std::vector<Lantern::Mesh> buddhaMeshes;
+	std::vector<Lantern::Material> buddhaMaterials;
+	Lantern::LoadMeshesFromObj("buddha.obj", buddhaMeshes, buddhaMaterials);
+	for (auto &mesh : buddhaMeshes) {
+		scene.AddMesh(&mesh, green);
+	}
+}
+
+void LoadBallsScene(Lantern::Scene &scene) {
+	scene.SetCamera(M_PI_2, 0.0f, 20.0f, 1280.0f, 720.0f);
+
 	// Create the materials
-	Lantern::LambertMaterial *gray = new Lantern::LambertMaterial(float3(0.9f, 0.9f, 0.9f));
 	Lantern::LambertMaterial *green = new Lantern::LambertMaterial(float3(0.408f, 0.741f, 0.467f));
 	Lantern::LambertMaterial *blue = new Lantern::LambertMaterial(float3(0.392f, 0.584f, 0.929f));
 	Lantern::LambertMaterial *orange = new Lantern::LambertMaterial(float3(1.0f, 0.498f, 0.314f));
 	Lantern::LambertMaterial *white = new Lantern::LambertMaterial(float3(1.0f));
-	Lantern::LambertMaterial *black = new Lantern::LambertMaterial(float3(0.0f));
+	Lantern::LambertMaterial *gray = new Lantern::LambertMaterial(float3(0.9f, 0.9f, 0.9f));
 	Lantern::MirrorMaterial *mirror = new Lantern::MirrorMaterial(float3(0.95f, 0.95f, 0.95f));
 
 	// Create the floor
@@ -59,7 +86,8 @@ void SetScene(Lantern::Scene &scene) {
 	scene.AddMesh(&floorMesh, gray);
 
 	// Create the 9 spheres
-	Lantern::Mesh *sphere = new Lantern::Mesh();
+	Lantern::Mesh sphereMesh;
+	Lantern::Mesh *sphere = &sphereMesh;
 	Lantern::CreateGeosphere(2.0f, 8u, sphere);
 
 	scene.AddMesh(sphere, white, float3(1.0f), 800.0f);
@@ -87,6 +115,4 @@ void SetScene(Lantern::Scene &scene) {
 
 	Lantern::TranslateMesh(float3(0.0f, 0.0f, -8.0f), sphere);
 	scene.AddMesh(sphere, mirror);
-
-	scene.Commit();
 }
