@@ -28,11 +28,11 @@ Scene::~Scene() {
 }
 
 uint Scene::AddMeshInternal(Mesh *mesh, Material *material) {
-	uint meshId = rtcNewTriangleMesh(m_scene, RTC_GEOMETRY_STATIC, mesh->Indices.size() / 3, mesh->Vertices.size());
+	uint meshId = rtcNewTriangleMesh(m_scene, RTC_GEOMETRY_STATIC, mesh->Indices.size() / 3, mesh->Positions.size());
 	m_materials[meshId] = material;
 
-	Vertex *vertices = (Vertex *)rtcMapBuffer(m_scene, meshId, RTC_VERTEX_BUFFER);
-	memcpy(vertices, &mesh->Vertices[0], mesh->Vertices.size() * sizeof(Vertex));
+	float3a *vertices = (float3a *)rtcMapBuffer(m_scene, meshId, RTC_VERTEX_BUFFER);
+	memcpy(vertices, &mesh->Positions[0], mesh->Positions.size() * sizeof(float3a));
 	rtcUnmapBuffer(m_scene, meshId, RTC_VERTEX_BUFFER);
 
 	uint *indices = (uint *)rtcMapBuffer(m_scene, meshId, RTC_INDEX_BUFFER);
@@ -50,8 +50,7 @@ void Scene::AddMesh(Mesh *mesh, Material *material, float3 color, float radiantP
 	uint meshId = AddMeshInternal(mesh, material);
 	
 	// Calculate the surface area
-	assert(sizeof(Vertex) == sizeof(float3a));
-	std::vector<float3a> *vertices = (std::vector<float3a> *)&mesh->Vertices;
+	std::vector<float3a> *vertices = (std::vector<float3a> *)&mesh->Positions;
 	std::vector<int> *indices = &mesh->Indices;
 
 	float totalArea = 0.0f;

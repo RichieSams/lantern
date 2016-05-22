@@ -19,8 +19,8 @@
 namespace Lantern {
 
 void CreateBox(float width, float height, float depth, Mesh *mesh) {
-	// Create the vertex data
-	mesh->Vertices.resize(24);
+	// Create the float3a data
+	mesh->Positions.resize(24);
 	mesh->Normals.resize(24);
 	mesh->Tangents.resize(24);
 	mesh->TexCoords.resize(24);
@@ -31,42 +31,42 @@ void CreateBox(float width, float height, float depth, Mesh *mesh) {
 
 	mesh->BoundingSphere = float4(0.0f, 0.0f, 0.0f, std::max(std::max(w2, h2), d2));
 
-	// Fill in the front face vertex data.
-	mesh->Vertices[0] = Vertex(-w2, -h2, +d2, 1.0f); mesh->Normals[0] = float3(0.0f, 0.0f, 1.0f); mesh->Tangents[0] = float3(1.0f, 0.0f, 0.0f); mesh->TexCoords[0] = float2(0.0f, 1.0f);
-	mesh->Vertices[1] = Vertex(-w2, +h2, +d2, 1.0f); mesh->Normals[1] = float3(0.0f, 0.0f, 1.0f); mesh->Tangents[1] = float3(1.0f, 0.0f, 0.0f); mesh->TexCoords[1] = float2(0.0f, 0.0f);
-	mesh->Vertices[2] = Vertex(+w2, +h2, +d2, 1.0f); mesh->Normals[2] = float3(0.0f, 0.0f, 1.0f); mesh->Tangents[2] = float3(1.0f, 0.0f, 0.0f); mesh->TexCoords[2] = float2(1.0f, 0.0f);
-	mesh->Vertices[3] = Vertex(+w2, -h2, +d2, 1.0f); mesh->Normals[3] = float3(0.0f, 0.0f, 1.0f); mesh->Tangents[3] = float3(1.0f, 0.0f, 0.0f); mesh->TexCoords[3] = float2(1.0f, 1.0f);
+	// Fill in the front face float3a data.
+	mesh->Positions[0] = float3a(-w2, -h2, +d2); mesh->Normals[0] = float3(0.0f, 0.0f, 1.0f); mesh->Tangents[0] = float3(1.0f, 0.0f, 0.0f); mesh->TexCoords[0] = float2(0.0f, 1.0f);
+	mesh->Positions[1] = float3a(-w2, +h2, +d2); mesh->Normals[1] = float3(0.0f, 0.0f, 1.0f); mesh->Tangents[1] = float3(1.0f, 0.0f, 0.0f); mesh->TexCoords[1] = float2(0.0f, 0.0f);
+	mesh->Positions[2] = float3a(+w2, +h2, +d2); mesh->Normals[2] = float3(0.0f, 0.0f, 1.0f); mesh->Tangents[2] = float3(1.0f, 0.0f, 0.0f); mesh->TexCoords[2] = float2(1.0f, 0.0f);
+	mesh->Positions[3] = float3a(+w2, -h2, +d2); mesh->Normals[3] = float3(0.0f, 0.0f, 1.0f); mesh->Tangents[3] = float3(1.0f, 0.0f, 0.0f); mesh->TexCoords[3] = float2(1.0f, 1.0f);
 
 
-	// Fill in the back face vertex data.
-	mesh->Vertices[4] = Vertex(-w2, -h2, -d2, 1.0f); mesh->Normals[4] = float3(0.0f, 0.0f, -1.0f); mesh->Tangents[4] = float3(-1.0f, 0.0f, 0.0f); mesh->TexCoords[4] = float2(1.0f, 1.0f);
-	mesh->Vertices[5] = Vertex(+w2, -h2, -d2, 1.0f); mesh->Normals[5] = float3(0.0f, 0.0f, -1.0f); mesh->Tangents[5] = float3(-1.0f, 0.0f, 0.0f); mesh->TexCoords[5] = float2(0.0f, 1.0f);
-	mesh->Vertices[6] = Vertex(+w2, +h2, -d2, 1.0f); mesh->Normals[6] = float3(0.0f, 0.0f, -1.0f); mesh->Tangents[6] = float3(-1.0f, 0.0f, 0.0f); mesh->TexCoords[6] = float2(0.0f, 0.0f);
-	mesh->Vertices[7] = Vertex(-w2, +h2, -d2, 1.0f); mesh->Normals[7] = float3(0.0f, 0.0f, -1.0f); mesh->Tangents[7] = float3(-1.0f, 0.0f, 0.0f); mesh->TexCoords[7] = float2(1.0f, 0.0f);
+	// Fill in the back face float3a data.
+	mesh->Positions[4] = float3a(-w2, -h2, -d2); mesh->Normals[4] = float3(0.0f, 0.0f, -1.0f); mesh->Tangents[4] = float3(-1.0f, 0.0f, 0.0f); mesh->TexCoords[4] = float2(1.0f, 1.0f);
+	mesh->Positions[5] = float3a(+w2, -h2, -d2); mesh->Normals[5] = float3(0.0f, 0.0f, -1.0f); mesh->Tangents[5] = float3(-1.0f, 0.0f, 0.0f); mesh->TexCoords[5] = float2(0.0f, 1.0f);
+	mesh->Positions[6] = float3a(+w2, +h2, -d2); mesh->Normals[6] = float3(0.0f, 0.0f, -1.0f); mesh->Tangents[6] = float3(-1.0f, 0.0f, 0.0f); mesh->TexCoords[6] = float2(0.0f, 0.0f);
+	mesh->Positions[7] = float3a(-w2, +h2, -d2); mesh->Normals[7] = float3(0.0f, 0.0f, -1.0f); mesh->Tangents[7] = float3(-1.0f, 0.0f, 0.0f); mesh->TexCoords[7] = float2(1.0f, 0.0f);
 
-	// Fill in the top face vertex data.
-	mesh->Vertices[8] = Vertex(-w2, +h2, +d2, 1.0f); mesh->Normals[8] = float3(0.0f, 1.0f, 0.0f); mesh->Tangents[8] = float3(1.0f, 0.0f, 0.0f); mesh->TexCoords[8] = float2(0.0f, 1.0f);
-	mesh->Vertices[9] = Vertex(-w2, +h2, -d2, 1.0f); mesh->Normals[9] = float3(0.0f, 1.0f, 0.0f); mesh->Tangents[9] = float3(1.0f, 0.0f, 0.0f); mesh->TexCoords[9] = float2(0.0f, 0.0f);
-	mesh->Vertices[10] = Vertex(+w2, +h2, -d2, 1.0f); mesh->Normals[10] = float3(0.0f, 1.0f, 0.0f); mesh->Tangents[10] = float3(1.0f, 0.0f, 0.0f); mesh->TexCoords[10] = float2(1.0f, 0.0f);
-	mesh->Vertices[11] = Vertex(+w2, +h2, +d2, 1.0f); mesh->Normals[11] = float3(0.0f, 1.0f, 0.0f); mesh->Tangents[11] = float3(1.0f, 0.0f, 0.0f); mesh->TexCoords[11] = float2(1.0f, 1.0f);
+	// Fill in the top face float3a data.
+	mesh->Positions[8] = float3a(-w2, +h2, +d2); mesh->Normals[8] = float3(0.0f, 1.0f, 0.0f); mesh->Tangents[8] = float3(1.0f, 0.0f, 0.0f); mesh->TexCoords[8] = float2(0.0f, 1.0f);
+	mesh->Positions[9] = float3a(-w2, +h2, -d2); mesh->Normals[9] = float3(0.0f, 1.0f, 0.0f); mesh->Tangents[9] = float3(1.0f, 0.0f, 0.0f); mesh->TexCoords[9] = float2(0.0f, 0.0f);
+	mesh->Positions[10] = float3a(+w2, +h2, -d2); mesh->Normals[10] = float3(0.0f, 1.0f, 0.0f); mesh->Tangents[10] = float3(1.0f, 0.0f, 0.0f); mesh->TexCoords[10] = float2(1.0f, 0.0f);
+	mesh->Positions[11] = float3a(+w2, +h2, +d2); mesh->Normals[11] = float3(0.0f, 1.0f, 0.0f); mesh->Tangents[11] = float3(1.0f, 0.0f, 0.0f); mesh->TexCoords[11] = float2(1.0f, 1.0f);
 
-	// Fill in the bottom face vertex data.
-	mesh->Vertices[12] = Vertex(-w2, -h2, +d2, 1.0f); mesh->Normals[12] = float3(0.0f, -1.0f, 0.0f); mesh->Tangents[12] = float3(-1.0f, 0.0f, 0.0f); mesh->TexCoords[12] = float2(1.0f, 1.0f);
-	mesh->Vertices[13] = Vertex(+w2, -h2, +d2, 1.0f); mesh->Normals[13] = float3(0.0f, -1.0f, 0.0f); mesh->Tangents[13] = float3(-1.0f, 0.0f, 0.0f); mesh->TexCoords[13] = float2(0.0f, 1.0f);
-	mesh->Vertices[14] = Vertex(+w2, -h2, -d2, 1.0f); mesh->Normals[14] = float3(0.0f, -1.0f, 0.0f); mesh->Tangents[14] = float3(-1.0f, 0.0f, 0.0f); mesh->TexCoords[14] = float2(0.0f, 0.0f);
-	mesh->Vertices[15] = Vertex(-w2, -h2, -d2, 1.0f); mesh->Normals[15] = float3(0.0f, -1.0f, 0.0f); mesh->Tangents[15] = float3(-1.0f, 0.0f, 0.0f); mesh->TexCoords[15] = float2(1.0f, 0.0f);
+	// Fill in the bottom face float3a data.
+	mesh->Positions[12] = float3a(-w2, -h2, +d2); mesh->Normals[12] = float3(0.0f, -1.0f, 0.0f); mesh->Tangents[12] = float3(-1.0f, 0.0f, 0.0f); mesh->TexCoords[12] = float2(1.0f, 1.0f);
+	mesh->Positions[13] = float3a(+w2, -h2, +d2); mesh->Normals[13] = float3(0.0f, -1.0f, 0.0f); mesh->Tangents[13] = float3(-1.0f, 0.0f, 0.0f); mesh->TexCoords[13] = float2(0.0f, 1.0f);
+	mesh->Positions[14] = float3a(+w2, -h2, -d2); mesh->Normals[14] = float3(0.0f, -1.0f, 0.0f); mesh->Tangents[14] = float3(-1.0f, 0.0f, 0.0f); mesh->TexCoords[14] = float2(0.0f, 0.0f);
+	mesh->Positions[15] = float3a(-w2, -h2, -d2); mesh->Normals[15] = float3(0.0f, -1.0f, 0.0f); mesh->Tangents[15] = float3(-1.0f, 0.0f, 0.0f); mesh->TexCoords[15] = float2(1.0f, 0.0f);
 
-	// Fill in the left face vertex data.
-	mesh->Vertices[16] = Vertex(-w2, -h2, -d2, 1.0f); mesh->Normals[16] = float3(-1.0f, 0.0f, 0.0f); mesh->Tangents[16] = float3(0.0f, 0.0f, 1.0f); mesh->TexCoords[16] = float2(0.0f, 1.0f);
-	mesh->Vertices[17] = Vertex(-w2, +h2, -d2, 1.0f); mesh->Normals[17] = float3(-1.0f, 0.0f, 0.0f); mesh->Tangents[17] = float3(0.0f, 0.0f, 1.0f); mesh->TexCoords[17] = float2(0.0f, 0.0f);
-	mesh->Vertices[18] = Vertex(-w2, +h2, +d2, 1.0f); mesh->Normals[18] = float3(-1.0f, 0.0f, 0.0f); mesh->Tangents[18] = float3(0.0f, 0.0f, 1.0f); mesh->TexCoords[18] = float2(1.0f, 0.0f);
-	mesh->Vertices[19] = Vertex(-w2, -h2, +d2, 1.0f); mesh->Normals[19] = float3(-1.0f, 0.0f, 0.0f); mesh->Tangents[19] = float3(0.0f, 0.0f, 1.0f); mesh->TexCoords[19] = float2(1.0f, 1.0f);
+	// Fill in the left face float3a data.
+	mesh->Positions[16] = float3a(-w2, -h2, -d2); mesh->Normals[16] = float3(-1.0f, 0.0f, 0.0f); mesh->Tangents[16] = float3(0.0f, 0.0f, 1.0f); mesh->TexCoords[16] = float2(0.0f, 1.0f);
+	mesh->Positions[17] = float3a(-w2, +h2, -d2); mesh->Normals[17] = float3(-1.0f, 0.0f, 0.0f); mesh->Tangents[17] = float3(0.0f, 0.0f, 1.0f); mesh->TexCoords[17] = float2(0.0f, 0.0f);
+	mesh->Positions[18] = float3a(-w2, +h2, +d2); mesh->Normals[18] = float3(-1.0f, 0.0f, 0.0f); mesh->Tangents[18] = float3(0.0f, 0.0f, 1.0f); mesh->TexCoords[18] = float2(1.0f, 0.0f);
+	mesh->Positions[19] = float3a(-w2, -h2, +d2); mesh->Normals[19] = float3(-1.0f, 0.0f, 0.0f); mesh->Tangents[19] = float3(0.0f, 0.0f, 1.0f); mesh->TexCoords[19] = float2(1.0f, 1.0f);
 
-	// Fill in the right face vertex data.
-	mesh->Vertices[20] = Vertex(+w2, -h2, +d2, 1.0f); mesh->Normals[20] = float3(1.0f, 0.0f, 0.0f); mesh->Tangents[20] = float3(0.0f, 0.0f, -1.0f); mesh->TexCoords[20] = float2(0.0f, 1.0f);
-	mesh->Vertices[21] = Vertex(+w2, +h2, +d2, 1.0f); mesh->Normals[21] = float3(1.0f, 0.0f, 0.0f); mesh->Tangents[21] = float3(0.0f, 0.0f, -1.0f); mesh->TexCoords[21] = float2(0.0f, 0.0f);
-	mesh->Vertices[22] = Vertex(+w2, +h2, -d2, 1.0f); mesh->Normals[22] = float3(1.0f, 0.0f, 0.0f); mesh->Tangents[22] = float3(0.0f, 0.0f, -1.0f); mesh->TexCoords[22] = float2(1.0f, 0.0f);
-	mesh->Vertices[23] = Vertex(+w2, -h2, -d2, 1.0f); mesh->Normals[23] = float3(1.0f, 0.0f, 0.0f); mesh->Tangents[23] = float3(0.0f, 0.0f, -1.0f); mesh->TexCoords[23] = float2(1.0f, 1.0f);
+	// Fill in the right face float3a data.
+	mesh->Positions[20] = float3a(+w2, -h2, +d2); mesh->Normals[20] = float3(1.0f, 0.0f, 0.0f); mesh->Tangents[20] = float3(0.0f, 0.0f, -1.0f); mesh->TexCoords[20] = float2(0.0f, 1.0f);
+	mesh->Positions[21] = float3a(+w2, +h2, +d2); mesh->Normals[21] = float3(1.0f, 0.0f, 0.0f); mesh->Tangents[21] = float3(0.0f, 0.0f, -1.0f); mesh->TexCoords[21] = float2(0.0f, 0.0f);
+	mesh->Positions[22] = float3a(+w2, +h2, -d2); mesh->Normals[22] = float3(1.0f, 0.0f, 0.0f); mesh->Tangents[22] = float3(0.0f, 0.0f, -1.0f); mesh->TexCoords[22] = float2(1.0f, 0.0f);
+	mesh->Positions[23] = float3a(+w2, -h2, -d2); mesh->Normals[23] = float3(1.0f, 0.0f, 0.0f); mesh->Tangents[23] = float3(0.0f, 0.0f, -1.0f); mesh->TexCoords[23] = float2(1.0f, 1.0f);
 
 
 	// Create the index data
@@ -131,7 +131,7 @@ void CreateSphere(float radius, uint sliceCount, uint stackCount, Mesh *mesh) {
 	// a rectangular texture onto a sphere
 
 	// Push top pole
-	mesh->Vertices.emplace_back(0.0f, +radius, 0.0f, 1.0f);
+	mesh->Positions.emplace_back(0.0f, +radius, 0.0f);
 	mesh->Normals.emplace_back(0.0f, +1.0f, 0.0f);
 	mesh->Tangents.emplace_back(1.0f, 0.0f, 0.0f);
 	mesh->TexCoords.emplace_back(0.0f, 0.0f);
@@ -152,7 +152,7 @@ void CreateSphere(float radius, uint sliceCount, uint stackCount, Mesh *mesh) {
 			float y = radius * std::cosf(phi);
 			float z = radius * std::sinf(phi) * std::cosf(theta);
 
-			mesh->Vertices.emplace_back(x, y, z, 1.0f);
+			mesh->Positions.emplace_back(x, y, z);
 			mesh->Normals.push_back(normalize(float3(x, y, z)));
 
 			// Partial derivative of P with respect to theta
@@ -167,12 +167,12 @@ void CreateSphere(float radius, uint sliceCount, uint stackCount, Mesh *mesh) {
 	}
 
 	// Push the bottom pole
-	mesh->Vertices.emplace_back(0.0f, -radius, 0.0f, 1.0f);
+	mesh->Positions.emplace_back(0.0f, -radius, 0.0f);
 	mesh->Normals.emplace_back(0.0f, -1.0f, 0.0f);
 	mesh->Tangents.emplace_back(1.0f, 0.0f, 0.0f);
 	mesh->TexCoords.emplace_back(0.0f, 1.0f);
 
-	// Compute indices for top stack.  The top stack was written first to the vertex buffer
+	// Compute indices for top stack.  The top stack was written first to the float3a buffer
 	// and connects the top pole to the first ring
 	for (uint i = 1; i <= sliceCount; ++i) {
 		mesh->Indices.push_back(0);
@@ -182,30 +182,30 @@ void CreateSphere(float radius, uint sliceCount, uint stackCount, Mesh *mesh) {
 
 	// Compute indices for inner stacks (not connected to poles)
 
-	// Offset the indices to the index of the first vertex in the first ring
-	// This is just skipping the top pole vertex
+	// Offset the indices to the index of the first float3a in the first ring
+	// This is just skipping the top pole float3a
 	uint baseIndex = 1;
-	uint ringVertexCount = sliceCount + 1;
+	uint ringfloat3aCount = sliceCount + 1;
 	for (uint i = 0; i < stackCount - 2; ++i) {
 		for (uint j = 0; j < sliceCount; ++j) {
-			mesh->Indices.push_back(baseIndex + i * ringVertexCount + j);
-			mesh->Indices.push_back(baseIndex + i * ringVertexCount + j + 1);
-			mesh->Indices.push_back(baseIndex + (i + 1) * ringVertexCount + j);
+			mesh->Indices.push_back(baseIndex + i * ringfloat3aCount + j);
+			mesh->Indices.push_back(baseIndex + i * ringfloat3aCount + j + 1);
+			mesh->Indices.push_back(baseIndex + (i + 1) * ringfloat3aCount + j);
 
-			mesh->Indices.push_back(baseIndex + (i + 1) * ringVertexCount + j);
-			mesh->Indices.push_back(baseIndex + i * ringVertexCount + j + 1);
-			mesh->Indices.push_back(baseIndex + (i + 1) * ringVertexCount + j + 1);
+			mesh->Indices.push_back(baseIndex + (i + 1) * ringfloat3aCount + j);
+			mesh->Indices.push_back(baseIndex + i * ringfloat3aCount + j + 1);
+			mesh->Indices.push_back(baseIndex + (i + 1) * ringfloat3aCount + j + 1);
 		}
 	}
 
-	// Compute indices for bottom stack.  The bottom stack was written last to the vertex buffer
+	// Compute indices for bottom stack.  The bottom stack was written last to the float3a buffer
 	// and connects the bottom pole to the bottom ring
 
-	// South pole vertex was added last.
-	uint southPoleIndex = (uint)mesh->Vertices.size() - 1;
+	// South pole float3a was added last.
+	uint southPoleIndex = (uint)mesh->Positions.size() - 1;
 
-	// Offset the indices to the index of the first vertex in the last ring.
-	baseIndex = southPoleIndex - ringVertexCount;
+	// Offset the indices to the index of the first float3a in the last ring.
+	baseIndex = southPoleIndex - ringfloat3aCount;
 
 	for (uint i = 0; i < sliceCount; ++i) {
 		mesh->Indices.push_back(southPoleIndex);
@@ -219,7 +219,7 @@ void Subdivide(Mesh *mesh) {
 	Mesh inputCopy = *mesh;
 
 
-	mesh->Vertices.resize(0);
+	mesh->Positions.resize(0);
 	mesh->Indices.resize(0);
 
 	//       v1
@@ -234,40 +234,37 @@ void Subdivide(Mesh *mesh) {
 
 	uint numTris = inputCopy.Indices.size() / 3;
 	for (uint i = 0; i < numTris; ++i) {
-		Vertex v0 = inputCopy.Vertices[inputCopy.Indices[i * 3 + 0]];
-		Vertex v1 = inputCopy.Vertices[inputCopy.Indices[i * 3 + 1]];
-		Vertex v2 = inputCopy.Vertices[inputCopy.Indices[i * 3 + 2]];
+		float3a v0 = inputCopy.Positions[inputCopy.Indices[i * 3 + 0]];
+		float3a v1 = inputCopy.Positions[inputCopy.Indices[i * 3 + 1]];
+		float3a v2 = inputCopy.Positions[inputCopy.Indices[i * 3 + 2]];
 
 
 		// Generate the midpoints
 		// For subdivision, we just care about the position component
-		// We derive the other vertex components in CreateGeosphere
-		Vertex m0(
+		// We derive the other float3a components in CreateGeosphere
+		float3a m0(
 			0.5f*(v0.x + v1.x),
 			0.5f*(v0.y + v1.y),
-			0.5f*(v0.z + v1.z),
-			1.0f);
+			0.5f*(v0.z + v1.z));
 
-		Vertex m1(
+		float3a m1(
 			0.5f*(v1.x + v2.x),
 			0.5f*(v1.y + v2.y),
-			0.5f*(v1.z + v2.z),
-			1.0f);
+			0.5f*(v1.z + v2.z));
 
-		Vertex m2(
+		float3a m2(
 			0.5f*(v0.x + v2.x),
 			0.5f*(v0.y + v2.y),
-			0.5f*(v0.z + v2.z),
-			1.0f);
+			0.5f*(v0.z + v2.z));
 
 		// Add new geometry.
 
-		mesh->Vertices.push_back(v0); // 0
-		mesh->Vertices.push_back(v1); // 1
-		mesh->Vertices.push_back(v2); // 2
-		mesh->Vertices.push_back(m0); // 3
-		mesh->Vertices.push_back(m1); // 4
-		mesh->Vertices.push_back(m2); // 5
+		mesh->Positions.push_back(v0); // 0
+		mesh->Positions.push_back(v1); // 1
+		mesh->Positions.push_back(v2); // 2
+		mesh->Positions.push_back(m0); // 3
+		mesh->Positions.push_back(m1); // 4
+		mesh->Positions.push_back(m2); // 5
 
 		mesh->Indices.push_back(i * 6 + 0);
 		mesh->Indices.push_back(i * 6 + 3);
@@ -317,13 +314,13 @@ void CreateGeosphere(float radius, uint numSubdivisions, Mesh *mesh) {
 	const float X = 0.525731f;
 	const float Z = 0.850651f;
 
-	Vertex pos[12] = {
-		Vertex(-X, 0.0f, -Z, 1.0f),  Vertex(X, 0.0f, -Z, 1.0f),
-		Vertex(-X, 0.0f, Z, 1.0f), Vertex(X, 0.0f, Z, 1.0f),
-		Vertex(0.0f, Z, -X, 1.0f),   Vertex(0.0f, Z, X, 1.0f),
-		Vertex(0.0f, -Z, -X, 1.0f),  Vertex(0.0f, -Z, X, 1.0f),
-		Vertex(Z, X, 0.0f, 1.0f),   Vertex(-Z, X, 0.0f, 1.0f),
-		Vertex(Z, -X, 0.0f, 1.0f),  Vertex(-Z, -X, 0.0f, 1.0f)
+	float3a pos[12] = {
+		float3a(-X, 0.0f, -Z),  float3a(X, 0.0f, -Z),
+		float3a(-X, 0.0f, Z), float3a(X, 0.0f, Z),
+		float3a(0.0f, Z, -X),   float3a(0.0f, Z, X),
+		float3a(0.0f, -Z, -X),  float3a(0.0f, -Z, X),
+		float3a(Z, X, 0.0f),   float3a(-Z, X, 0.0f),
+		float3a(Z, -X, 0.0f),  float3a(-Z, -X, 0.0f)
 	};
 
 	DWORD k[60] = {
@@ -333,10 +330,10 @@ void CreateGeosphere(float radius, uint numSubdivisions, Mesh *mesh) {
 		10,1,6, 11,0,9, 2,11,9, 5,2,9,  11,2,7
 	};
 
-	mesh->Vertices.resize(12);
+	mesh->Positions.resize(12);
 	mesh->Indices.resize(60);
 	for (uint i = 0; i < 12; ++i) {
-		mesh->Vertices[i] = pos[i];
+		mesh->Positions[i] = pos[i];
 	}
 	for (uint i = 0; i < 60; ++i) {
 		mesh->Indices[i] = k[i];
@@ -347,7 +344,7 @@ void CreateGeosphere(float radius, uint numSubdivisions, Mesh *mesh) {
 		Subdivide(mesh);
 	}
 
-	std::size_t numVertices = mesh->Vertices.size();
+	std::size_t numVertices = mesh->Positions.size();
 	mesh->Normals.resize(numVertices);
 	mesh->Tangents.resize(numVertices);
 	mesh->TexCoords.resize(numVertices);
@@ -355,11 +352,11 @@ void CreateGeosphere(float radius, uint numSubdivisions, Mesh *mesh) {
 	// Project vertices onto sphere and scale.
 	for (uint i = 0; i < numVertices; ++i) {
 		// Project onto unit sphere.
-		float3 n = normalize(mesh->Vertices[i].xyz());
-		Vertex p = Vertex(radius * n, 1.0f);
+		float3 n = normalize(mesh->Positions[i]);
+		float3a p = float3a(radius * n, 1.0f);
 
 		// Project onto sphere.
-		mesh->Vertices[i] = p;
+		mesh->Positions[i] = p;
 		mesh->Normals[i] = n;
 
 		// Derive texture coordinates from spherical coordinates.
@@ -401,15 +398,15 @@ void CreateGeosphere(float radius, uint numSubdivisions, Mesh *mesh) {
 //		// vertices of ring
 //		float dTheta = 2.0f*XM_PI / sliceCount;
 //		for (uint j = 0; j <= sliceCount; ++j) {
-//			Vertex Vertex;
+//			float3a vertex;
 //
 //			float c = cosf(j*dTheta);
 //			float s = sinf(j*dTheta);
 //
-//			Vertex.Position = Vertex(r*c, y, r*s);
+//			vertex.Position = float3a(r*c, y, r*s);
 //
-//			Vertex.TexC.x = (float)j / sliceCount;
-//			Vertex.TexC.y = 1.0f - (float)i / stackCount;
+//			vertex.TexC.x = (float)j / sliceCount;
+//			vertex.TexC.y = 1.0f - (float)i / stackCount;
 //
 //			// Cylinder can be parameterized as follows, where we introduce v
 //			// parameter that goes in the same direction as the v tex-coord
@@ -431,23 +428,23 @@ void CreateGeosphere(float radius, uint numSubdivisions, Mesh *mesh) {
 //			//  dz/dv = (r0-r1)*sin(t)
 //
 //			// This is unit length.
-//			Vertex.TangentU = Vertex(-s, 0.0f, c);
+//			vertex.TangentU = float3a(-s, 0.0f, c);
 //
 //			float dr = bottomRadius - topRadius;
-//			Vertex bitangent(dr*c, -height, dr*s);
+//			float3a bitangent(dr*c, -height, dr*s);
 //
-//			XMVECTOR T = XMLoadFloat3(&Vertex.TangentU);
+//			XMVECTOR T = XMLoadFloat3(&vertex.TangentU);
 //			XMVECTOR B = XMLoadFloat3(&bitangent);
 //			XMVECTOR N = XMVector3Normalize(XMVector3Cross(T, B));
-//			XMStoreFloat3(&Vertex.Normal, N);
+//			XMStoreFloat3(&vertex.Normal, N);
 //
-//			mesh.Vertices.push_back(Vertex);
+//			mesh.Vertices.push_back(vertex);
 //		}
 //	}
 //
-//	// Add one because we duplicate the first and last Vertex per ring
+//	// Add one because we duplicate the first and last float3a per ring
 //	// since the texture coordinates are different.
-//	uint ringVertexCount = sliceCount + 1;
+//	uint ringfloat3aCount = sliceCount + 1;
 //
 //	// Compute indices for each stack.
 //	for (uint i = 0; i < stackCount; ++i) {
@@ -483,13 +480,13 @@ void CreateGeosphere(float radius, uint numSubdivisions, Mesh *mesh) {
 //		float u = x / height + 0.5f;
 //		float v = z / height + 0.5f;
 //
-//		mesh.Vertices.push_back(Vertex(x, y, z, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f, u, v));
+//		mesh.Vertices.push_back(float3a(x, y, z, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f, u, v));
 //	}
 //
-//	// Cap center Vertex.
-//	mesh.Vertices.push_back(Vertex(0.0f, y, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.5f, 0.5f));
+//	// Cap center vertex.
+//	mesh.Vertices.push_back(float3a(0.0f, y, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.5f, 0.5f));
 //
-//	// Index of center Vertex.
+//	// Index of center vertex.
 //	uint centerIndex = (uint)mesh.Vertices.size() - 1;
 //
 //	for (uint i = 0; i < sliceCount; ++i) {
@@ -519,13 +516,13 @@ void CreateGeosphere(float radius, uint numSubdivisions, Mesh *mesh) {
 //		float u = x / height + 0.5f;
 //		float v = z / height + 0.5f;
 //
-//		mesh.Vertices.push_back(Vertex(x, y, z, 0.0f, -1.0f, 0.0f, 1.0f, 0.0f, 0.0f, u, v));
+//		mesh.Vertices.push_back(float3a(x, y, z, 0.0f, -1.0f, 0.0f, 1.0f, 0.0f, 0.0f, u, v));
 //	}
 //
-//	// Cap center Vertex.
-//	mesh.Vertices.push_back(Vertex(0.0f, y, 0.0f, 0.0f, -1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.5f, 0.5f));
+//	// Cap center vertex.
+//	mesh.Vertices.push_back(float3a(0.0f, y, 0.0f, 0.0f, -1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.5f, 0.5f));
 //
-//	// Cache the index of center Vertex.
+//	// Cache the index of center vertex.
 //	uint centerIndex = (uint)mesh.Vertices.size() - 1;
 //
 //	for (uint i = 0; i < sliceCount; ++i) {
@@ -551,7 +548,7 @@ void CreateGrid(float width, float depth, uint m, uint n, Mesh *mesh) {
 	float du = 1.0f / (n - 1);
 	float dv = 1.0f / (m - 1);
 
-	mesh->Vertices.resize(vertexCount);
+	mesh->Positions.resize(vertexCount);
 	mesh->Normals.resize(vertexCount);
 	mesh->Tangents.resize(vertexCount);
 	mesh->TexCoords.resize(vertexCount);
@@ -561,7 +558,7 @@ void CreateGrid(float width, float depth, uint m, uint n, Mesh *mesh) {
 		for (uint j = 0; j < n; ++j) {
 			float x = -halfWidth + j * dx;
 
-			mesh->Vertices[i * n + j] = Vertex(x, 0.0f, -z, 1.0f);
+			mesh->Positions[i * n + j] = float3a(x, 0.0f, -z, 1.0f);
 			mesh->Normals[i * n + j] = float3(0.0f, 1.0f, 0.0f);
 			mesh->Tangents[i * n + j] = float3(1.0f, 0.0f, 0.0f);
 

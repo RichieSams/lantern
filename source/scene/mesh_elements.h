@@ -13,10 +13,8 @@
 
 namespace Lantern {
 
-typedef float4 Vertex;
-
 struct Mesh {
-	std::vector<Vertex> Vertices;
+	std::vector<float3a> Positions;
 	std::vector<float3> Normals;
 	std::vector<float3> Tangents;
 	std::vector<float2> TexCoords;

@@ -17,7 +17,7 @@ void CreateGeosphere(float radius, uint numSubdivisions, Mesh *mesh);
 void CreateGrid(float width, float depth, uint m, uint n, Mesh *mesh);
 
 inline void ScaleMesh(float scale, Mesh *mesh) {
-	for (auto &vertex : mesh->Vertices) {
+	for (auto &vertex : mesh->Positions) {
 		vertex *= scale;
 	}
 
@@ -25,10 +25,8 @@ inline void ScaleMesh(float scale, Mesh *mesh) {
 }
 
 inline void TranslateMesh(float3 position, Mesh *mesh) {
-	float4 translation(position, 1.0f);
-
-	for (auto &vertex : mesh->Vertices) {
-		vertex += translation;
+	for (auto &vertex : mesh->Positions) {
+		vertex += position;
 	}
 
 	mesh->BoundingSphere.x += position.x;
