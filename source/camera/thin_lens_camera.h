@@ -106,10 +106,12 @@ private:
 	}
 
 	void UpdateCartesianCoordSystem() {
-		float3 worldUp(0.0f, m_up, 0.0f);
-
 		m_zAxis = normalize(m_origin - m_target);
-		m_xAxis = normalize(cross(worldUp, m_zAxis));
+		if (m_zAxis.x == 0.0 && (m_zAxis.y == 1.0f || m_zAxis.y == -1.0f) && m_zAxis.z == 0.0f) {
+			m_xAxis = normalize(cross(float3(0.0f, 0.0f, m_up), m_zAxis));
+		} else {
+			m_xAxis = normalize(cross(float3(0.0f, m_up, 0.0f), m_zAxis));
+		}
 		m_yAxis = cross(m_zAxis, m_xAxis);
 
 		m_matrixMulXAxis = float3a(m_xAxis.x, m_yAxis.x, m_zAxis.x);
