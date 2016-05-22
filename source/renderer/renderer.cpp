@@ -101,7 +101,7 @@ void Renderer::RenderPixel(uint x, uint y, UniformSampler *sampler) {
 
 		// The ray missed. Return the background color
 		if (ray.geomID == RTC_INVALID_GEOMETRY_ID) {
-			//color += throughput * float3(0.846f, 0.933f, 0.949f);
+			color += throughput * m_scene->BackgroundColor;
 			break;
 		}
 

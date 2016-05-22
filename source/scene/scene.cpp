@@ -17,7 +17,8 @@
 namespace Lantern {
 
 Scene::Scene()
-	: m_device(rtcNewDevice(nullptr)),
+	: BackgroundColor(0.0f),
+	  m_device(rtcNewDevice(nullptr)),
 	  m_scene(rtcDeviceNewScene(m_device, RTC_SCENE_STATIC, RTC_INTERSECT1)) {
 }
 

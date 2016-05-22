@@ -32,6 +32,7 @@ public:
 
 public:
 	ThinLensCamera Camera;
+	float3 BackgroundColor;
 
 private:
 	std::unordered_map<uint, Material *> m_materials;
