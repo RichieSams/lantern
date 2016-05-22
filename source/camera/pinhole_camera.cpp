@@ -4,14 +4,14 @@
 * Copyright Adrian Astley 2015 - 2016
 */
 
-#include "camera/thin_lens_camera.h"
+#include "camera/pinhole_camera.h"
 
 #include <embree2/rtcore.h>
 
 
 namespace Lantern {
 
-ThinLensCamera::ThinLensCamera()
+PinholeCamera::PinholeCamera()
 		: m_phi(M_PI_2),
 		  m_theta(0.0f),
 		  m_radius(10.0f),
@@ -26,7 +26,7 @@ ThinLensCamera::ThinLensCamera()
 	FrameBuffer.Reset();
 }
 
-ThinLensCamera::ThinLensCamera(float phi, float theta, float radius, float clientWidth, float clientHeight, float fov, ReconstructionFilter::Type filterType)
+PinholeCamera::PinholeCamera(float phi, float theta, float radius, float clientWidth, float clientHeight, float fov, ReconstructionFilter::Type filterType)
 		: m_phi(phi),
 		  m_theta(theta),
 		  m_radius(radius),
@@ -41,7 +41,7 @@ ThinLensCamera::ThinLensCamera(float phi, float theta, float radius, float clien
 	FrameBuffer.Reset();
 }
 
-void ThinLensCamera::Rotate(float dPhi, float dTheta) {
+void PinholeCamera::Rotate(float dPhi, float dTheta) {
 	if (m_up > 0.0f) {
 		m_theta += dTheta;
 	} else {
@@ -68,7 +68,7 @@ void ThinLensCamera::Rotate(float dPhi, float dTheta) {
 	UpdateCartesianCoordSystem();
 }
 
-void ThinLensCamera::Zoom(float distance) {
+void PinholeCamera::Zoom(float distance) {
 	m_radius -= distance;
 
 	// Don't let the radius go negative
@@ -81,13 +81,13 @@ void ThinLensCamera::Zoom(float distance) {
 	UpdateOrigin();
 }
 
-void ThinLensCamera::Pan(float dx, float dy) {
+void PinholeCamera::Pan(float dx, float dy) {
 	m_target += (m_xAxis * dx) + (m_yAxis * dy);
 
 	UpdateOrigin();
 }
 
-RTCRay ThinLensCamera::CalculateRayFromPixel(uint x, uint y, UniformSampler *sampler) const {
+RTCRay PinholeCamera::CalculateRayFromPixel(uint x, uint y, UniformSampler *sampler) const {
 	RTCRay ray;
 
 	ray.org = m_origin;

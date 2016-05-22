@@ -8,7 +8,7 @@
 
 #include "math/int_types.h"
 
-#include "camera/thin_lens_camera.h"
+#include "camera/pinhole_camera.h"
 
 #include "scene/light.h"
 
@@ -31,7 +31,7 @@ public:
 	~Scene();
 
 public:
-	ThinLensCamera Camera;
+	PinholeCamera Camera;
 	float3 BackgroundColor;
 
 private:
@@ -44,7 +44,7 @@ private:
 
 public:
 	void SetCamera(float phi, float theta, float radius, float clientWidth, float clientHeight, float fov = M_PI_2) {
-		Camera = ThinLensCamera(phi, theta, radius, clientWidth, clientHeight, fov);
+		Camera = PinholeCamera(phi, theta, radius, clientWidth, clientHeight, fov);
 	}
 
 	void AddMesh(Mesh *mesh, Material *material);

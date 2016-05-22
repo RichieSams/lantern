@@ -5,8 +5,8 @@ SetSourceGroup(NAME Root
 )
 
 SetSourceGroup(NAME Camera
-	SOURCE_FILES camera/thin_lens_camera.h
-	             camera/thin_lens_camera.cpp
+	SOURCE_FILES camera/pinhole_camera.h
+	             camera/pinhole_camera.cpp
 	             camera/frame_buffer.h
 	             camera/frame_buffer.cpp
 	             camera/reconstruction_filter.h
