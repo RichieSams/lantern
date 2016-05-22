@@ -1,7 +1,7 @@
 TODO List
 ====================
 
-- ~~**Re-add support for specular materials - Medium**~~ - Added in 20f4b81b26f4b158c43da0a1e277cc7e40caf66b
+- ~~**Re-add support for specular materials - Medium**~~ - Added in [20f4b81](https://github.com/RichieSams/lantern/commit/20f4b81b26f4b158c43da0a1e277cc7e40caf66b)
 - **Create a OpenGL renderer view - Easy/Medium**
 	- Start with just being able to switch between path tracing and OpenGL
 	- Need to decide whether to use "modern" OpenGL, or fixed pipeline
