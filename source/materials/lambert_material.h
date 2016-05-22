@@ -28,7 +28,7 @@ public:
 		return CosineSampleHemisphere(normal, sampler);
 	}
 
-	float Pdf(float3a &wi, float3a &normal) const override {
+	float Pdf(float3a &wi, float3a &wo, float3a &normal) const override {
 		return dot(wi, normal) * M_1_PI;
 	}
 };

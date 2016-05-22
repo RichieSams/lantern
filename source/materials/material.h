@@ -26,7 +26,7 @@ protected:
 public:
 	virtual float3 Eval(float3a &wi, float3a &wo, float3a &normal) const = 0;
 	virtual float3a Sample(float3a &wo, float3a &normal, UniformSampler *sampler) const = 0;
-	virtual float Pdf(float3a &wi, float3a &normal) const = 0;
+	virtual float Pdf(float3a &wi, float3a &wo, float3a &normal) const = 0;
 };
 
 } // End of namespace Lantern

@@ -9,6 +9,7 @@
 #include "materials/material.h"
 
 #include "math/uniform_sampler.h"
+#include "math/float_math.h"
 
 
 namespace Lantern {
@@ -28,8 +29,9 @@ public:
 		return reflect(wo, normal);
 	}
 
-	float Pdf(float3a &wi, float3a &normal) const override {
-		return 1.0f;
+	float Pdf(float3a &wi, float3a &wo, float3a &normal) const override {
+		float3a reflection = reflect(wi, normal);
+		return FloatNearlyEqual(reflection.x, wo.x) && FloatNearlyEqual(reflection.y, wo.y) && FloatNearlyEqual(reflection.z, wo.z) ? 1.0f : 0.0f;
 	}
 };
 

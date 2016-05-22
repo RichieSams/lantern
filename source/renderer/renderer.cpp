@@ -125,11 +125,10 @@ void Renderer::RenderPixel(uint x, uint y, UniformSampler *sampler) {
 		// Calculate the direct lighting
 		color += throughput * SampleOneLight(sampler, surfacePos, normal, wo, material, light);
 
-
 		// Get the new ray direction
 		// Choose the direction based on the material
 		float3a wi = material->Sample(wo, normal, sampler);
-		float pdf = material->Pdf(wi, normal);
+		float pdf = material->Pdf(wi, wo, normal);
 
 		// Accumulate the diffuse/specular weight
 		throughput = throughput * material->Eval(wi, wo, normal) / pdf;
@@ -199,7 +198,7 @@ float3 Renderer::EstimateDirect(Light *light, UniformSampler *sampler, float3a &
 	if (lightPdf != 0.0f && !all(Li)) {
 		// Calculate the brdf value
 		f = material->Eval(wi, wo, surfaceNormal);
-		scatteringPdf = material->Pdf(wi, surfaceNormal);
+		scatteringPdf = material->Pdf(wi, wo, surfaceNormal);
 
 		if (scatteringPdf != 0.0f && !all(f)) {
 			float weight = PowerHeuristic(1, lightPdf, 1, scatteringPdf);
@@ -212,7 +211,7 @@ float3 Renderer::EstimateDirect(Light *light, UniformSampler *sampler, float3a &
 
 	wi = material->Sample(wo, surfaceNormal, sampler);
 	f = material->Eval(wi, wo, surfaceNormal);
-	scatteringPdf = material->Pdf(wo, surfaceNormal);
+	scatteringPdf = material->Pdf(wo, wo, surfaceNormal);
 	if (scatteringPdf != 0.0f && !all(f)) {
 		lightPdf = light->PdfLi(m_scene, surfacePos, surfaceNormal, wi);
 		if (lightPdf == 0.0f) {

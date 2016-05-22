@@ -20,6 +20,7 @@ SetSourceGroup(NAME Math
 	             math/vector_math.h
 	             math/vector_math.cpp
 	             math/int_types.h
+	             math/float_math.h
 )
 
 SetSourceGroup(NAME Scene
