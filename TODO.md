@@ -1,8 +1,7 @@
 TODO List
 ====================
 
-- **Re-add support for specular materials - Medium**
-	- Removed when I switched to direct light sampling
+- ~~**Re-add support for specular materials - Medium**~~ - Added in 20f4b81b26f4b158c43da0a1e277cc7e40caf66b
 - **Create a OpenGL renderer view - Easy/Medium**
 	- Start with just being able to switch between path tracing and OpenGL
 	- Need to decide whether to use "modern" OpenGL, or fixed pipeline
@@ -55,3 +54,4 @@ TODO List
 	- I have access to Quixel Suite, but I won't be able to re-distribute them
 	- But, on that note, I probably won't share the scenes in git, since they will be quite large
 		- Perhaps, for the scenes that *are* redistributable, I can upload them to my site
+- **Implement transmissive materials - Medium**
