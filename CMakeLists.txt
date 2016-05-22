@@ -23,18 +23,18 @@ set( GLFW_BUILD_EXAMPLES OFF CACHE BOOL  "GLFW lib only" )
 set( GLFW_BUILD_TESTS OFF CACHE BOOL  "GLFW lib only" )
 set( GLFW_BUILD_DOCS OFF CACHE BOOL  "GLFW lib only" )
 set( GLFW_BUILD_INSTALL OFF CACHE BOOL  "GLFW lib only" )
-add_subdirectory(libs/glfw)
-include_directories(libs/glfw/include)
+add_subdirectory(third_party/glfw)
+include_directories(third_party/glfw/include)
 
-add_subdirectory(libs/imgui)
-include_directories(libs/imgui/include)
+add_subdirectory(third_party/imgui)
+include_directories(third_party/imgui/include)
 
 SET(ENABLE_ISPC_SUPPORT OFF CACHE BOOL "No ISPC support needed atm" )
 SET(ENABLE_TUTORIALS OFF CACHE BOOL "Only build lib" )
 SET(ENABLE_TESTS OFF CACHE BOOL "Only build lib")
-add_subdirectory(libs/embree)
-include_directories(libs/embree/include)
-include_directories(libs/embree/common)
+add_subdirectory(third_party/embree)
+include_directories(third_party/embree/include)
+include_directories(third_party/embree/common)
 
 
 # Add the main source
