@@ -8,6 +8,7 @@ macro( SetSourceGroup )
 	cmake_parse_arguments(SRC_GROUP "" "${oneValueArgs}" "${multiValuesArgs}" ${ARGN} )
 	
 	string(REPLACE " " "_" VAR_SUFFIX "${SRC_GROUP_NAME}")
+	string(REPLACE "/" "_" VAR_SUFFIX "${VAR_SUFFIX}")
 	string(TOUPPER ${VAR_SUFFIX} VAR_SUFFIX)
 	
 	set(VAR_NAME SRC_${VAR_SUFFIX})
@@ -18,6 +19,7 @@ macro( SetSourceGroup )
 	
 	string(REPLACE "Root" " " SRC_GROUP_NAME "${SRC_GROUP_NAME}")
 	string(REPLACE "root" " " SRC_GROUP_NAME "${SRC_GROUP_NAME}")
-	
+	string(REPLACE "/" "\\" SRC_GROUP_NAME "${SRC_GROUP_NAME}")
+
 	source_group("${SRC_GROUP_NAME}" FILES ${${VAR_NAME}})
 endmacro()
