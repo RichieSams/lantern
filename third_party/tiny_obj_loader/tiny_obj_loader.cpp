@@ -14,7 +14,7 @@
 #include <fstream>
 #include <sstream>
 
-#include "tiny_obj_loader.h"
+#include "tiny_obj_loader/tiny_obj_loader.h"
 
 
 namespace tinyobj {
