@@ -32,9 +32,7 @@ TODO List
 	- Some of the more complex BRDFs require more data than Material::Eval() is currently being passed
 		- We should consider whether to switch to some kind of struct for holding all the relavant data
 			- IE. Tungstun and PBRT's SurfaceInteraction struct
-- **Implement normal/UV interpolation - Easy**
-	- Embree has functions for vertex data interpolation
-	- However, last time I tried, it was outputting garbage numbers.
+- ~~**Implement normal/UV interpolation - Easy**~~ - Added in [6735168](https://github.com/RichieSams/lantern/commit/673516887c3ca1ae4f2e22ac48415cb68f62365f)
 - **Implement JSON scene loading - Medium**
 	- Two popular libaries are RapidJSON and nlohmann/json
 		- https://github.com/miloyip/rapidjson
