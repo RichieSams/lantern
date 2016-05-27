@@ -21,6 +21,7 @@ SetSourceGroup(NAME Math
 	             math/vector_math.cpp
 	             math/int_types.h
 	             math/float_math.h
+	             math/align.h
 )
 
 SetSourceGroup(NAME Scene

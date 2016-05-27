@@ -7,13 +7,8 @@
 #pragma once
 
 #include "math/vector_types.h"
+#include "math/align.h"
 
-
-#ifdef _WIN32
-	#define STRUCT_ALIGN(...) __declspec(align(__VA_ARGS__))
-#else
-	#define STRUCT_ALIGN(...) __attribute__((aligned(__VA_ARGS__)))
-#endif
 
 #define infinity std::numeric_limits<float>::infinity()
 #define INVALID_GEOMETRY_ID ((uint)-1)
