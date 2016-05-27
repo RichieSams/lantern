@@ -8,8 +8,8 @@
 #include "scene/geometry_generator.h"
 #include "scene/obj_loader.h"
 
-#include "materials/lambert_material.h"
-#include "materials/mirror.h"
+#include "bsdfs/lambert_bsdf.h"
+#include "bsdfs/mirror_bsdf.h"
 
 #include "visualizer/visualizer.h"
 
@@ -57,12 +57,12 @@ void SetScene(Lantern::Scene &scene) {
 void LoadObjScene(Lantern::Scene &scene) {
 	scene.SetCamera(M_PI_2, 0.0f, 1.25f, 1280.0f, 720.0f);
 
-	Lantern::LambertMaterial *green = new Lantern::LambertMaterial(float3(0.408f, 0.741f, 0.467f));
+	Lantern::LambertBSDF *green = new Lantern::LambertBSDF(float3(0.408f, 0.741f, 0.467f));
 	
 	// Create Buddha
 	std::vector<Lantern::Mesh> buddhaMeshes;
-	std::vector<Lantern::Material> buddhaMaterials;
-	Lantern::LoadMeshesFromObj("buddha.obj", buddhaMeshes, buddhaMaterials);
+	std::vector<Lantern::BSDF> buddhaBSDFs;
+	Lantern::LoadMeshesFromObj("buddha.obj", buddhaMeshes, buddhaBSDFs);
 	for (auto &mesh : buddhaMeshes) {
 		scene.AddMesh(&mesh, green);
 	}
@@ -72,12 +72,12 @@ void LoadBallsScene(Lantern::Scene &scene) {
 	scene.SetCamera(M_PI_2, 0.0f, 20.0f, 1280.0f, 720.0f);
 
 	// Create the materials
-	Lantern::LambertMaterial *green = new Lantern::LambertMaterial(float3(0.408f, 0.741f, 0.467f));
-	Lantern::LambertMaterial *blue = new Lantern::LambertMaterial(float3(0.392f, 0.584f, 0.929f));
-	Lantern::LambertMaterial *orange = new Lantern::LambertMaterial(float3(1.0f, 0.498f, 0.314f));
-	Lantern::LambertMaterial *white = new Lantern::LambertMaterial(float3(1.0f));
-	Lantern::LambertMaterial *gray = new Lantern::LambertMaterial(float3(0.9f, 0.9f, 0.9f));
-	Lantern::MirrorMaterial *mirror = new Lantern::MirrorMaterial(float3(0.95f, 0.95f, 0.95f));
+	Lantern::LambertBSDF *green = new Lantern::LambertBSDF(float3(0.408f, 0.741f, 0.467f));
+	Lantern::LambertBSDF *blue = new Lantern::LambertBSDF(float3(0.392f, 0.584f, 0.929f));
+	Lantern::LambertBSDF *orange = new Lantern::LambertBSDF(float3(1.0f, 0.498f, 0.314f));
+	Lantern::LambertBSDF *white = new Lantern::LambertBSDF(float3(0.0f));
+	Lantern::LambertBSDF *gray = new Lantern::LambertBSDF(float3(0.9f, 0.9f, 0.9f));
+	Lantern::MirrorBSDF *mirror = new Lantern::MirrorBSDF(float3(0.95f, 0.95f, 0.95f));
 
 	// Create the floor
 	Lantern::Mesh floorMesh;

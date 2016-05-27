@@ -6,32 +6,30 @@
 
 #pragma once
 
-#include "materials/material.h"
+#include "bsdfs/bsdf.h"
 
-#include "math/uniform_sampler.h"
-#include "math/float_math.h"
+#include "math/sampling.h"
 
 
 namespace Lantern {
 
-class MirrorMaterial : public Material {
+class LambertBSDF : public BSDF {
 public:
-	MirrorMaterial(float3 albedo)
-		: Material(albedo) {
+	LambertBSDF(float3 albedo)
+		: BSDF(albedo) {
 	}
 
 public:
 	float3 Eval(float3a &wi, float3a &wo, float3a &normal) const override {
-		return m_albedo;
+		return m_albedo * M_1_PI * dot(wi, normal);
 	}
-
+	
 	float3a Sample(float3a &wo, float3a &normal, UniformSampler *sampler) const override {
-		return reflect(wo, normal);
+		return CosineSampleHemisphere(normal, sampler);
 	}
 
 	float Pdf(float3a &wi, float3a &wo, float3a &normal) const override {
-		float3a reflection = reflect(wi, normal);
-		return FloatNearlyEqual(reflection.x, wo.x) && FloatNearlyEqual(reflection.y, wo.y) && FloatNearlyEqual(reflection.z, wo.z) ? 1.0f : 0.0f;
+		return dot(wi, normal) * M_1_PI;
 	}
 };
 

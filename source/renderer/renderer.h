@@ -13,8 +13,8 @@
 namespace Lantern {
 
 class UniformSampler;
+class BSDF;
 class Scene;
-class Material;
 class Light;
 
 class Renderer {
@@ -36,8 +36,8 @@ public:
 private:
 	void RenderTile(uint index, uint width, uint height, uint numTilesX, uint numTilesY);
 	void RenderPixel(uint x, uint y, UniformSampler *sampler);
-	float3 SampleOneLight(UniformSampler *sampler, float3a &surfacePos, float3a &surfaceNormal, float3a &wo, Material *material, Light *hitLight) const;
-	float3 EstimateDirect(Light *light, UniformSampler *sampler, float3a &surfacePos, float3a &surfaceNormal, float3a &wo, Material *material) const;
+	float3 SampleOneLight(UniformSampler *sampler, float3a &surfacePos, float3a &surfaceNormal, float3a &wo, BSDF *material, Light *hitLight) const;
+	float3 EstimateDirect(Light *light, UniformSampler *sampler, float3a &surfacePos, float3a &surfaceNormal, float3a &wo, BSDF *material) const;
 };
 
 } // End of namespace Lantern

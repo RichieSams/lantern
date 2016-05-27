@@ -37,10 +37,10 @@ SetSourceGroup(NAME Scene
 	             scene/obj_loader.cpp
 )
 
-SetSourceGroup(NAME Materials
-	SOURCE_FILES materials/material.h
-	             materials/lambert_material.h
-	             materials/mirror.h
+SetSourceGroup(NAME BSDFs
+	SOURCE_FILES bsdfs/bsdf.h
+	             bsdfs/lambert_bsdf.h
+	             bsdfs/mirror_bsdf.h
 )
 
 SetSourceGroup(NAME Renderer
@@ -68,7 +68,7 @@ set(LANTERN_SRC
 	${SRC_CAMERA}
 	${SRC_MATH}
 	${SRC_SCENE}
-	${SRC_MATERIALS}
+	${SRC_BSDFS}
 	${SRC_RENDERER}
 	${SRC_VISUALIZER}
 	${SRC_THIRD_PARTY}

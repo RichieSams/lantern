@@ -9,7 +9,7 @@
 #include "scene/scene.h"
 #include "scene/ray.h"
 
-#include "materials/material.h"
+#include "bsdfs/bsdf.h"
 
 #include "math/uniform_sampler.h"
 #include "math/vector_math.h"
@@ -107,8 +107,8 @@ void Renderer::RenderPixel(uint x, uint y, UniformSampler *sampler) {
 
 		// We hit an object
 			
-		// Fetch the material
-		Material *material = m_scene->GetMaterial(ray.geomID);
+		// Fetch the bsdf
+		BSDF *bsdf = m_scene->GetBSDF(ray.GeomID);
 		// The object might be emissive. If so, it will have a corresponding light
 		// Otherwise, GetLight will return nullptr
 		Light *light = m_scene->GetLight(ray.geomID);
@@ -123,15 +123,15 @@ void Renderer::RenderPixel(uint x, uint y, UniformSampler *sampler) {
 		float3a surfacePos = ray.org + ray.dir * ray.tfar;
 
 		// Calculate the direct lighting
-		color += throughput * SampleOneLight(sampler, surfacePos, normal, wo, material, light);
+		color += throughput * SampleOneLight(sampler, surfacePos, normal, wo, bsdf, light);
 
 		// Get the new ray direction
-		// Choose the direction based on the material
-		float3a wi = material->Sample(wo, normal, sampler);
-		float pdf = material->Pdf(wi, wo, normal);
+		// Choose the direction based on the bsdf
+		float3a wi = bsdf->Sample(wo, normal, sampler);
+		float pdf = bsdf->Pdf(wi, wo, normal);
 
 		// Accumulate the diffuse/specular weight
-		throughput = throughput * material->Eval(wi, wo, normal) / pdf;
+		throughput = throughput * bsdf->Eval(wi, wo, normal) / pdf;
 
 		// Russian Roulette
 		if (bounces > 3) {
@@ -162,7 +162,7 @@ void Renderer::RenderPixel(uint x, uint y, UniformSampler *sampler) {
 	m_scene->Camera.FrameBuffer.SplatPixel(x, y, color);
 }
 
-float3 Renderer::SampleOneLight(UniformSampler *sampler, float3a &surfacePos, float3a &surfaceNormal, float3a &wo, Material *material, Light *hitLight) const {
+float3 Renderer::SampleOneLight(UniformSampler *sampler, float3a &surfacePos, float3a &surfaceNormal, float3a &wo, BSDF *bsdf, Light *hitLight) const {
 	std::size_t numLights = m_scene->NumLights();
 	
 	// Return black if there are no lights
@@ -180,10 +180,10 @@ float3 Renderer::SampleOneLight(UniformSampler *sampler, float3a &surfacePos, fl
 		light = m_scene->RandomOneLight(sampler);
 	} while (light == hitLight);
 
-	return numLights * EstimateDirect(light, sampler, surfacePos, surfaceNormal, wo, material);
+	return numLights * EstimateDirect(light, sampler, surfacePos, surfaceNormal, wo, bsdf);
 }
 
-float3 Renderer::EstimateDirect(Light *light, UniformSampler *sampler, float3a &surfacePos, float3a &surfaceNormal, float3a &wo, Material *material) const {
+float3 Renderer::EstimateDirect(Light *light, UniformSampler *sampler, float3a &surfacePos, float3a &surfaceNormal, float3a &wo, BSDF *bsdf) const {
 	float3 directLighting = float3(0.0f);
 	float3a wi;
 	float3 f;
@@ -197,8 +197,8 @@ float3 Renderer::EstimateDirect(Light *light, UniformSampler *sampler, float3a &
 	// Make sure the pdf isn't zero and the radiance isn't black
 	if (lightPdf != 0.0f && !all(Li)) {
 		// Calculate the brdf value
-		f = material->Eval(wi, wo, surfaceNormal);
-		scatteringPdf = material->Pdf(wi, wo, surfaceNormal);
+		f = bsdf->Eval(wi, wo, surfaceNormal);
+		scatteringPdf = bsdf->Pdf(wi, wo, surfaceNormal);
 
 		if (scatteringPdf != 0.0f && !all(f)) {
 			float weight = PowerHeuristic(1, lightPdf, 1, scatteringPdf);
@@ -209,9 +209,9 @@ float3 Renderer::EstimateDirect(Light *light, UniformSampler *sampler, float3a &
 
 	// Sample brdf with multiple importance sampling
 
-	wi = material->Sample(wo, surfaceNormal, sampler);
-	f = material->Eval(wi, wo, surfaceNormal);
-	scatteringPdf = material->Pdf(wo, wo, surfaceNormal);
+	wi = bsdf->Sample(wo, surfaceNormal, sampler);
+	f = bsdf->Eval(wi, wo, surfaceNormal);
+	scatteringPdf = bsdf->Pdf(wo, wo, surfaceNormal);
 	if (scatteringPdf != 0.0f && !all(f)) {
 		lightPdf = light->PdfLi(m_scene, surfacePos, surfaceNormal, wi);
 		if (lightPdf == 0.0f) {

@@ -11,19 +11,20 @@
 #include "camera/pinhole_camera.h"
 
 #include "scene/light.h"
-
-#include <embree2/rtcore.h>
+#include "scene/ray.h"
 
 #include <unordered_map>
 
 
+struct __RTCDevice;
+typedef __RTCDevice * RTCDevice;
 struct __RTCScene;
 typedef __RTCScene * RTCScene;
 
 namespace Lantern {
 
+class BSDF;
 struct Mesh;
-class Material;
 
 class Scene {
 public:
@@ -35,7 +36,7 @@ public:
 	float3 BackgroundColor;
 
 private:
-	std::unordered_map<uint, Material *> m_materials;
+	std::unordered_map<uint, BSDF *> m_bsdfs;
 	std::vector<Light *> m_lightList;
 	std::unordered_map<uint, Light *> m_lightMap;
 
@@ -47,12 +48,12 @@ public:
 		Camera = PinholeCamera(phi, theta, radius, clientWidth, clientHeight, fov);
 	}
 
-	void AddMesh(Mesh *mesh, Material *material);
-	void AddMesh(Mesh *mesh, Material *material, float3 color, float radiantPower);
-	void Commit() { rtcCommit(m_scene);	}
+	void AddMesh(Mesh *mesh, BSDF *bsdf);
+	void AddMesh(Mesh *mesh, BSDF *bsdf, float3 color, float radiantPower);
+	void Commit() const;
 
-	Material *GetMaterial(uint meshId) {
-		return m_materials[meshId];
+	BSDF *GetBSDF(uint meshId) {
+		return m_bsdfs[meshId];
 	}
 	Light *GetLight(uint meshId) {
 		auto iter = m_lightMap.find(meshId);
@@ -62,13 +63,13 @@ public:
 			return nullptr;
 		}
 	}
-	std::size_t NumLights() { return m_lightList.size(); }
+	std::size_t NumLights() const { return m_lightList.size(); }
 	Light *RandomOneLight(UniformSampler *sampler);
 
-	void Intersect(RTCRay &ray) const { rtcIntersect(m_scene, ray); }
+	void Intersect(RTCRay &ray) const;
 
 private:
-	uint AddMeshInternal(Mesh *mesh, Material *material);
+	uint AddMeshInternal(Mesh *mesh, BSDF *bsdf);
 };
 
 } // End of namespace Lantern

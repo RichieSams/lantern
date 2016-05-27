@@ -13,7 +13,7 @@
 
 namespace Lantern {
 
-void LoadMeshesFromObj(const char *filePath, std::vector<Mesh> &meshes, std::vector<Material> &materials) {
+void LoadMeshesFromObj(const char *filePath, std::vector<Mesh> &meshes, std::vector<BSDF> &bsdfs) {
 	std::vector<tinyobj::shape_t> tinyObjShapes;
 	std::vector<tinyobj::material_t> tinyObjMaterials;
 	std::string err;

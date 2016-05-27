@@ -13,12 +13,13 @@ namespace Lantern {
 
 class UniformSampler;
 
-class Material {
+class BSDF {
 public:
-	Material(float3 albedo)
+	BSDF(float3 albedo)
 		: m_albedo(albedo) {
 	}
-	virtual ~Material() {}
+	virtual ~BSDF() {
+	}
 
 protected:
 	float3 m_albedo;

@@ -1,65 +1,70 @@
-// ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
-//                                                                          //
-// Licensed under the Apache License, Version 2.0 (the "License");          //
-// you may not use this file except in compliance with the License.         //
-// You may obtain a copy of the License at                                  //
-//                                                                          //
-//     http://www.apache.org/licenses/LICENSE-2.0                           //
-//                                                                          //
-// Unless required by applicable law or agreed to in writing, software      //
-// distributed under the License is distributed on an "AS IS" BASIS,        //
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. //
-// See the License for the specific language governing permissions and      //
-// limitations under the License.                                           //
-// ======================================================================== //
+/* Lantern - A path tracer
+*
+* Lantern is the legal property of Adrian Astley
+* Copyright Adrian Astley 2015 - 2016
+*/
 
 #pragma once
 
-#include <math/vec3fa.h>
+#include "math/vector_types.h"
 
-/*! Ray structure. Contains all information about a ray including
-*  precomputed reciprocal direction. */
-struct RTCRay {
-	/*! Default construction does nothing. */
+
+#ifdef _WIN32
+	#define STRUCT_ALIGN(...) __declspec(align(__VA_ARGS__))
+#else
+	#define STRUCT_ALIGN(...) __attribute__((aligned(__VA_ARGS__)))
+#endif
+
+#define infinity std::numeric_limits<float>::infinity()
+#define INVALID_GEOMETRY_ID ((uint)-1)
+#define INVALID_PRIMATIVE_ID ((uint)-1)
+#define INVALID_INSTANCE_ID ((uint)-1)
+
+
+struct STRUCT_ALIGN(64) RTCRay {
+public:
+	/**
+	 * Default constructor does nothing. 
+	 */
 	__forceinline RTCRay() {
 	}
 
-	/*! Constructs a ray from origin, direction, and ray segment. Near
-	*  has to be smaller than far. */
-	__forceinline RTCRay(const embree::Vec3fa& org, const embree::Vec3fa& dir,
-						 float tnear = embree::zero, float tfar = embree::inf,
-						 float time = embree::zero, int mask = -1)
-		: org(org), dir(dir), tnear(tnear), tfar(tfar), time(time), mask(mask), geomID(-1), primID(-1), instID(-1) {
-	}
-
-	/*! Tests if we hit something. */
-	__forceinline operator bool() const {
-		return geomID != -1;
+	/**
+	 * Constructs a ray from origin, direction, and ray segment. 
+	 *
+	 * Note: Near has to be smaller than far. 
+	 */
+	__forceinline RTCRay(const float3a& org, const float3a& dir,
+	                  float tnear = 0.0f, float tfar = infinity,
+	                  float time = 0.0f, uint mask = -1)
+		: Origin(org), 
+		  Direction(dir), 
+		  TNear(tnear), TFar(tfar), 
+		  Time(time), 
+		  Mask(mask), 
+		  GeomID(INVALID_GEOMETRY_ID), PrimID(INVALID_PRIMATIVE_ID), InstID(INVALID_INSTANCE_ID) {
 	}
 
 public:
-	embree::Vec3fa org;        //!< Ray origin
-	embree::Vec3fa dir;        //!< Ray direction
-	float tnear;       //!< Start of ray segment
-	float tfar;        //!< End of ray segment
-	float time;        //!< Time of this ray for motion blur.
-	int mask;          //!< used to mask out objects during traversal
-
-public:
-	embree::Vec3fa Ng;         //!< Not normalized geometry normal
-	float u;           //!< Barycentric u coordinate of hit
-	float v;           //!< Barycentric v coordinate of hit
-	int geomID;           //!< geometry ID
-	int primID;           //!< primitive ID
-	int instID;           //!< instance ID
-
-						  // ray extensions
+	float3a Origin;
+	float3a Direction;
+	float TNear;
+	float TFar;
+	float Time;
+	uint Mask;
+	float3a GeomNormal; // Not normalized
+	float U; // Barycentric u coordinate of hit
+	float V; // Barycentric v coordinate of hit
+	int GeomID;
+	int PrimID;
+	int InstID;
 };
 
+typedef RTCRay Ray;
+
 /*! Outputs ray to stream. */
-inline std::ostream& operator<<(std::ostream& cout, const RTCRay& ray) {
+inline std::ostream& operator<<(std::ostream& cout, const Ray& ray) {
 	return cout << "{ " <<
-		"org = " << ray.org << ", dir = " << ray.dir << ", near = " << ray.tnear << ", far = " << ray.tfar << ", time = " << ray.time << ", " <<
-		"instID = " << ray.instID << ", geomID = " << ray.geomID << ", primID = " << ray.primID << ", " << "u = " << ray.u << ", v = " << ray.v << ", Ng = " << ray.Ng << " }";
+		"origin = " << ray.Origin << ", direction = " << ray.Direction << ", near = " << ray.TNear << ", far = " << ray.TFar << ", time = " << ray.Time << ", " <<
+		"instID = " << ray.InstID << ", geomID = " << ray.GeomID << ", primID = " << ray.PrimID << ", " << "u = " << ray.U << ", v = " << ray.V << ", geomNormal = " << ray.GeomNormal << " }";
 }
