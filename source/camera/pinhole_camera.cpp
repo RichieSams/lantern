@@ -6,7 +6,7 @@
 
 #include "camera/pinhole_camera.h"
 
-#include <embree2/rtcore.h>
+#include "scene/ray.h"
 
 
 namespace Lantern {
@@ -87,18 +87,17 @@ void PinholeCamera::Pan(float dx, float dy) {
 	UpdateOrigin();
 }
 
-RTCRay PinholeCamera::CalculateRayFromPixel(uint x, uint y, UniformSampler *sampler) const {
-	RTCRay ray;
+Ray PinholeCamera::CalculateRayFromPixel(uint x, uint y, UniformSampler *sampler) const {
+	Ray ray;
 
-	ray.org = m_origin;
-
-	ray.tnear = 0.0f;
-	ray.tfar = embree::inf;
-	ray.geomID = RTC_INVALID_GEOMETRY_ID;
-	ray.primID = RTC_INVALID_GEOMETRY_ID;
-	ray.instID = RTC_INVALID_GEOMETRY_ID;
-	ray.mask = 0xFFFFFFFF;
-	ray.time = 0.0f;
+	ray.Origin = m_origin;
+	ray.TNear = 0.0f;
+	ray.TFar = infinity;
+	ray.GeomID = INVALID_GEOMETRY_ID;
+	ray.PrimID = INVALID_PRIMATIVE_ID;
+	ray.InstID = INVALID_INSTANCE_ID;
+	ray.Mask = 0xFFFFFFFF;
+	ray.Time = 0.0f;
 
 	float u = m_filter.Sample(sampler->NextFloat());
 	float v = m_filter.Sample(sampler->NextFloat());
@@ -108,7 +107,7 @@ RTCRay PinholeCamera::CalculateRayFromPixel(uint x, uint y, UniformSampler *samp
 	                   -1.0f);
 
 	// Matrix multiply
-	ray.dir = normalize(float3a(dot(viewVector, m_matrixMulXAxis),
+	ray.Direction = normalize(float3a(dot(viewVector, m_matrixMulXAxis),
 	                            dot(viewVector, m_matrixMulYAxis),
 	                            dot(viewVector, m_matrixMulZAxis)));
 

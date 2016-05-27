@@ -81,7 +81,7 @@ Light *Scene::RandomOneLight(UniformSampler *sampler) {
 	return m_lightList[lightIndex];
 }
 
-void Scene::Intersect(RTCRay &ray) const {
+void Scene::Intersect(Ray &ray) const {
 	rtcIntersect(m_scene, ray);
 }
 

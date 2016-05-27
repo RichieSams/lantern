@@ -66,7 +66,7 @@ public:
 	std::size_t NumLights() const { return m_lightList.size(); }
 	Light *RandomOneLight(UniformSampler *sampler);
 
-	void Intersect(RTCRay &ray) const;
+	void Intersect(Ray &ray) const;
 
 private:
 	uint AddMeshInternal(Mesh *mesh, BSDF *bsdf);

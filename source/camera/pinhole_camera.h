@@ -89,7 +89,7 @@ public:
 	 * @param x         The x coordinate of the pixel
 	 * @param y         The y coordinate of the pixel
 	 */
-	RTCRay CalculateRayFromPixel(uint x, uint y, UniformSampler *sampler) const;
+	Ray CalculateRayFromPixel(uint x, uint y, UniformSampler *sampler) const;
 
 private:
 	/**

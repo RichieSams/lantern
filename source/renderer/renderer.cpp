@@ -90,7 +90,7 @@ void Renderer::RenderTile(uint index, uint width, uint height, uint numTilesX, u
 }
 
 void Renderer::RenderPixel(uint x, uint y, UniformSampler *sampler) {
-	RTCRay ray = m_scene->Camera.CalculateRayFromPixel(x, y, sampler);
+	Ray ray = m_scene->Camera.CalculateRayFromPixel(x, y, sampler);
 
 	float3 color(0.0f);
 	float3 throughput(1.0f);
@@ -100,7 +100,7 @@ void Renderer::RenderPixel(uint x, uint y, UniformSampler *sampler) {
 		m_scene->Intersect(ray);
 
 		// The ray missed. Return the background color
-		if (ray.geomID == RTC_INVALID_GEOMETRY_ID) {
+		if (ray.GeomID == INVALID_GEOMETRY_ID) {
 			color += throughput * m_scene->BackgroundColor;
 			break;
 		}
@@ -111,16 +111,16 @@ void Renderer::RenderPixel(uint x, uint y, UniformSampler *sampler) {
 		BSDF *bsdf = m_scene->GetBSDF(ray.GeomID);
 		// The object might be emissive. If so, it will have a corresponding light
 		// Otherwise, GetLight will return nullptr
-		Light *light = m_scene->GetLight(ray.geomID);
+		Light *light = m_scene->GetLight(ray.GeomID);
 
 		// If this is the first bounce, we need to add the emmisive light
 		if (bounces == 0 && light != nullptr) {
 			color += throughput * light->Le();
 		}
 
-		float3a normal = normalize(ray.Ng);
-		float3a wo = normalize(-ray.dir);
-		float3a surfacePos = ray.org + ray.dir * ray.tfar;
+		float3a normal = normalize(ray.GeomNormal);
+		float3a wo = normalize(-ray.Direction);
+		float3a surfacePos = ray.Origin + ray.Direction * ray.TFar;
 
 		// Calculate the direct lighting
 		color += throughput * SampleOneLight(sampler, surfacePos, normal, wo, bsdf, light);
@@ -146,17 +146,17 @@ void Renderer::RenderPixel(uint x, uint y, UniformSampler *sampler) {
 		// Shoot a new ray
 
 		// Set the origin at the intersection point
-		ray.org = surfacePos;
+		ray.Origin = surfacePos;
 
 		// Reset the other ray properties
-		ray.dir = wi;
-		ray.tnear = 0.001f;
-		ray.tfar = embree::inf;
-		ray.geomID = RTC_INVALID_GEOMETRY_ID;
-		ray.primID = RTC_INVALID_GEOMETRY_ID;
-		ray.instID = RTC_INVALID_GEOMETRY_ID;
-		ray.mask = 0xFFFFFFFF;
-		ray.time = 0.0f;
+		ray.Direction = wi;
+		ray.TNear = 0.001f;
+		ray.TFar = infinity;
+		ray.GeomID = INVALID_GEOMETRY_ID;
+		ray.PrimID = INVALID_PRIMATIVE_ID;
+		ray.InstID = INVALID_INSTANCE_ID;
+		ray.Mask = 0xFFFFFFFF;
+		ray.Time = 0.0f;
 	}
 
 	m_scene->Camera.FrameBuffer.SplatPixel(x, y, color);

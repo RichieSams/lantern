@@ -34,27 +34,27 @@ float3 AreaLight::SampleLi(UniformSampler *sampler, Scene *scene, float3a &surfa
 	}
 
 	// Make sure there's nothing occluding us
-	RTCRay ray;
-	ray.org = surfacePos;
-	ray.dir = direction;
-	ray.tnear = 0.001f;
-	ray.tfar = embree::inf;
-	ray.geomID = RTC_INVALID_GEOMETRY_ID;
-	ray.primID = RTC_INVALID_GEOMETRY_ID;
-	ray.instID = RTC_INVALID_GEOMETRY_ID;
-	ray.mask = 0xFFFFFFFF;
-	ray.time = 0.0f;
+	Ray ray;
+	ray.Origin = surfacePos;
+	ray.Direction = direction;
+	ray.TNear = 0.001f;
+	ray.TFar = embree::inf;
+	ray.GeomID = INVALID_GEOMETRY_ID;
+	ray.PrimID = INVALID_PRIMATIVE_ID;
+	ray.InstID = INVALID_INSTANCE_ID;
+	ray.Mask = 0xFFFFFFFF;
+	ray.Time = 0.0f;
 
 	scene->Intersect(ray);
-	if (ray.geomID != m_geomId) {
+	if (ray.GeomID != m_geomId) {
 		*pdf = 0.0f;
 		return float3(0.0f);
 	}
 
 	// Calculate the pdf
-	float3a intersectionPoint = ray.org + ray.dir * ray.tfar;
+	float3a intersectionPoint = ray.Origin + ray.Direction * ray.TFar;
 	float distanceSquared = sqr_length(intersectionPoint - surfacePos);
-	*pdf = distanceSquared / (std::abs(dot(normalize(ray.Ng), -direction)) * m_area);
+	*pdf = distanceSquared / (std::abs(dot(normalize(ray.GeomNormal), -direction)) * m_area);
 
 	// Return the full radiance value
 	// The value will be attenuated by the BRDF
@@ -68,27 +68,27 @@ float AreaLight::PdfLi(Scene *scene, float3a &surfacePos, float3a &surfaceNormal
 	}
 
 	// Make sure there's nothing occluding us
-	RTCRay ray;
-	ray.org = surfacePos;
-	ray.dir = wi;
-	ray.tnear = 0.001f;
-	ray.tfar = embree::inf;
-	ray.geomID = RTC_INVALID_GEOMETRY_ID;
-	ray.primID = RTC_INVALID_GEOMETRY_ID;
-	ray.instID = RTC_INVALID_GEOMETRY_ID;
-	ray.mask = 0xFFFFFFFF;
-	ray.time = 0.0f;
+	Ray ray;
+	ray.Origin = surfacePos;
+	ray.Direction = wi;
+	ray.TNear = 0.001f;
+	ray.TFar = embree::inf;
+	ray.GeomID = INVALID_GEOMETRY_ID;
+	ray.PrimID = INVALID_PRIMATIVE_ID;
+	ray.InstID = INVALID_INSTANCE_ID;
+	ray.Mask = 0xFFFFFFFF;
+	ray.Time = 0.0f;
 
 	scene->Intersect(ray);
-	if (ray.geomID != m_geomId) {
+	if (ray.GeomID != m_geomId) {
 		return 0.0f;
 	}
 
 	// Calculate the pdf
-	float3a intersectionPoint = ray.org + ray.dir * ray.tfar;
+	float3a intersectionPoint = ray.Origin + ray.Direction * ray.TFar;
 	float distanceSquared = sqr_length(intersectionPoint - surfacePos);
 	
-	return distanceSquared / (std::abs(dot(normalize(ray.Ng), -wi)) * m_area);
+	return distanceSquared / (std::abs(dot(normalize(ray.GeomNormal), -wi)) * m_area);
 }
 
 } // End of namespace Lantern
