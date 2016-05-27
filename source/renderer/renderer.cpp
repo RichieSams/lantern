@@ -123,7 +123,7 @@ void Renderer::RenderPixel(uint x, uint y, UniformSampler *sampler) const {
 
 		SurfaceInteraction interaction;
 		interaction.Position = ray.Origin + ray.Direction * ray.TFar;
-		interaction.Normal = normalize(ray.GeomNormal);
+		interaction.Normal = normalize(m_scene->InterpolateNormal(ray.GeomID, ray.PrimID, ray.U, ray.V));
 		interaction.OutputDirection = normalize(-ray.Direction);
 		
 

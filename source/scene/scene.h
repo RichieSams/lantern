@@ -67,6 +67,7 @@ public:
 	Light *RandomOneLight(UniformSampler *sampler);
 
 	void Intersect(Ray &ray) const;
+	float3 InterpolateNormal(uint meshId, uint primId, float u, float v) const;
 
 private:
 	uint AddMeshInternal(Mesh *mesh, BSDF *bsdf);

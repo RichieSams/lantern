@@ -56,7 +56,7 @@ float3 AreaLight::SampleLi(UniformSampler *sampler, Scene *scene, SurfaceInterac
 	// Calculate the pdf
 	float3a intersectionPoint = ray.Origin + ray.Direction * ray.TFar;
 	float distanceSquared = sqr_length(intersectionPoint - interaction.Position);
-	*pdf = distanceSquared / (std::abs(dot(normalize(ray.GeomNormal), -direction)) * m_area);
+	*pdf = distanceSquared / (std::abs(dot(normalize(scene->InterpolateNormal(ray.GeomID, ray.PrimID, ray.U, ray.V)), -direction)) * m_area);
 
 	// Return the full radiance value
 	// The value will be attenuated by the BRDF
@@ -90,7 +90,7 @@ float AreaLight::PdfLi(Scene *scene, SurfaceInteraction &interaction) const {
 	float3a intersectionPoint = ray.Origin + ray.Direction * ray.TFar;
 	float distanceSquared = sqr_length(intersectionPoint - interaction.Position);
 	
-	return distanceSquared / (std::abs(dot(normalize(ray.GeomNormal), interaction.InputDirection)) * m_area);
+	return distanceSquared / (std::abs(dot(normalize(scene->InterpolateNormal(ray.GeomID, ray.PrimID, ray.U, ray.V)), interaction.InputDirection)) * m_area);
 }
 
 } // End of namespace Lantern

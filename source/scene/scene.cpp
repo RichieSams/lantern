@@ -19,7 +19,7 @@ namespace Lantern {
 Scene::Scene()
 	: BackgroundColor(0.0f),
 	  m_device(rtcNewDevice(nullptr)),
-	  m_scene(rtcDeviceNewScene(m_device, RTC_SCENE_STATIC, RTC_INTERSECT1)) {
+	  m_scene(rtcDeviceNewScene(m_device, RTC_SCENE_STATIC, RTC_INTERSECT1 | RTC_INTERPOLATE)) {
 }
 
 Scene::~Scene() {
@@ -38,6 +38,10 @@ uint Scene::AddMeshInternal(Mesh *mesh, BSDF *bsdf) {
 	uint *indices = (uint *)rtcMapBuffer(m_scene, meshId, RTC_INDEX_BUFFER);
 	memcpy(indices, &mesh->Indices[0], mesh->Indices.size() * sizeof(int));
 	rtcUnmapBuffer(m_scene, meshId, RTC_INDEX_BUFFER);
+
+	float3 *normals = (float3 *)_aligned_malloc(sizeof(float3) * mesh->Normals.size(), 16);
+	memcpy(normals, &mesh->Normals[0], sizeof(float3) * mesh->Normals.size());
+	rtcSetBuffer(m_scene, meshId, RTC_USER_VERTEX_BUFFER0, normals, 0u, sizeof(float3));
 
 	return meshId;
 }
