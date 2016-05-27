@@ -11,6 +11,7 @@
 
 namespace Lantern {
 
+struct SurfaceInteraction;
 class UniformSampler;
 
 class BSDF {
@@ -25,9 +26,9 @@ protected:
 	float3 m_albedo;
 
 public:
-	virtual float3 Eval(float3a &wi, float3a &wo, float3a &normal) const = 0;
-	virtual float3a Sample(float3a &wo, float3a &normal, UniformSampler *sampler) const = 0;
-	virtual float Pdf(float3a &wi, float3a &wo, float3a &normal) const = 0;
+	virtual float3 Eval(SurfaceInteraction &interaction) const = 0;
+	virtual void Sample(SurfaceInteraction &interaction, UniformSampler *sampler) const = 0;
+	virtual float Pdf(SurfaceInteraction &interaction) const = 0;
 };
 
 } // End of namespace Lantern

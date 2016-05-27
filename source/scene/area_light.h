@@ -26,8 +26,8 @@ private:
 	float4 m_boundingSphere;
 
 public:
-	float3 SampleLi(UniformSampler *sampler, Scene *scene, float3a &surfacePos, float3a &surfaceNormal, float3a *wi, float *pdf) const override;
-	float PdfLi(Scene *scene, float3a &surfacePos, float3a &surfaceNormal, float3a &wi) const override;
+	float3 SampleLi(UniformSampler *sampler, Scene *scene, SurfaceInteraction &interaction, float *pdf) const override;
+	float PdfLi(Scene *scene, SurfaceInteraction &interaction) const override;
 };
 
 } // End of namespace Lantern

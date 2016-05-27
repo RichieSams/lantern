@@ -8,6 +8,8 @@
 
 #include "bsdfs/bsdf.h"
 
+#include "renderer/surface_interaction.h"
+
 #include "math/uniform_sampler.h"
 #include "math/float_math.h"
 
@@ -21,17 +23,19 @@ public:
 	}
 
 public:
-	float3 Eval(float3a &wi, float3a &wo, float3a &normal) const override {
+	float3 Eval(SurfaceInteraction &interaction) const override {
 		return m_albedo;
 	}
 
-	float3a Sample(float3a &wo, float3a &normal, UniformSampler *sampler) const override {
-		return reflect(wo, normal);
+	void Sample(SurfaceInteraction &interaction, UniformSampler *sampler) const override {
+		interaction.SampledLobe = BSDFLobe::SpecularReflection;
+
+		interaction.InputDirection = reflect(interaction.OutputDirection, interaction.Normal);
 	}
 
-	float Pdf(float3a &wi, float3a &wo, float3a &normal) const override {
-		float3a reflection = reflect(wi, normal);
-		return FloatNearlyEqual(reflection.x, wo.x) && FloatNearlyEqual(reflection.y, wo.y) && FloatNearlyEqual(reflection.z, wo.z) ? 1.0f : 0.0f;
+	float Pdf(SurfaceInteraction &interaction) const override {
+		float3a reflection = reflect(interaction.InputDirection, interaction.Normal);
+		return Float3aNearlyEqual(reflection, interaction.OutputDirection) ? 1.0f : 0.0f;
 	}
 };
 

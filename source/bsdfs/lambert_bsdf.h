@@ -8,6 +8,8 @@
 
 #include "bsdfs/bsdf.h"
 
+#include "renderer/surface_interaction.h"
+
 #include "math/sampling.h"
 
 
@@ -20,16 +22,18 @@ public:
 	}
 
 public:
-	float3 Eval(float3a &wi, float3a &wo, float3a &normal) const override {
-		return m_albedo * M_1_PI * dot(wi, normal);
+	float3 Eval(SurfaceInteraction &interaction) const override {
+		return m_albedo * M_1_PI * dot(interaction.InputDirection, interaction.Normal);
 	}
 	
-	float3a Sample(float3a &wo, float3a &normal, UniformSampler *sampler) const override {
-		return CosineSampleHemisphere(normal, sampler);
+	void Sample(SurfaceInteraction &interaction, UniformSampler *sampler) const override {
+		interaction.SampledLobe = BSDFLobe::Diffuse;
+
+		interaction.InputDirection = CosineSampleHemisphere(interaction.Normal, sampler);
 	}
 
-	float Pdf(float3a &wi, float3a &wo, float3a &normal) const override {
-		return dot(wi, normal) * M_1_PI;
+	float Pdf(SurfaceInteraction &interaction) const override {
+		return dot(interaction.InputDirection, interaction.Normal) * M_1_PI;
 	}
 };
 

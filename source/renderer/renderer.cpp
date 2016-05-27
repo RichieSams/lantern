@@ -6,6 +6,8 @@
 
 #include "renderer/renderer.h"
 
+#include "renderer/surface_interaction.h"
+
 #include "scene/scene.h"
 #include "scene/ray.h"
 
@@ -113,25 +115,28 @@ void Renderer::RenderPixel(uint x, uint y, UniformSampler *sampler) {
 		// Otherwise, GetLight will return nullptr
 		Light *light = m_scene->GetLight(ray.GeomID);
 
-		// If this is the first bounce, we need to add the emmisive light
+		// If this is the first bounce or if we just had a specular bounce,
+		// we need to add the emmisive light
 		if (bounces == 0 && light != nullptr) {
 			color += throughput * light->Le();
 		}
 
-		float3a normal = normalize(ray.GeomNormal);
-		float3a wo = normalize(-ray.Direction);
-		float3a surfacePos = ray.Origin + ray.Direction * ray.TFar;
+		SurfaceInteraction interaction;
+		interaction.Position = ray.Origin + ray.Direction * ray.TFar;
+		interaction.Normal = normalize(ray.GeomNormal);
+		interaction.OutputDirection = normalize(-ray.Direction);
+		
 
 		// Calculate the direct lighting
-		color += throughput * SampleOneLight(sampler, surfacePos, normal, wo, bsdf, light);
+		color += throughput * SampleOneLight(sampler, interaction, bsdf, light);
 
 		// Get the new ray direction
 		// Choose the direction based on the bsdf
-		float3a wi = bsdf->Sample(wo, normal, sampler);
-		float pdf = bsdf->Pdf(wi, wo, normal);
+		bsdf->Sample(interaction, sampler);
+		float pdf = bsdf->Pdf(interaction);
 
 		// Accumulate the diffuse/specular weight
-		throughput = throughput * bsdf->Eval(wi, wo, normal) / pdf;
+		throughput = throughput * bsdf->Eval(interaction) / pdf;
 
 		// Russian Roulette
 		if (bounces > 3) {
@@ -146,10 +151,10 @@ void Renderer::RenderPixel(uint x, uint y, UniformSampler *sampler) {
 		// Shoot a new ray
 
 		// Set the origin at the intersection point
-		ray.Origin = surfacePos;
+		ray.Origin = interaction.Position;
 
 		// Reset the other ray properties
-		ray.Direction = wi;
+		ray.Direction = interaction.InputDirection;
 		ray.TNear = 0.001f;
 		ray.TFar = infinity;
 		ray.GeomID = INVALID_GEOMETRY_ID;
@@ -162,7 +167,7 @@ void Renderer::RenderPixel(uint x, uint y, UniformSampler *sampler) {
 	m_scene->Camera.FrameBuffer.SplatPixel(x, y, color);
 }
 
-float3 Renderer::SampleOneLight(UniformSampler *sampler, float3a &surfacePos, float3a &surfaceNormal, float3a &wo, BSDF *bsdf, Light *hitLight) const {
+float3 Renderer::SampleOneLight(UniformSampler *sampler, SurfaceInteraction interaction, BSDF *bsdf, Light *hitLight) const {
 	std::size_t numLights = m_scene->NumLights();
 	
 	// Return black if there are no lights
@@ -180,25 +185,24 @@ float3 Renderer::SampleOneLight(UniformSampler *sampler, float3a &surfacePos, fl
 		light = m_scene->RandomOneLight(sampler);
 	} while (light == hitLight);
 
-	return numLights * EstimateDirect(light, sampler, surfacePos, surfaceNormal, wo, bsdf);
+	return numLights * EstimateDirect(light, sampler, interaction, bsdf);
 }
 
-float3 Renderer::EstimateDirect(Light *light, UniformSampler *sampler, float3a &surfacePos, float3a &surfaceNormal, float3a &wo, BSDF *bsdf) const {
+float3 Renderer::EstimateDirect(Light *light, UniformSampler *sampler, SurfaceInteraction &interaction, BSDF *bsdf) const {
 	float3 directLighting = float3(0.0f);
-	float3a wi;
 	float3 f;
 	float lightPdf, scatteringPdf;
 
 
 	// Sample lighting with multiple importance sampling
 
-	float3 Li = light->SampleLi(sampler, m_scene, surfacePos, surfaceNormal, &wi, &lightPdf);
+	float3 Li = light->SampleLi(sampler, m_scene, interaction, &lightPdf);
 
 	// Make sure the pdf isn't zero and the radiance isn't black
 	if (lightPdf != 0.0f && !all(Li)) {
 		// Calculate the brdf value
-		f = bsdf->Eval(wi, wo, surfaceNormal);
-		scatteringPdf = bsdf->Pdf(wi, wo, surfaceNormal);
+		f = bsdf->Eval(interaction);
+		scatteringPdf = bsdf->Pdf(interaction);
 
 		if (scatteringPdf != 0.0f && !all(f)) {
 			float weight = PowerHeuristic(1, lightPdf, 1, scatteringPdf);
@@ -209,11 +213,11 @@ float3 Renderer::EstimateDirect(Light *light, UniformSampler *sampler, float3a &
 
 	// Sample brdf with multiple importance sampling
 
-	wi = bsdf->Sample(wo, surfaceNormal, sampler);
-	f = bsdf->Eval(wi, wo, surfaceNormal);
-	scatteringPdf = bsdf->Pdf(wo, wo, surfaceNormal);
+	bsdf->Sample(interaction, sampler);
+	f = bsdf->Eval(interaction);
+	scatteringPdf = bsdf->Pdf(interaction);
 	if (scatteringPdf != 0.0f && !all(f)) {
-		lightPdf = light->PdfLi(m_scene, surfacePos, surfaceNormal, wi);
+		lightPdf = light->PdfLi(m_scene, interaction);
 		if (lightPdf == 0.0f) {
 			// We didn't hit anything, so ignore the brdf sample
 			return directLighting;

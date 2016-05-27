@@ -11,6 +11,7 @@
 
 namespace Lantern {
 
+struct SurfaceInteraction;
 class Scene;
 
 class Light {
@@ -24,8 +25,8 @@ public:
 	float3 m_radiance;
 
 public:
-	virtual float3 SampleLi(UniformSampler *sampler, Scene *scene, float3a &surfacePos, float3a &surfaceNormal, float3a *wi, float *pdf) const = 0;
-	virtual float PdfLi(Scene *scene, float3a &surfacePos, float3a &surfaceNormal, float3a &wi) const = 0;
+	virtual float3 SampleLi(UniformSampler *sampler, Scene *scene, SurfaceInteraction &interaction, float *pdf) const = 0;
+	virtual float PdfLi(Scene *scene, SurfaceInteraction &interaction) const = 0;
 	virtual float3 Le() const { return m_radiance; }
 };
 

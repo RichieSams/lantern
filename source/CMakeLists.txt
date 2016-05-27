@@ -41,11 +41,13 @@ SetSourceGroup(NAME BSDFs
 	SOURCE_FILES bsdfs/bsdf.h
 	             bsdfs/lambert_bsdf.h
 	             bsdfs/mirror_bsdf.h
+	             bsdfs/bsdf_lobe.h
 )
 
 SetSourceGroup(NAME Renderer
 	SOURCE_FILES renderer/renderer.h
 	             renderer/renderer.cpp
+	             renderer/surface_interaction.h
 )
 
 SetSourceGroup(NAME Visualizer

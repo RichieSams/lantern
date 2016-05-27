@@ -13,6 +13,7 @@
 namespace Lantern {
 
 class UniformSampler;
+struct SurfaceInteraction;
 class BSDF;
 class Scene;
 class Light;
@@ -34,10 +35,10 @@ public:
 	void RenderFrame();
 
 private:
-	void RenderTile(uint index, uint width, uint height, uint numTilesX, uint numTilesY);
-	void RenderPixel(uint x, uint y, UniformSampler *sampler);
-	float3 SampleOneLight(UniformSampler *sampler, float3a &surfacePos, float3a &surfaceNormal, float3a &wo, BSDF *material, Light *hitLight) const;
-	float3 EstimateDirect(Light *light, UniformSampler *sampler, float3a &surfacePos, float3a &surfaceNormal, float3a &wo, BSDF *material) const;
+	void RenderTile(uint index, uint width, uint height, uint numTilesX, uint numTilesY) const;
+	void RenderPixel(uint x, uint y, UniformSampler *sampler) const;
+	float3 SampleOneLight(UniformSampler *sampler, SurfaceInteraction interaction, BSDF *bsdf, Light *hitLight) const;
+	float3 EstimateDirect(Light *light, UniformSampler *sampler, SurfaceInteraction &interaction, BSDF *bsdf) const;
 };
 
 } // End of namespace Lantern
