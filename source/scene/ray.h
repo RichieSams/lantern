@@ -19,24 +19,24 @@
 struct STRUCT_ALIGN(64) RTCRay {
 public:
 	/**
-	 * Default constructor does nothing. 
+	 * Default constructor does nothing.
 	 */
 	__forceinline RTCRay() {
 	}
 
 	/**
-	 * Constructs a ray from origin, direction, and ray segment. 
+	 * Constructs a ray from origin, direction, and ray segment.
 	 *
-	 * Note: Near has to be smaller than far. 
+	 * Note: Near has to be smaller than far.
 	 */
 	__forceinline RTCRay(const float3a& org, const float3a& dir,
-	                  float tnear = 0.0f, float tfar = infinity,
-	                  float time = 0.0f, uint mask = -1)
-		: Origin(org), 
-		  Direction(dir), 
-		  TNear(tnear), TFar(tfar), 
-		  Time(time), 
-		  Mask(mask), 
+	                     float tnear = 0.0f, float tfar = infinity,
+	                     float time = 0.0f, uint mask = -1)
+		: Origin(org),
+		  Direction(dir),
+		  TNear(tnear), TFar(tfar),
+		  Time(time),
+		  Mask(mask),
 		  GeomID(INVALID_GEOMETRY_ID), PrimID(INVALID_PRIMATIVE_ID), InstID(INVALID_INSTANCE_ID) {
 	}
 
@@ -59,7 +59,7 @@ typedef RTCRay Ray;
 
 /*! Outputs ray to stream. */
 inline std::ostream& operator<<(std::ostream& cout, const Ray& ray) {
-	return cout << "{ " <<
+	return std::cout << "{ " <<
 		"origin = " << ray.Origin << ", direction = " << ray.Direction << ", near = " << ray.TNear << ", far = " << ray.TFar << ", time = " << ray.Time << ", " <<
 		"instID = " << ray.InstID << ", geomID = " << ray.GeomID << ", primID = " << ray.PrimID << ", " << "u = " << ray.U << ", v = " << ray.V << ", geomNormal = " << ray.GeomNormal << " }";
 }
