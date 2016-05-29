@@ -44,4 +44,12 @@ inline float Fresnel(float IORi, float IORo, float VdotN, float sinSquaredThetaT
 	return 0.5f * (R_perpendicular * R_perpendicular + R_parallel * R_parallel);
 }
 
+inline bool AnyNan(float3 &a) {
+	return isnan(a.x) || isnan(a.y) || isnan(a.z);
+}
+
+inline bool AnyNan(float3a &a) {
+	return isnan(a.x) || isnan(a.y) || isnan(a.z);
+}
+
 } // End of namespace Lantern
