@@ -96,9 +96,12 @@ void Renderer::RenderPixel(uint x, uint y, UniformSampler *sampler) const {
 
 	float3 color(0.0f);
 	float3 throughput(1.0f);
+	SurfaceInteraction interaction;
+	interaction.IORi = 1.0f; // Air
 
 	// Bounce the ray around the scene
-	for (uint bounces = 0; bounces < 10; ++bounces) {
+	uint bounces = 0;
+	for (; bounces < 20; ++bounces) {
 		m_scene->Intersect(ray);
 
 		// The ray missed. Return the background color
@@ -109,7 +112,7 @@ void Renderer::RenderPixel(uint x, uint y, UniformSampler *sampler) const {
 
 		// We hit an object
 			
-		// Fetch the bsdf
+		// Fetch the material
 		BSDF *bsdf = m_scene->GetBSDF(ray.GeomID);
 		// The object might be emissive. If so, it will have a corresponding light
 		// Otherwise, GetLight will return nullptr
@@ -121,21 +124,22 @@ void Renderer::RenderPixel(uint x, uint y, UniformSampler *sampler) const {
 			color += throughput * light->Le();
 		}
 
-		SurfaceInteraction interaction;
 		interaction.Position = ray.Origin + ray.Direction * ray.TFar;
 		interaction.Normal = normalize(m_scene->InterpolateNormal(ray.GeomID, ray.PrimID, ray.U, ray.V));
 		interaction.OutputDirection = normalize(-ray.Direction);
-		
+		interaction.IORo = 0.0f;
+
 
 		// Calculate the direct lighting
 		color += throughput * SampleOneLight(sampler, interaction, bsdf, light);
 
+
 		// Get the new ray direction
-		// Choose the direction based on the bsdf
+		// Choose the direction based on the bsdf		
 		bsdf->Sample(interaction, sampler);
 		float pdf = bsdf->Pdf(interaction);
 
-		// Accumulate the diffuse/specular weight
+		// Accumulate the weight
 		throughput = throughput * bsdf->Eval(interaction) / pdf;
 
 		// Russian Roulette
@@ -146,6 +150,11 @@ void Renderer::RenderPixel(uint x, uint y, UniformSampler *sampler) const {
 			}
 
 			throughput *= 1 / p;
+		}
+
+		// Update the current IOR if we refracted
+		if (interaction.SampledLobe == BSDFLobe::SpecularTransmission) {
+			interaction.IORi = interaction.IORo;
 		}
 
 		// Shoot a new ray
@@ -195,24 +204,25 @@ float3 Renderer::EstimateDirect(Light *light, UniformSampler *sampler, SurfaceIn
 
 
 	// Sample lighting with multiple importance sampling
+	// Only sample if the BRDF is non-specular 
+	if ((bsdf->SupportedLobes & ~BSDFLobe::Specular) != 0) {
+		float3 Li = light->SampleLi(sampler, m_scene, interaction, &lightPdf);
 
-	float3 Li = light->SampleLi(sampler, m_scene, interaction, &lightPdf);
+		// Make sure the pdf isn't zero and the radiance isn't black
+		if (lightPdf != 0.0f && !all(Li)) {
+			// Calculate the brdf value
+			f = bsdf->Eval(interaction);
+			scatteringPdf = bsdf->Pdf(interaction);
 
-	// Make sure the pdf isn't zero and the radiance isn't black
-	if (lightPdf != 0.0f && !all(Li)) {
-		// Calculate the brdf value
-		f = bsdf->Eval(interaction);
-		scatteringPdf = bsdf->Pdf(interaction);
-
-		if (scatteringPdf != 0.0f && !all(f)) {
-			float weight = PowerHeuristic(1, lightPdf, 1, scatteringPdf);
-			directLighting += f * Li * weight / lightPdf;
+			if (scatteringPdf != 0.0f && !all(f)) {
+				float weight = PowerHeuristic(1, lightPdf, 1, scatteringPdf);
+				directLighting += f * Li * weight / lightPdf;
+			}
 		}
 	}
 
 
 	// Sample brdf with multiple importance sampling
-
 	bsdf->Sample(interaction, sampler);
 	f = bsdf->Eval(interaction);
 	scatteringPdf = bsdf->Pdf(interaction);
@@ -224,7 +234,7 @@ float3 Renderer::EstimateDirect(Light *light, UniformSampler *sampler, SurfaceIn
 		}
 
 		float weight = PowerHeuristic(1, scatteringPdf, 1, lightPdf);
-		Li = light->Le();
+		float3 Li = light->Le();
 		directLighting += f * Li * weight / scatteringPdf;
 	}
 

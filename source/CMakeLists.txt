@@ -43,6 +43,7 @@ SetSourceGroup(NAME BSDFs
 	             bsdfs/lambert_bsdf.h
 	             bsdfs/mirror_bsdf.h
 	             bsdfs/bsdf_lobe.h
+	             bsdfs/ideal_specular_dielectric.h
 )
 
 SetSourceGroup(NAME Renderer

@@ -15,7 +15,9 @@ namespace Lantern {
 
 struct SurfaceInteraction {
 	SurfaceInteraction()
-		: SampledLobe(BSDFLobe::Null) {
+		: SampledLobe(BSDFLobe::Null), 
+		  IORi(0.0f), 
+		  IORo(0.0f) {
 	}
 
 	float3a Position;
@@ -23,6 +25,8 @@ struct SurfaceInteraction {
 	float3a InputDirection;
 	float3a OutputDirection;
 	BSDFLobe::Type SampledLobe;
+	float IORi;
+	float IORo;
 };
 
 } // End of namespace Lantern

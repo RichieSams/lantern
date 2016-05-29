@@ -19,7 +19,7 @@ namespace Lantern {
 class MirrorBSDF : public BSDF {
 public:
 	MirrorBSDF(float3 albedo)
-		: BSDF(albedo) {
+		: BSDF(BSDFLobe::SpecularReflection, albedo) {
 	}
 
 public:
@@ -28,14 +28,12 @@ public:
 	}
 
 	void Sample(SurfaceInteraction &interaction, UniformSampler *sampler) const override {
-		interaction.SampledLobe = BSDFLobe::SpecularReflection;
-
 		interaction.InputDirection = reflect(interaction.OutputDirection, interaction.Normal);
+		interaction.SampledLobe = BSDFLobe::SpecularReflection;
 	}
 
 	float Pdf(SurfaceInteraction &interaction) const override {
-		float3a reflection = reflect(interaction.InputDirection, interaction.Normal);
-		return Float3aNearlyEqual(reflection, interaction.OutputDirection) ? 1.0f : 0.0f;
+		return 1.0f;
 	}
 };
 

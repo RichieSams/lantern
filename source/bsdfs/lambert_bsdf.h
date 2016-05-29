@@ -18,7 +18,7 @@ namespace Lantern {
 class LambertBSDF : public BSDF {
 public:
 	LambertBSDF(float3 albedo)
-		: BSDF(albedo) {
+		: BSDF(BSDFLobe::Diffuse, albedo) {
 	}
 
 public:
@@ -27,9 +27,9 @@ public:
 	}
 	
 	void Sample(SurfaceInteraction &interaction, UniformSampler *sampler) const override {
+		interaction.InputDirection = CosineSampleHemisphere(interaction.Normal, sampler);
 		interaction.SampledLobe = BSDFLobe::Diffuse;
 
-		interaction.InputDirection = CosineSampleHemisphere(interaction.Normal, sampler);
 	}
 
 	float Pdf(SurfaceInteraction &interaction) const override {

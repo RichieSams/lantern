@@ -8,6 +8,8 @@
 
 #include "math/vector_types.h"
 
+#include "bsdfs/bsdf_lobe.h"
+
 
 namespace Lantern {
 
@@ -16,11 +18,15 @@ class UniformSampler;
 
 class BSDF {
 public:
-	BSDF(float3 albedo)
-		: m_albedo(albedo) {
+	BSDF(BSDFLobe::Type supportedLobes, float3 albedo)
+		: SupportedLobes(supportedLobes),
+		  m_albedo(albedo) {
 	}
 	virtual ~BSDF() {
 	}
+
+public:
+	BSDFLobe::Type SupportedLobes;
 
 protected:
 	float3 m_albedo;
