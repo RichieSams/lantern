@@ -27,4 +27,21 @@ inline bool any(float3a &a) {
 
 float3a RotateToWorld(float x, float y, float z, float3a &normal);
 
+inline float SinSquaredThetaT(float VdotN, float eta) {
+	return eta * eta * (1 - VdotN * VdotN);
+}
+
+inline float Fresnel(float IORi, float IORo, float VdotN, float sinSquaredThetaT) {
+	// Check for total internal reflection
+	if (sinSquaredThetaT > 1.0f) {
+		return 1.0f;
+	}
+
+	float cosThetaT = std::sqrtf(1.0f - sinSquaredThetaT);
+	float R_perpendicular = (IORi * VdotN - IORo * cosThetaT) / (IORi * VdotN + IORo * cosThetaT);
+	float R_parallel = (IORo * VdotN - IORi * cosThetaT) / (IORo * VdotN + IORi * cosThetaT);
+
+	return 0.5f * (R_perpendicular * R_perpendicular + R_parallel * R_parallel);
+}
+
 } // End of namespace Lantern

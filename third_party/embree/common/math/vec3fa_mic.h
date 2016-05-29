@@ -270,6 +270,9 @@ namespace embree
   __forceinline float  halfArea   ( const Vec3fa& d )                    { return d.x*(d.y+d.z)+d.y*d.z; }
   __forceinline float  area       ( const Vec3fa& d )                    { return 2.0f*halfArea(d); }
   __forceinline Vec3fa_t reflect  ( const Vec3fa_t& V, const Vec3fa_t& N ) { return 2.0f*dot(V,N)*N-V; }
+  __forceinline Vec3fa_t refract(const Vec3fa_t& V, const Vec3fa_t& N, float VdotN, float eta, float sinSquaredThetaT) {
+	  return (eta * VdotN - std::sqrtf(1.0f - sinSquaredThetaT)) * N - eta * V;
+  }
   
   __forceinline Vec3fa_t normalize_safe( const Vec3fa_t& a ) { 
     const float d = dot(a,a); if (unlikely(d == 0.0f)) return a; else return a*rsqrt(d);

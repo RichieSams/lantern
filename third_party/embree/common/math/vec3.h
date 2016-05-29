@@ -204,6 +204,9 @@ namespace embree
   template<typename T> __forceinline      T  halfArea ( const Vec3<T>& d )                  { return d.x*(d.y+d.z)+d.y*d.z; }
   template<typename T> __forceinline      T  area     ( const Vec3<T>& d )                  { return 2.0f*halfArea(d); }
   template<typename T> __forceinline Vec3<T> reflect  ( const Vec3<T>& V, const Vec3fa& N ) { return 2.0f*dot(V,N)*N-V; }
+  template<typename T> __forceinline Vec3<T> refract  ( const Vec3<T>& V, const Vec3fa& N, float VdotN, float eta, float sinSquaredThetaT) {
+	  return (eta * VdotN - std::sqrtf(1.0f - sinSquaredThetaT)) * N - eta * V;
+  }
 
   template<typename T> __forceinline Vec3<T> normalize_safe( const Vec3<T>& a ) {
     const T d = dot(a,a); return select(d == T( zero ), a ,  a*rsqrt(d) );
