@@ -29,11 +29,13 @@ void LoadMeshesFromObj(const char *filePath, std::vector<Mesh> &meshes, std::vec
 			// tiny_obj_loader uses LH coords
 			mesh.Positions.emplace_back(shape.mesh.positions[i], shape.mesh.positions[i + 1], -shape.mesh.positions[i + 2]);
 		}
+		for (uint i = 0; i < shape.mesh.normals.size(); i += 3) {
+			// tiny_obj_loader uses LH coords
+			mesh.Normals.emplace_back(shape.mesh.normals[i], shape.mesh.normals[i + 1], -shape.mesh.normals[i + 2]);
+		}
 		for (uint i = 0; i < shape.mesh.indices.size(); ++i) {
 			mesh.Indices.push_back(shape.mesh.indices[i]);
 		}
-
-		// Ignore normals, tangents, etc. for now
 
 		meshes.push_back(mesh);
 	}
