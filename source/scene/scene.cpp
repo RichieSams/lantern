@@ -11,6 +11,8 @@
 
 #include "bsdfs/bsdf.h"
 
+#include "math/vector_math.h"
+
 #include <embree2/rtcore.h>
 
 
@@ -87,6 +89,17 @@ Light *Scene::RandomOneLight(UniformSampler *sampler) {
 
 void Scene::Intersect(Ray &ray) const {
 	rtcIntersect(m_scene, ray);
+}
+
+float3 Scene::InterpolateNormal(uint meshId, uint primId, float u, float v) const {
+	float3 normal;
+	rtcInterpolate(m_scene, meshId, primId, u, v, RTC_USER_VERTEX_BUFFER0, &normal.x, nullptr, nullptr, 3);
+
+	if (AnyNan(normal)) {
+		printf("nan");
+	}
+
+	return normal;
 }
 
 } // End of namespace Lantern
