@@ -32,7 +32,7 @@ TODO List
 	- Some of the more complex BRDFs require more data than Material::Eval() is currently being passed
 		- We should consider whether to switch to some kind of struct for holding all the relavant data
 			- IE. Tungstun and PBRT's SurfaceInteraction struct
-- ~~**Implement normal/UV interpolation - Easy**~~ - Added in [6735168](https://github.com/RichieSams/lantern/commit/673516887c3ca1ae4f2e22ac48415cb68f62365f)
+- ~~**Implement normal/UV interpolation - Easy**~~ - Added in [6735168](https://github.com/RichieSams/lantern/commit/673516887c3ca1ae4f2e22ac48415cb68f62365f), [2c92ec3](https://github.com/RichieSams/lantern/commit/2c92ec3fc15b59980dfbf510d4b3dc1cde922a6d), [25a16f2](https://github.com/RichieSams/lantern/commit/25a16f2bf398ed80bfce7bf7b1affd47157ebc91)
 - **Implement JSON scene loading - Medium**
 	- Two popular libaries are RapidJSON and nlohmann/json
 		- https://github.com/miloyip/rapidjson
@@ -53,3 +53,4 @@ TODO List
 	- But, on that note, I probably won't share the scenes in git, since they will be quite large
 		- Perhaps, for the scenes that *are* redistributable, I can upload them to my site
 - **Implement transmissive materials - Medium**
+	- Start by implementing ideal specular refraction and transmission - Added in [4feb070](https://github.com/RichieSams/lantern/commit/4feb07069a95c1175402552432e4e81f36489521)
