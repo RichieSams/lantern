@@ -9,7 +9,7 @@
 #include "math/vector_types.h"
 #include "math/uniform_sampler.h"
 #include "math/vector_math.h"
-#include <DirectXMath.h>
+
 
 namespace Lantern {
 
