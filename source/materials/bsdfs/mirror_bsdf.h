@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "bsdfs/bsdf.h"
+#include "materials/bsdfs/bsdf.h"
 
 #include "renderer/surface_interaction.h"
 

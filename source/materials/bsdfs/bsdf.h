@@ -8,7 +8,7 @@
 
 #include "math/vector_types.h"
 
-#include "bsdfs/bsdf_lobe.h"
+#include "materials/bsdfs/bsdf_lobe.h"
 
 
 namespace Lantern {

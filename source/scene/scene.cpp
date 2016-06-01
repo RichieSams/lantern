@@ -9,9 +9,9 @@
 #include "scene/mesh_elements.h"
 #include "scene/area_light.h"
 
-#include "bsdfs/bsdf.h"
-
 #include "math/vector_math.h"
+
+#include "materials/material.h"
 
 #include <embree2/rtcore.h>
 
@@ -29,9 +29,9 @@ Scene::~Scene() {
 	rtcDeleteDevice(m_device);
 }
 
-uint Scene::AddMeshInternal(Mesh *mesh, BSDF *bsdf) {
+uint Scene::AddMeshInternal(Mesh *mesh, Material *material) {
 	uint meshId = rtcNewTriangleMesh(m_scene, RTC_GEOMETRY_STATIC, mesh->Indices.size() / 3, mesh->Positions.size());
-	m_bsdfs[meshId] = bsdf;
+	m_materials[meshId] = material;
 
 	float3a *vertices = (float3a *)rtcMapBuffer(m_scene, meshId, RTC_VERTEX_BUFFER);
 	memcpy(vertices, &mesh->Positions[0], mesh->Positions.size() * sizeof(float3a));
@@ -48,12 +48,12 @@ uint Scene::AddMeshInternal(Mesh *mesh, BSDF *bsdf) {
 	return meshId;
 }
 
-void Scene::AddMesh(Mesh *mesh, BSDF *bsdf) {
-	AddMeshInternal(mesh, bsdf);
+void Scene::AddMesh(Mesh *mesh, Material *material) {
+	AddMeshInternal(mesh, material);
 }
 
-void Scene::AddMesh(Mesh *mesh, BSDF *bsdf, float3 color, float radiantPower) {
-	uint meshId = AddMeshInternal(mesh, bsdf);
+void Scene::AddMesh(Mesh *mesh, Material *material, float3 color, float radiantPower) {
+	uint meshId = AddMeshInternal(mesh, material);
 	
 	// Calculate the surface area
 	std::vector<float3a> *vertices = (std::vector<float3a> *)&mesh->Positions;

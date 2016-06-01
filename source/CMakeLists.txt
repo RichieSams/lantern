@@ -38,12 +38,20 @@ SetSourceGroup(NAME Scene
 	             scene/obj_loader.cpp
 )
 
-SetSourceGroup(NAME BSDFs
-	SOURCE_FILES bsdfs/bsdf.h
-	             bsdfs/lambert_bsdf.h
-	             bsdfs/mirror_bsdf.h
-	             bsdfs/bsdf_lobe.h
-	             bsdfs/ideal_specular_dielectric.h
+SetSourceGroup(NAME Materials
+	SOURCE_FILES materials/material.h
+)
+
+SetSourceGroup(NAME Materials/BSDFs
+	SOURCE_FILES materials/bsdfs/bsdf.h
+	             materials/bsdfs/lambert_bsdf.h
+	             materials/bsdfs/mirror_bsdf.h
+	             materials/bsdfs/bsdf_lobe.h
+	             materials/bsdfs/ideal_specular_dielectric.h
+)
+
+SetSourceGroup(NAME "Materials/Transmission Functions"
+	SOURCE_FILES materials/transmission_functions/beer_lambert_transmission_function.h
 )
 
 SetSourceGroup(NAME Renderer
@@ -72,7 +80,9 @@ set(LANTERN_SRC
 	${SRC_CAMERA}
 	${SRC_MATH}
 	${SRC_SCENE}
-	${SRC_BSDFS}
+	${SRC_MATERIALS}
+	${SRC_MATERIALS_BSDFS}
+	${SRC_MATERIALS_TRANSMISSION_FUNCTIONS}
 	${SRC_RENDERER}
 	${SRC_VISUALIZER}
 	${SRC_THIRD_PARTY}

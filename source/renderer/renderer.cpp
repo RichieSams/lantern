@@ -11,7 +11,9 @@
 #include "scene/scene.h"
 #include "scene/ray.h"
 
-#include "bsdfs/bsdf.h"
+#include "materials/material.h"
+#include "materials/bsdfs/bsdf.h"
+#include "materials/transmission_functions/beer_lambert_transmission_function.h"
 
 #include "math/uniform_sampler.h"
 #include "math/vector_math.h"
@@ -113,10 +115,16 @@ void Renderer::RenderPixel(uint x, uint y, UniformSampler *sampler) const {
 		// We hit an object
 			
 		// Fetch the material
-		BSDF *bsdf = m_scene->GetBSDF(ray.GeomID);
+		Material *material = m_scene->GetMaterial(ray.GeomID);
 		// The object might be emissive. If so, it will have a corresponding light
 		// Otherwise, GetLight will return nullptr
 		Light *light = m_scene->GetLight(ray.GeomID);
+
+		// Accumulate the transmissive function attenuation
+		if (interaction.IORi != 1.0f && material->TransmissionFunction != nullptr) {
+			float3a transmission = material->TransmissionFunction->Transmission(ray.TFar - ray.TNear);
+			throughput = throughput * transmission;
+		}
 
 		// If this is the first bounce or if we just had a specular bounce,
 		// we need to add the emmisive light
@@ -131,16 +139,16 @@ void Renderer::RenderPixel(uint x, uint y, UniformSampler *sampler) const {
 
 
 		// Calculate the direct lighting
-		color += throughput * SampleOneLight(sampler, interaction, bsdf, light);
+		color += throughput * SampleOneLight(sampler, interaction, material->BSDF, light);
 
 
 		// Get the new ray direction
 		// Choose the direction based on the bsdf		
-		bsdf->Sample(interaction, sampler);
-		float pdf = bsdf->Pdf(interaction);
+		material->BSDF->Sample(interaction, sampler);
+		float pdf = material->BSDF->Pdf(interaction);
 
 		// Accumulate the weight
-		throughput = throughput * bsdf->Eval(interaction) / pdf;
+		throughput = throughput * material->BSDF->Eval(interaction) / pdf;
 
 		// Russian Roulette
 		if (bounces > 3) {

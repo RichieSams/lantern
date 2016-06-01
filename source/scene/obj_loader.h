@@ -8,13 +8,13 @@
 
 #include "scene/mesh_elements.h"
 
-#include "bsdfs/bsdf.h"
+#include "materials/bsdfs/bsdf.h"
 
 #include <vector>
 
 
 namespace Lantern {
 
-void LoadMeshesFromObj(const char *filePath, std::vector<Mesh> &meshes, std::vector<BSDF> &materials);
+void LoadMeshesFromObj(const char *filePath, std::vector<Mesh> &meshes);
 
 } // End of namespace Lantern

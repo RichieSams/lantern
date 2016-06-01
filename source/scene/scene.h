@@ -23,7 +23,7 @@ typedef __RTCScene * RTCScene;
 
 namespace Lantern {
 
-class BSDF;
+struct Material;
 struct Mesh;
 
 class Scene {
@@ -36,7 +36,7 @@ public:
 	float3 BackgroundColor;
 
 private:
-	std::unordered_map<uint, BSDF *> m_bsdfs;
+	std::unordered_map<uint, Material *> m_materials;
 	std::vector<Light *> m_lightList;
 	std::unordered_map<uint, Light *> m_lightMap;
 
@@ -48,12 +48,12 @@ public:
 		Camera = PinholeCamera(phi, theta, radius, clientWidth, clientHeight, fov);
 	}
 
-	void AddMesh(Mesh *mesh, BSDF *bsdf);
-	void AddMesh(Mesh *mesh, BSDF *bsdf, float3 color, float radiantPower);
+	void AddMesh(Mesh *mesh, Material *material);
+	void AddMesh(Mesh *mesh, Material *material, float3 color, float radiantPower);
 	void Commit() const;
 
-	BSDF *GetBSDF(uint meshId) {
-		return m_bsdfs[meshId];
+	Material *GetMaterial(uint meshId) {
+		return m_materials[meshId];
 	}
 	Light *GetLight(uint meshId) {
 		auto iter = m_lightMap.find(meshId);
@@ -70,7 +70,7 @@ public:
 	float3 InterpolateNormal(uint meshId, uint primId, float u, float v) const;
 
 private:
-	uint AddMeshInternal(Mesh *mesh, BSDF *bsdf);
+	uint AddMeshInternal(Mesh *mesh, Material *material);
 };
 
 } // End of namespace Lantern

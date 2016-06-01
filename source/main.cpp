@@ -8,9 +8,11 @@
 #include "scene/geometry_generator.h"
 #include "scene/obj_loader.h"
 
-#include "bsdfs/lambert_bsdf.h"
-#include "bsdfs/mirror_bsdf.h"
-#include "bsdfs/ideal_specular_dielectric.h"
+#include "materials/material.h"
+#include "materials/bsdfs/lambert_bsdf.h"
+#include "materials/bsdfs/mirror_bsdf.h"
+#include "materials/bsdfs/ideal_specular_dielectric.h"
+#include "materials/transmission_functions/beer_lambert_transmission_function.h"
 
 #include "visualizer/visualizer.h"
 
@@ -56,31 +58,31 @@ void SetScene(Lantern::Scene &scene) {
 }
 
 void LoadObjScene(Lantern::Scene &scene) {
-	scene.SetCamera(M_PI_2, M_PI_2, 1.25f, 1280.0f, 720.0f);
+	scene.SetCamera(1.25f, -M_PI_2, 2.0f, 1280.0f, 720.0f);
 
-	Lantern::LambertBSDF *green = new Lantern::LambertBSDF(float3(0.408f, 0.741f, 0.467f));
-	Lantern::IdealSpecularDielectric *glass = new Lantern::IdealSpecularDielectric(float3(0.95f), 1.5f);
+	Lantern::IdealSpecularDielectric *glass = new Lantern::IdealSpecularDielectric(float3(1.0f), 1.5f);
+	Lantern::BeerLambertTransmissionFunction *yellowTransmission = new Lantern::BeerLambertTransmissionFunction(float3(1.0f, 0.7f, 0.1f), 0.25f);
+	Lantern::Material *material = new Lantern::Material(glass, yellowTransmission);
 
-	// Create Buddha
+	// Create Dragon
 	std::vector<Lantern::Mesh> dragonMeshes;
-	std::vector<Lantern::BSDF> dragonBSDFs;
-	Lantern::LoadMeshesFromObj("dragon.obj", dragonMeshes, dragonBSDFs);
+	Lantern::LoadMeshesFromObj("dragon.obj", dragonMeshes);
 	for (auto &mesh : dragonMeshes) {
-		scene.AddMesh(&mesh, glass);
+		scene.AddMesh(&mesh, material);
 	}
 }
 
 void LoadBallsScene(Lantern::Scene &scene) {
-	scene.SetCamera(M_PI_2, 0.0f, 20.0f, 1280.0f, 720.0f);
+	scene.SetCamera(M_PI_2, 0.0f, 40.0f, 1280.0f, 720.0f);
 
 	// Create the materials
-	Lantern::LambertBSDF *green = new Lantern::LambertBSDF(float3(0.408f, 0.741f, 0.467f));
-	Lantern::LambertBSDF *blue = new Lantern::LambertBSDF(float3(0.392f, 0.584f, 0.929f));
-	Lantern::LambertBSDF *orange = new Lantern::LambertBSDF(float3(1.0f, 0.498f, 0.314f));
-	Lantern::LambertBSDF *black = new Lantern::LambertBSDF(float3(0.0f));
-	Lantern::LambertBSDF *gray = new Lantern::LambertBSDF(float3(0.9f, 0.9f, 0.9f));
-	Lantern::MirrorBSDF *mirror = new Lantern::MirrorBSDF(float3(0.95f, 0.95f, 0.95f));
-	Lantern::IdealSpecularDielectric *glass = new Lantern::IdealSpecularDielectric(float3(0.95f), 1.5f);
+	Lantern::Material *green = new Lantern::Material(new Lantern::LambertBSDF(float3(0.408f, 0.741f, 0.467f)), nullptr);
+	Lantern::Material *blue = new Lantern::Material(new Lantern::LambertBSDF(float3(0.392f, 0.584f, 0.929f)), nullptr);
+	Lantern::Material *orange = new Lantern::Material(new Lantern::LambertBSDF(float3(1.0f, 0.498f, 0.314f)), nullptr);
+	Lantern::Material *black = new Lantern::Material(new Lantern::LambertBSDF(float3(0.0f)), nullptr);
+	Lantern::Material *gray = new Lantern::Material(new Lantern::LambertBSDF(float3(0.9f, 0.9f, 0.9f)), nullptr);
+	Lantern::Material *mirror = new Lantern::Material(new Lantern::MirrorBSDF(float3(0.95f, 0.95f, 0.95f)), nullptr);
+	Lantern::Material *glass = new Lantern::Material(new Lantern::IdealSpecularDielectric(float3(0.95f), 1.5f), nullptr);
 
 	// Create the floor
 	Lantern::Mesh floorMesh;
