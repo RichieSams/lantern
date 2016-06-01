@@ -44,7 +44,7 @@ private:
 	RTCScene m_scene;
 
 public:
-	void SetCamera(float phi, float theta, float radius, float clientWidth, float clientHeight, float fov = M_PI_2) {
+	void SetCamera(float phi, float theta, float radius, float clientWidth, float clientHeight, float fov = M_PI_4) {
 		Camera = PinholeCamera(phi, theta, radius, clientWidth, clientHeight, fov);
 	}
 
