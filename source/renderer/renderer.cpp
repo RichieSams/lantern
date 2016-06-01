@@ -103,7 +103,7 @@ void Renderer::RenderPixel(uint x, uint y, UniformSampler *sampler) const {
 
 	// Bounce the ray around the scene
 	uint bounces = 0;
-	for (; bounces < 20; ++bounces) {
+	for (; bounces < 40; ++bounces) {
 		m_scene->Intersect(ray);
 
 		// The ray missed. Return the background color
