@@ -128,7 +128,7 @@ void Renderer::RenderPixel(uint x, uint y, UniformSampler *sampler) const {
 
 		// If this is the first bounce or if we just had a specular bounce,
 		// we need to add the emmisive light
-		if (bounces == 0 && light != nullptr) {
+		if ((bounces == 0 || (interaction.SampledLobe & BSDFLobe::Specular) != 0) && light != nullptr) {
 			color += throughput * light->Le();
 		}
 
