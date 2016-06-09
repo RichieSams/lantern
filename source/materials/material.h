@@ -9,20 +9,20 @@
 namespace Lantern {
 
 class BSDF;
-class BeerLambertTransmissionFunction;
+class Medium;
 
 struct Material {
 	Material()
 		: BSDF(nullptr), 
-		  TransmissionFunction(nullptr) {
+		  Medium(nullptr) {
 	}
-	Material(BSDF *bsdf, BeerLambertTransmissionFunction *transmissionFunction)
+	explicit Material(BSDF *bsdf, Medium *medium = nullptr)
 		: BSDF(bsdf),
-		  TransmissionFunction(transmissionFunction) {
+		  Medium(medium) {
 	}
 
 	BSDF *BSDF;
-	BeerLambertTransmissionFunction *TransmissionFunction;
+	Medium *Medium;
 };
 
 } // End of namespace Lantern

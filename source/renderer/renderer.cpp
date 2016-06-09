@@ -13,7 +13,7 @@
 
 #include "materials/material.h"
 #include "materials/bsdfs/bsdf.h"
-#include "materials/transmission_functions/beer_lambert_transmission_function.h"
+#include "materials/media/medium.h"
 
 #include "math/uniform_sampler.h"
 #include "math/vector_math.h"
@@ -100,6 +100,8 @@ void Renderer::RenderPixel(uint x, uint y, UniformSampler *sampler) const {
 	float3 throughput(1.0f);
 	SurfaceInteraction interaction;
 	interaction.IORi = 1.0f; // Air
+	Medium *medium = nullptr;
+	bool hitSurface = false;
 
 	// Bounce the ray around the scene
 	uint bounces = 0;
@@ -113,42 +115,86 @@ void Renderer::RenderPixel(uint x, uint y, UniformSampler *sampler) const {
 		}
 
 		// We hit an object
-			
-		// Fetch the material
-		Material *material = m_scene->GetMaterial(ray.GeomID);
-		// The object might be emissive. If so, it will have a corresponding light
-		// Otherwise, GetLight will return nullptr
-		Light *light = m_scene->GetLight(ray.GeomID);
+		hitSurface = true;
+		
+		// Calculate any transmission
+		if (medium != nullptr) {
+			float weight = 1.0f;
+			float distance = medium->SampleDistance(sampler, ray.TFar, &weight);
+			float3 transmission = medium->Transmission(distance);
+			throughput = throughput * weight * transmission;
 
-		// Accumulate the transmissive function attenuation
-		if (interaction.IORi != 1.0f && material->TransmissionFunction != nullptr) {
-			float3a transmission = material->TransmissionFunction->Transmission(ray.TFar - ray.TNear);
-			throughput = throughput * transmission;
+			if (distance < ray.TFar) {
+				// Create a scatter event
+				hitSurface = false;
+				printf("scattered");
+				
+				ray.Origin = ray.Origin + ray.Direction * distance;
+
+				// Reset the other ray properties
+				ray.Direction = interaction.InputDirection;
+				ray.TNear = 0.001f;
+				ray.TFar = infinity;
+				ray.GeomID = INVALID_GEOMETRY_ID;
+				ray.PrimID = INVALID_PRIMATIVE_ID;
+				ray.InstID = INVALID_INSTANCE_ID;
+				ray.Mask = 0xFFFFFFFF;
+				ray.Time = 0.0f;
+			}
 		}
 
-		// If this is the first bounce or if we just had a specular bounce,
-		// we need to add the emmisive light
-		if ((bounces == 0 || (interaction.SampledLobe & BSDFLobe::Specular) != 0) && light != nullptr) {
-			color += throughput * light->Le();
+		if (hitSurface) {
+			// Fetch the material
+			Material *material = m_scene->GetMaterial(ray.GeomID);
+			// The object might be emissive. If so, it will have a corresponding light
+			// Otherwise, GetLight will return nullptr
+			Light *light = m_scene->GetLight(ray.GeomID);
+
+			// If this is the first bounce or if we just had a specular bounce,
+			// we need to add the emmisive light
+			if ((bounces == 0 || (interaction.SampledLobe & BSDFLobe::Specular) != 0) && light != nullptr) {
+				color += throughput * light->Le();
+			}
+
+			interaction.Position = ray.Origin + ray.Direction * ray.TFar;
+			interaction.Normal = normalize(m_scene->InterpolateNormal(ray.GeomID, ray.PrimID, ray.U, ray.V));
+			interaction.OutputDirection = normalize(-ray.Direction);
+			interaction.IORo = 0.0f;
+
+
+			// Calculate the direct lighting
+			color += throughput * SampleOneLight(sampler, interaction, material->BSDF, light);
+
+
+			// Get the new ray direction
+			// Choose the direction based on the bsdf		
+			material->BSDF->Sample(interaction, sampler);
+			float pdf = material->BSDF->Pdf(interaction);
+
+			// Accumulate the weight
+			throughput = throughput * material->BSDF->Eval(interaction) / pdf;
+
+			// Update the current IOR and medium if we refracted
+			if (interaction.SampledLobe == BSDFLobe::SpecularTransmission) {
+				interaction.IORi = interaction.IORo;
+				medium = material->Medium;
+			}
+
+			// Shoot a new ray
+
+			// Set the origin at the intersection point
+			ray.Origin = interaction.Position;
+
+			// Reset the other ray properties
+			ray.Direction = interaction.InputDirection;
+			ray.TNear = 0.001f;
+			ray.TFar = infinity;
+			ray.GeomID = INVALID_GEOMETRY_ID;
+			ray.PrimID = INVALID_PRIMATIVE_ID;
+			ray.InstID = INVALID_INSTANCE_ID;
+			ray.Mask = 0xFFFFFFFF;
+			ray.Time = 0.0f;
 		}
-
-		interaction.Position = ray.Origin + ray.Direction * ray.TFar;
-		interaction.Normal = normalize(m_scene->InterpolateNormal(ray.GeomID, ray.PrimID, ray.U, ray.V));
-		interaction.OutputDirection = normalize(-ray.Direction);
-		interaction.IORo = 0.0f;
-
-
-		// Calculate the direct lighting
-		color += throughput * SampleOneLight(sampler, interaction, material->BSDF, light);
-
-
-		// Get the new ray direction
-		// Choose the direction based on the bsdf		
-		material->BSDF->Sample(interaction, sampler);
-		float pdf = material->BSDF->Pdf(interaction);
-
-		// Accumulate the weight
-		throughput = throughput * material->BSDF->Eval(interaction) / pdf;
 
 		// Russian Roulette
 		if (bounces > 3) {
@@ -159,26 +205,6 @@ void Renderer::RenderPixel(uint x, uint y, UniformSampler *sampler) const {
 
 			throughput *= 1 / p;
 		}
-
-		// Update the current IOR if we refracted
-		if (interaction.SampledLobe == BSDFLobe::SpecularTransmission) {
-			interaction.IORi = interaction.IORo;
-		}
-
-		// Shoot a new ray
-
-		// Set the origin at the intersection point
-		ray.Origin = interaction.Position;
-
-		// Reset the other ray properties
-		ray.Direction = interaction.InputDirection;
-		ray.TNear = 0.001f;
-		ray.TFar = infinity;
-		ray.GeomID = INVALID_GEOMETRY_ID;
-		ray.PrimID = INVALID_PRIMATIVE_ID;
-		ray.InstID = INVALID_INSTANCE_ID;
-		ray.Mask = 0xFFFFFFFF;
-		ray.Time = 0.0f;
 	}
 
 	m_scene->Camera.FrameBuffer.SplatPixel(x, y, color);

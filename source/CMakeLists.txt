@@ -50,8 +50,9 @@ SetSourceGroup(NAME Materials/BSDFs
 	             materials/bsdfs/ideal_specular_dielectric.h
 )
 
-SetSourceGroup(NAME "Materials/Transmission Functions"
-	SOURCE_FILES materials/transmission_functions/beer_lambert_transmission_function.h
+SetSourceGroup(NAME "Materials/Media"
+	SOURCE_FILES materials/media/medium.h
+	             materials/media/non_scattering_medium.h
 )
 
 SetSourceGroup(NAME Renderer
@@ -82,7 +83,7 @@ set(LANTERN_SRC
 	${SRC_SCENE}
 	${SRC_MATERIALS}
 	${SRC_MATERIALS_BSDFS}
-	${SRC_MATERIALS_TRANSMISSION_FUNCTIONS}
+	${SRC_MATERIALS_MEDIA}
 	${SRC_RENDERER}
 	${SRC_VISUALIZER}
 	${SRC_THIRD_PARTY}
