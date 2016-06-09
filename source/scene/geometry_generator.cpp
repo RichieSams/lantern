@@ -162,7 +162,7 @@ void CreateSphere(float radius, uint sliceCount, uint stackCount, Mesh *mesh) {
 
 			mesh->Tangents.push_back(normalize(float3(dx, dy, dz)));
 
-			mesh->TexCoords.emplace_back(theta / (2.0f * M_PI), phi / M_PI);
+			mesh->TexCoords.emplace_back(theta / (2.0f * (float)M_PI), phi / (float)M_PI);
 		}
 	}
 
