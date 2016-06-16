@@ -53,6 +53,7 @@ SetSourceGroup(NAME Materials/BSDFs
 SetSourceGroup(NAME "Materials/Media"
 	SOURCE_FILES materials/media/medium.h
 	             materials/media/non_scattering_medium.h
+	             materials/media/isotropic_scattering_medium.h
 )
 
 SetSourceGroup(NAME Renderer

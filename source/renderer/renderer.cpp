@@ -105,7 +105,8 @@ void Renderer::RenderPixel(uint x, uint y, UniformSampler *sampler) const {
 
 	// Bounce the ray around the scene
 	uint bounces = 0;
-	for (; bounces < 40; ++bounces) {
+	const uint maxBounces = 1500;
+	for (; bounces < maxBounces; ++bounces) {
 		m_scene->Intersect(ray);
 
 		// The ray missed. Return the background color
@@ -120,19 +121,21 @@ void Renderer::RenderPixel(uint x, uint y, UniformSampler *sampler) const {
 		// Calculate any transmission
 		if (medium != nullptr) {
 			float weight = 1.0f;
-			float distance = medium->SampleDistance(sampler, ray.TFar, &weight);
+			float pdf = 1.0f;
+			float distance = medium->SampleDistance(sampler, ray.TFar, &weight, &pdf);
 			float3 transmission = medium->Transmission(distance);
 			throughput = throughput * weight * transmission;
 
 			if (distance < ray.TFar) {
 				// Create a scatter event
 				hitSurface = false;
-				printf("scattered");
 				
 				ray.Origin = ray.Origin + ray.Direction * distance;
 
 				// Reset the other ray properties
-				ray.Direction = interaction.InputDirection;
+				float directionPdf;
+				float3a wo = normalize(ray.Direction);
+				ray.Direction = medium->SampleScatterDirection(sampler, wo, &directionPdf);
 				ray.TNear = 0.001f;
 				ray.TFar = infinity;
 				ray.GeomID = INVALID_GEOMETRY_ID;
@@ -205,6 +208,10 @@ void Renderer::RenderPixel(uint x, uint y, UniformSampler *sampler) const {
 
 			throughput *= 1 / p;
 		}
+	}
+
+	if (bounces == maxBounces) {
+		printf("Over max bounces");
 	}
 
 	m_scene->Camera.FrameBuffer.SplatPixel(x, y, color);

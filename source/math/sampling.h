@@ -51,4 +51,28 @@ inline float3a CosineSampleHemisphere(float3a &normal, UniformSampler *sampler) 
 	return normalize(RotateToWorld(x, y, z, normal));
 }
 
+inline float3a UniformSampleHemisphere(float3a &normal, UniformSampler *sampler) {
+	float cosPhi = sampler->NextFloat();
+	float sinPhi = std::sqrt(1.0f - cosPhi * cosPhi);
+	float theta = 2 * M_PI * sampler->NextFloat();
+
+	float x = sinPhi * std::sinf(theta);
+	float y = cosPhi;
+	float z = sinPhi * std::cosf(theta);
+
+	return normalize(RotateToWorld(x, y, z, normal));
+}
+
+inline float3a UniformSampleSphere(UniformSampler *sampler) {
+	float cosPhi = 2.0f * sampler->NextFloat() - 1.0f;
+	float sinPhi = std::sqrt(1.0f - cosPhi * cosPhi);
+	float theta = 2 * M_PI * sampler->NextFloat();
+
+	float x = sinPhi * std::sinf(theta);
+	float y = cosPhi;
+	float z = sinPhi * std::cosf(theta);
+
+	return float3a(x, y, z);
+}
+
 } // End of namespace Lantern

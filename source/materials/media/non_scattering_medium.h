@@ -18,11 +18,12 @@ namespace Lantern {
 class NonScatteringMedium : public Medium {
 public:
 	NonScatteringMedium(float3 color, float atDistance)
-		: Medium(color, atDistance, float3(0.0f), 0.0f) {
+		: Medium(color, atDistance) {
 	}
 
 public:
-	float SampleDistance(UniformSampler *sampler, float tFar, float *weight) const override {
+	float SampleDistance(UniformSampler *sampler, float tFar, float *weight, float *pdf) const override {
+		*pdf = 1.0f;
 		return tFar;
 	}
 	

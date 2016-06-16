@@ -13,6 +13,7 @@
 #include "materials/bsdfs/mirror_bsdf.h"
 #include "materials/bsdfs/ideal_specular_dielectric.h"
 #include "materials/media/non_scattering_medium.h"
+#include "materials/media/isotropic_scattering_medium.h"
 
 #include "visualizer/visualizer.h"
 
@@ -60,9 +61,11 @@ void SetScene(Lantern::Scene &scene) {
 void LoadObjScene(Lantern::Scene &scene) {
 	scene.SetCamera(1.25f, -M_PI_2, 2.0f, 1280.0f, 720.0f);
 
-	Lantern::IdealSpecularDielectric *glass = new Lantern::IdealSpecularDielectric(float3(1.0f), 1.5f);
-	Lantern::NonScatteringMedium *yellowTransmission = new Lantern::NonScatteringMedium(float3(1.0f, 0.7f, 0.1f), 0.25f);
-	Lantern::Material *material = new Lantern::Material(glass, yellowTransmission);
+	Lantern::IdealSpecularDielectric *glass = new Lantern::IdealSpecularDielectric(float3(1.0f), 1.35f);
+	Lantern::NonScatteringMedium *redTransmission = new Lantern::NonScatteringMedium(float3(0.9801986733f, 0.00609674656f, 0.00334596545f), 1.0f);
+	Lantern::IsotropicScatteringMedium *redScattering = new Lantern::IsotropicScatteringMedium(float3(0.9801986733f, 0.00609674656f, 0.00334596545f), 1.0f, 100.0f);
+
+	Lantern::Material *material = new Lantern::Material(glass, redScattering);
 
 	// Create Dragon
 	std::vector<Lantern::Mesh> dragonMeshes;
