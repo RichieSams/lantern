@@ -83,7 +83,7 @@ Light *Scene::RandomOneLight(UniformSampler *sampler) {
 		return nullptr;
 	}
 
-	uint lightIndex = sampler->NextFloat() * numLights;
+	uint lightIndex = sampler->NextDiscrete(numLights);
 	return m_lightList[lightIndex];
 }
 
