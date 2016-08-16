@@ -19,9 +19,9 @@ namespace Lantern {
 
 class IsotropicScatteringMedium : public Medium {
 public:
-	IsotropicScatteringMedium(float3 absorptionColor, float absorptionAtDistance, float scatteringCoefficient)
+	IsotropicScatteringMedium(float3 absorptionColor, float absorptionAtDistance, float scatteringDistance)
 		: Medium(absorptionColor, absorptionAtDistance),
-		  m_scatteringCoefficient(scatteringCoefficient) {
+		  m_scatteringCoefficient(1 / scatteringDistance) {
 	}
 
 private:

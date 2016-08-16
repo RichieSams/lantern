@@ -63,7 +63,7 @@ void LoadObjScene(Lantern::Scene &scene) {
 
 	Lantern::IdealSpecularDielectric *glass = new Lantern::IdealSpecularDielectric(float3(1.0f), 1.35f);
 	Lantern::NonScatteringMedium *redTransmission = new Lantern::NonScatteringMedium(float3(0.9801986733f, 0.00609674656f, 0.00334596545f), 1.0f);
-	Lantern::IsotropicScatteringMedium *redScattering = new Lantern::IsotropicScatteringMedium(float3(0.9801986733f, 0.00609674656f, 0.00334596545f), 1.0f, 100.0f);
+	Lantern::IsotropicScatteringMedium *redScattering = new Lantern::IsotropicScatteringMedium(float3(0.9801986733f, 0.00609674656f, 0.00334596545f), 1.0f, 0.01f);
 
 	Lantern::Material *material = new Lantern::Material(glass, redScattering);
 
