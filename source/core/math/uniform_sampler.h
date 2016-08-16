@@ -47,6 +47,10 @@ public:
 		return float2(NextFloat(), NextFloat());
 	}
 
+	uint NextDiscrete(uint range) {
+		return range * NextFloat();
+	}
+
 private:
 	// Note: Could replace this with memcpy, which gcc optimizes to the same assembly
 	// as the code below. I'm not sure how other compiler treat it though, since it's
