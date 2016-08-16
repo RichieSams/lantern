@@ -10,6 +10,11 @@ SetSourceGroup(NAME Camera
 	             camera/reconstruction_filter.cpp
 )
 
+SetSourceGroup(NAME IO
+	PREFIX LANTERN_CORE
+	SOURCE_FILES io/file_io.h
+)
+
 SetSourceGroup(NAME Math
 	PREFIX LANTERN_CORE
 	SOURCE_FILES math/sampling.h
@@ -95,6 +100,7 @@ SetSourceGroup(NAME "Third Party/EZ Option Parser"
 # Link all the sources into one
 set(LANTERN_CORE_SRC
 	${LANTERN_CORE_CAMERA}
+	${LANTERN_CORE_IO}
 	${LANTERN_CORE_MATH}
 	${LANTERN_CORE_SCENE}
 	${LANTERN_CORE_MATERIALS}
