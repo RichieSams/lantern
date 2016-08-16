@@ -3,7 +3,7 @@
 include(CMakeParseArguments)
 
 macro( SetSourceGroup )
-	set(oneValueArgs NAME)
+	set(oneValueArgs NAME PREFIX)
 	set(multiValuesArgs SOURCE_FILES)
 	cmake_parse_arguments(SRC_GROUP "" "${oneValueArgs}" "${multiValuesArgs}" ${ARGN} )
 	
@@ -11,7 +11,7 @@ macro( SetSourceGroup )
 	string(REPLACE "/" "_" VAR_SUFFIX "${VAR_SUFFIX}")
 	string(TOUPPER ${VAR_SUFFIX} VAR_SUFFIX)
 	
-	set(VAR_NAME SRC_${VAR_SUFFIX})
+	set(VAR_NAME ${SRC_GROUP_PREFIX}_${VAR_SUFFIX})
 	
 	set(${VAR_NAME}
 	    ${SRC_GROUP_SOURCE_FILES}

@@ -9,6 +9,8 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake")
 #OptimizeForArchitecture()
 
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${Vc_ARCHITECTURE_FLAGS}")
+set (CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+set (CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 
 
 # Add necessary dependencies
@@ -36,7 +38,7 @@ add_subdirectory(third_party/embree)
 include_directories(third_party/embree/include)
 include_directories(third_party/embree/common)
 
+include_directories(third_party/tiny_obj_loader/include)
 
 # Add the main source
-include_directories(source)
 add_subdirectory(source)

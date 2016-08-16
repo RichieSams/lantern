@@ -12,6 +12,7 @@
 
 #include <math/vec3fa.h>
 
+
 typedef embree::Vec2<float> float2;
 typedef embree::Vec3<float> float3;
 typedef embree::Vec4<float> float4;
