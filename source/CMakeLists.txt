@@ -8,4 +8,7 @@ add_subdirectory(core)
 add_subdirectory(lantern)
 
 
+# Generate projects for the tools
 
+# LMF Compiler
+add_subdirectory(lmf_compiler)
