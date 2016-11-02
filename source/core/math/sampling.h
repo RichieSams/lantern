@@ -20,6 +20,14 @@ inline float PowerHeuristic(uint numf, float fPdf, uint numg, float gPdf) {
 	return (f * f) / (f * f + g * g);
 }
 
+inline float PowerHeuristic(uint numf, float fPdf, uint numg, float gPdf, uint numh, float hPdf) {
+	float f = numf * fPdf;
+	float g = numg * gPdf;
+	float h = numh * hPdf;
+
+	return (f * f) / (f * f + g * g + h * h);
+}
+
 inline void UniformSampleDisc(UniformSampler *sampler, float radius, float *x, float *y) {
 	float rand = sampler->NextFloat();
 	float r = std::sqrtf(rand) * radius;
