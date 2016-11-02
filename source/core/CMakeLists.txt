@@ -13,6 +13,8 @@ SetSourceGroup(NAME Camera
 SetSourceGroup(NAME IO
 	PREFIX LANTERN_CORE
 	SOURCE_FILES io/file_io.h
+	             io/lantern_model_file.h
+	             io/lantern_model_file.cpp
 )
 
 SetSourceGroup(NAME Math

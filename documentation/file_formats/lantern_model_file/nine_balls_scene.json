@@ -1,0 +1,211 @@
+{
+	"background_color" : [0.846, 0.933, 0.949],
+	"camera" : {
+		"phi" : 1.57079632679489661923,
+		"theta" : 0.0,
+		"radius" : 40.0,
+		"client_width" : 1280,
+		"client_height" : 720,
+		"fov" : 0.7853981
+	},
+	"bsdfs" : [
+		{
+			"name" : "green",
+			"type" : "lambert",
+			"albedo" : [0.408, 0.741, 0.467]
+		},
+		{
+			"name" : "blue",
+			"type" : "lambert",
+			"albedo" : [0.392, 0.584, 0.929]
+		},
+		{
+			"name" : "orange",
+			"type" : "lambert",
+			"albedo" : [1.0, 0.498, 0.314]
+		},
+		{
+			"name" : "black",
+			"type" : "lambert",
+			"albedo" : [0.0, 0.0, 0.0]
+		},
+		{
+			"name" : "gray",
+			"type" : "lambert",
+			"albedo" : [0.9, 0.9, 0.9]
+		},
+		{
+			"name" : "mirror",
+			"type" : "mirror",
+			"albedo" : [0.95, 0.95, 0.95]
+		},
+		{
+			"name" : "glass",
+			"type" : "ideal_specular_dielectric",
+			"albedo" : [0.95, 0.95, 0.95],
+			"ior" : 1.35
+		}
+	],
+	"materials" : [
+		{
+			"name" : "green",
+			"bsdf" : "green"
+		},
+		{
+			"name" : "blue",
+			"bsdf" : "blue"
+		},
+		{
+			"name" : "orange",
+			"bsdf" : "orange"
+		},
+		{
+			"name" : "black",
+			"bsdf" : "black"
+		},
+		{
+			"name" : "gray",
+			"bsdf" : "gray"
+		},
+		{
+			"name" : "mirror",
+			"bsdf" : "mirror"
+		},
+		{
+			"name" : "glass",
+			"bsdf" : "glass"
+		}
+	],
+	"primitives" : [
+		{
+			"name" : "floor",
+			"type" : "grid",
+			"width" : 50.0,
+			"depth" : 50.0,
+			"n" : 2,
+			"m" : 2,
+			"material" : "gray",
+			"transform" : [
+				1, 0, 0, 0,
+				0, 1, 0, -6,
+				0, 0, 1, 0,
+				0, 0, 0, 1
+			]
+		},
+		{
+			"name" : "emissive_ball",
+			"type" : "geosphere",
+			"radius" : 2.0,
+			"n" : 3,
+			"material" : "black",
+			"emission" : {
+				"color" : [1.0, 1.0, 1.0],
+				"radiant_power" : 800.0
+			}
+		},
+		{
+			"name" : "left_top_front",
+			"type" : "geosphere",
+			"radius" : 2.0,
+			"n" : 3,
+			"material" : "green",
+			"transform" : [
+				1, 0, 0, -4,
+				0, 1, 0, 4,
+				0, 0, 1, 4,
+				0, 0, 0, 1
+			]
+		},
+		{
+			"name" : "right_top_front",
+			"type" : "geosphere",
+			"radius" : 2.0,
+			"n" : 3,
+			"material" : "glass",
+			"transform" : [
+				1, 0, 0, 4,
+				0, 1, 0, 4,
+				0, 0, 1, 4,
+				0, 0, 0, 1
+			]
+		},
+		{
+			"name" : "left_bottom_front",
+			"type" : "geosphere",
+			"radius" : 2.0,
+			"n" : 3,
+			"material" : "orange",
+			"transform" : [
+				1, 0, 0, -4,
+				0, 1, 0, -4,
+				0, 0, 1, 4,
+				0, 0, 0, 1
+			]
+		},
+		{
+			"name" : "right_bottom_front",
+			"type" : "geosphere",
+			"radius" : 2.0,
+			"n" : 3,
+			"material" : "blue",
+			"transform" : [
+				1, 0, 0, 4,
+				0, 1, 0, -4,
+				0, 0, 1, 4,
+				0, 0, 0, 1
+			]
+		},
+		{
+			"name" : "left_top_back",
+			"type" : "geosphere",
+			"radius" : 2.0,
+			"n" : 3,
+			"material" : "blue",
+			"transform" : [
+				1, 0, 0, -4,
+				0, 1, 0, 4,
+				0, 0, 1, -4,
+				0, 0, 0, 1
+			]
+		},
+		{
+			"name" : "right_top_back",
+			"type" : "geosphere",
+			"radius" : 2.0,
+			"n" : 3,
+			"material" : "orange",
+			"transform" : [
+				1, 0, 0, 4,
+				0, 1, 0, 4,
+				0, 0, 1, -4,
+				0, 0, 0, 1
+			]
+		},
+		{
+			"name" : "left_bottom_back",
+			"type" : "geosphere",
+			"radius" : 2.0,
+			"n" : 3,
+			"material" : "mirror",
+			"transform" : [
+				1, 0, 0, -4,
+				0, 1, 0, -4,
+				0, 0, 1, -4,
+				0, 0, 0, 1
+			]
+		},
+		{
+			"name" : "right_bottom_back",
+			"type" : "geosphere",
+			"radius" : 2.0,
+			"n" : 3,
+			"material" : "green",
+			"transform" : [
+				1, 0, 0, 4,
+				0, 1, 0, -4,
+				0, 0, 1, -4,
+				0, 0, 0, 1
+			]
+		}
+	]
+}
