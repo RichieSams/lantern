@@ -29,16 +29,8 @@ TODO List
 		- It would be very nice to be able to visualize the sampling. 
 			- For example, to draw the disc and ray chosen for general area light shapes
 - **Implement other BRDFs - Medium**
-	- Some of the more complex BRDFs require more data than Material::Eval() is currently being passed
-		- We should consider whether to switch to some kind of struct for holding all the relavant data
-			- IE. Tungstun and PBRT's SurfaceInteraction struct
 - ~~**Implement normal/UV interpolation - Easy**~~ - Added in [6735168](https://github.com/RichieSams/lantern/commit/673516887c3ca1ae4f2e22ac48415cb68f62365f), [2c92ec3](https://github.com/RichieSams/lantern/commit/2c92ec3fc15b59980dfbf510d4b3dc1cde922a6d), [25a16f2](https://github.com/RichieSams/lantern/commit/25a16f2bf398ed80bfce7bf7b1affd47157ebc91)
-- **Implement JSON scene loading - Medium**
-	- Two popular libaries are RapidJSON and nlohmann/json
-		- https://github.com/miloyip/rapidjson
-		- https://github.com/nlohmann/json
-	- RapidJSON is slightly faster
-	- nlohmann/json seems to be a bit nicer to use (Iterating, etc.) but pretty minor overall
+- ~~**Implement JSON scene loading - Medium**~~ Added in [b021497](https://github.com/RichieSams/lantern/commit/b021497cd2033e1bfc8e104555f76038a12e6a5f), [1f03f32](https://github.com/RichieSams/lantern/commit/1f03f32332692ea46f8f5ddfd38b5a4418ba4b55), [c762815](https://github.com/RichieSams/lantern/commit/c762815fefbec78ced5e3f1edefc214e6297adf9)
 - **Implement using textures for material properties - Medium**
 	- First, implement UV interpolation
 	- Then using that to get real triangle UVs, implement the others
@@ -53,4 +45,6 @@ TODO List
 	- But, on that note, I probably won't share the scenes in git, since they will be quite large
 		- Perhaps, for the scenes that *are* redistributable, I can upload them to my site
 - **Implement transmissive materials - Medium**
-	- Start by implementing ideal specular refraction and transmission - Added in [4feb070](https://github.com/RichieSams/lantern/commit/4feb07069a95c1175402552432e4e81f36489521)
+	- ~~Implement ideal specular refraction and transmission~~ - Added in [4feb070](https://github.com/RichieSams/lantern/commit/4feb07069a95c1175402552432e4e81f36489521)
+	- ~~Implement isotropic scattering media~~ - Added in [eff77d8](https://github.com/RichieSams/lantern/commit/eff77d848a511656ba0196a60332b6685688c788)
+	- Implement non-isotripic scattering media (Henyey-Greenstein, Raleigh, etc.)
