@@ -27,8 +27,8 @@
 namespace Lantern {
 
 void Renderer::RenderFrame() {
-	uint width = m_scene->Camera.FrameBuffer.Width;
-	uint height = m_scene->Camera.FrameBuffer.Height;
+	uint width = m_scene->Camera->FrameBuffer.Width;
+	uint height = m_scene->Camera->FrameBuffer.Height;
 
 	const int numTilesX = (width + kTileSize - 1) / kTileSize;
 	const int numTilesY = (height + kTileSize - 1) / kTileSize;
@@ -94,7 +94,7 @@ void Renderer::RenderTile(uint index, uint width, uint height, uint numTilesX, u
 }
 
 void Renderer::RenderPixel(uint x, uint y, UniformSampler *sampler) const {
-	Ray ray = m_scene->Camera.CalculateRayFromPixel(x, y, sampler);
+	Ray ray = m_scene->Camera->CalculateRayFromPixel(x, y, sampler);
 
 	float3 color(0.0f);
 	float3 throughput(1.0f);
@@ -190,6 +190,8 @@ void Renderer::RenderPixel(uint x, uint y, UniformSampler *sampler) const {
 
 			// Reset the other ray properties
 			ray.Direction = interaction.InputDirection;
+			if (AnyNan(ray.Direction))
+				printf("bad");
 			ray.TNear = 0.001f;
 			ray.TFar = infinity;
 			ray.GeomID = INVALID_GEOMETRY_ID;
@@ -214,7 +216,7 @@ void Renderer::RenderPixel(uint x, uint y, UniformSampler *sampler) const {
 		printf("Over max bounces");
 	}
 
-	m_scene->Camera.FrameBuffer.SplatPixel(x, y, color);
+	m_scene->Camera->FrameBuffer.SplatPixel(x, y, color);
 }
 
 float3 Renderer::SampleOneLight(UniformSampler *sampler, SurfaceInteraction interaction, BSDF *bsdf, Light *hitLight) const {

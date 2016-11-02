@@ -32,7 +32,7 @@ Visualizer::Visualizer(Renderer *renderer, Scene *scene)
 		  m_window(nullptr),
 		  m_leftMouseCaptured(false),
 		  m_middleMouseCaptured(false) {
-	m_tempFrameBuffer = new float3[scene->Camera.FrameBuffer.Width * scene->Camera.FrameBuffer.Height];
+	m_tempFrameBuffer = new float3[scene->Camera->FrameBuffer.Width * scene->Camera->FrameBuffer.Height];
 	g_visualizer = this;
 }
 
@@ -121,25 +121,25 @@ void Visualizer::CursorPosCallback(GLFWwindow *window, double xpos, double ypos)
 		double oldY = g_visualizer->m_lastMousePosY;
 		glfwGetCursorPos(window, &g_visualizer->m_lastMousePosX, &g_visualizer->m_lastMousePosY);
 
-		g_visualizer->m_scene->Camera.Rotate((float)(oldY - g_visualizer->m_lastMousePosY) / 300,
+		g_visualizer->m_scene->Camera->Rotate((float)(oldY - g_visualizer->m_lastMousePosY) / 300,
 		                                     (float)(oldX - g_visualizer->m_lastMousePosX) / 300);
 
-		g_visualizer->m_scene->Camera.FrameBuffer.Reset();
+		g_visualizer->m_scene->Camera->FrameBuffer.Reset();
 	} else if (g_visualizer->m_middleMouseCaptured) {
 		double oldX = g_visualizer->m_lastMousePosX;
 		double oldY = g_visualizer->m_lastMousePosY;
 		glfwGetCursorPos(window, &g_visualizer->m_lastMousePosX, &g_visualizer->m_lastMousePosY);
 
-		g_visualizer->m_scene->Camera.Pan((float)(oldX - g_visualizer->m_lastMousePosX) * 0.01,
+		g_visualizer->m_scene->Camera->Pan((float)(oldX - g_visualizer->m_lastMousePosX) * 0.01,
 		                                  (float)(g_visualizer->m_lastMousePosY - oldY) * 0.01);
 
-		g_visualizer->m_scene->Camera.FrameBuffer.Reset();
+		g_visualizer->m_scene->Camera->FrameBuffer.Reset();
 	}
 }
 
 void Visualizer::ScrollCallback(GLFWwindow *window, double xoffset, double yoffset) {
-	g_visualizer->m_scene->Camera.Zoom(yoffset);
-	g_visualizer->m_scene->Camera.FrameBuffer.Reset();
+	g_visualizer->m_scene->Camera->Zoom(yoffset);
+	g_visualizer->m_scene->Camera->FrameBuffer.Reset();
 
 	g_visualizer->m_imGuiImpl.ScrollCallback(window, xoffset, yoffset);
 }
@@ -160,8 +160,8 @@ void Visualizer::Init() {
 		exit(EXIT_FAILURE);
 	}
 
-	int width = m_scene->Camera.FrameBuffer.Width;
-	int height = m_scene->Camera.FrameBuffer.Height;
+	int width = m_scene->Camera->FrameBuffer.Width;
+	int height = m_scene->Camera->FrameBuffer.Height;
 
 	glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
 	GLFWwindow *window = glfwCreateWindow(width, height, "Lantern", nullptr, nullptr);
@@ -203,7 +203,7 @@ void Visualizer::Shutdown() {
 
 
 void Visualizer::CopyFrameBufferToGPU() {
-	FrameBuffer *frameBuffer = &m_scene->Camera.FrameBuffer;
+	FrameBuffer *frameBuffer = &m_scene->Camera->FrameBuffer;
 
 	uint width = frameBuffer->Width;
 	uint height = frameBuffer->Height;

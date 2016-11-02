@@ -20,18 +20,12 @@ inline void ScaleMesh(float scale, Mesh *mesh) {
 	for (auto &vertex : mesh->Positions) {
 		vertex *= scale;
 	}
-
-	mesh->BoundingSphere *= scale;
 }
 
 inline void TranslateMesh(float3 position, Mesh *mesh) {
 	for (auto &vertex : mesh->Positions) {
 		vertex += position;
 	}
-
-	mesh->BoundingSphere.x += position.x;
-	mesh->BoundingSphere.y += position.y;
-	mesh->BoundingSphere.z += position.z;
 }
 
 } // End of namespace Lantern

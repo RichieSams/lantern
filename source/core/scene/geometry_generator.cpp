@@ -29,8 +29,6 @@ void CreateBox(float width, float height, float depth, Mesh *mesh) {
 	float h2 = 0.5f * height;
 	float d2 = 0.5f * depth;
 
-	mesh->BoundingSphere = float4(0.0f, 0.0f, 0.0f, std::max(std::max(w2, h2), d2));
-
 	// Fill in the front face float3a data.
 	mesh->Positions[0] = float3a(-w2, -h2, +d2); mesh->Normals[0] = float3(0.0f, 0.0f, 1.0f); mesh->Tangents[0] = float3(1.0f, 0.0f, 0.0f); mesh->TexCoords[0] = float2(0.0f, 1.0f);
 	mesh->Positions[1] = float3a(-w2, +h2, +d2); mesh->Normals[1] = float3(0.0f, 0.0f, 1.0f); mesh->Tangents[1] = float3(1.0f, 0.0f, 0.0f); mesh->TexCoords[1] = float2(0.0f, 0.0f);
@@ -122,8 +120,6 @@ void CreateBox(float width, float height, float depth, Mesh *mesh) {
 }
 
 void CreateSphere(float radius, uint sliceCount, uint stackCount, Mesh *mesh) {
-	mesh->BoundingSphere = float4(0.0f, 0.0f, 0.0f, radius);
-	
 	// Compute the vertices stating at the top pole and moving down the stacks
 
 	// Poles: note that there will be texture coordinate distortion as there is
@@ -307,8 +303,6 @@ inline float QuadrantAwareArcTan(float y, float x) {
 }
 
 void CreateGeosphere(float radius, uint numSubdivisions, Mesh *mesh) {
-	mesh->BoundingSphere = float4(0.0f, 0.0f, 0.0f, radius);
-	
 	// Approximate a sphere by tessellating an icosahedron.
 
 	const float X = 0.525731f;
@@ -538,8 +532,6 @@ void CreateGrid(float width, float depth, uint m, uint n, Mesh *mesh) {
 
 	float halfWidth = 0.5f * width;
 	float halfDepth = 0.5f * depth;
-
-	mesh->BoundingSphere = float4(0.0f, 0.0f, 0.0f, std::max(halfWidth, halfDepth));
 
 	// Create the vertices.
 	float dx = width / (n - 1);

@@ -22,7 +22,7 @@ class PinholeCamera {
 public:
 	PinholeCamera();
 	PinholeCamera(float phi, float theta, float radius, float clientWidth, float clientHeight, float fov = M_PI_2, ReconstructionFilter::Type filterType = ReconstructionFilter::Type::Tent);
-
+	
 public:
 	// Frame Data
 	FrameBuffer FrameBuffer;
