@@ -55,12 +55,20 @@ void Visualizer::Run() {
 		glfwPollEvents();
 		m_imGuiImpl.NewFrame();
 
+		ImGui::SetNextWindowPos(ImVec2(0, 75));
+		ImGui::Begin("Scene Options", nullptr, ImVec2(0, 0), -1.0f, ImGuiWindowFlags_AlwaysAutoResize);
+		if (ImGui::Button("Reload Scene", ImVec2(125, 25))) {
+			m_scene->ReloadSceneFromJSON();
+			startTime = std::chrono::high_resolution_clock::now();
+		}
+		ImGui::End();
+
 		m_renderer->RenderFrame();
 
 		auto currentTime = std::chrono::high_resolution_clock::now();
 		int delta = std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - lastRender).count();
 
-		ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiSetCond_FirstUseEver);
+		ImGui::SetNextWindowPos(ImVec2(0, 0));
 		ImGui::Begin("Frame Stats", nullptr, ImVec2(0, 0), -1.0f, ImGuiWindowFlags_AlwaysAutoResize);
 		ImGui::Text("%d ms/frame (%.1f FPS)", delta, 1.0f / delta * 1000.0f);
 		

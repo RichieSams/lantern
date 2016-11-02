@@ -85,7 +85,6 @@ int main(int argc, const char *argv[]) {
 		printf("Could not load scene.json\n");
 		return 1;
 	}
-	scene.Commit();
 
 	Lantern::Renderer renderer(&scene);
 

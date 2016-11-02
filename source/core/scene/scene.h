@@ -14,6 +14,8 @@
 #include "scene/ray.h"
 
 #include <unordered_map>
+#include <experimental/filesystem>
+namespace fs = std::experimental::filesystem;
 
 
 struct __RTCDevice;
@@ -39,6 +41,8 @@ public:
 	float3 BackgroundColor;
 
 private:
+	fs::path m_jsonPath;
+	
 	std::vector<BSDF *> m_bsdfs;
 	std::vector<Medium *> m_media;
 	std::vector<Material *> m_materials;
@@ -61,8 +65,8 @@ private:
 	RTCScene m_scene;
 
 public:
-	bool LoadSceneFromJSON(const char *filePath);
-	void Commit() const;
+	bool LoadSceneFromJSON(std::string &filePath);
+	bool ReloadSceneFromJSON();
 
 	Material *GetMaterial(uint modelId) {
 		return m_models[modelId].Material;
@@ -77,8 +81,10 @@ public:
 	float3 InterpolateNormal(uint meshId, uint primId, float u, float v) const;
 
 private:
+	bool ParseJSON();
 	uint AddMesh(Mesh *mesh, float4x4 &transform, float *out_surfaceArea, float4 *out_boundingSphere);
 	uint AddLMF(LanternModelFile *lmf, float4x4 &transform, float *out_surfaceArea, float4 *out_boundingSphere);
+	void CleanupScene();
 };
 
 } // End of namespace Lantern
