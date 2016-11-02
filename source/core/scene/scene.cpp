@@ -269,11 +269,15 @@ bool Scene::ParseJSON() {
 			float surfaceArea;
 			float4 boundingSphere;
 			if (type == "lmf") {
-				std::string lmfFilePath = primitive["file_path"].get<std::string>();
+				std::string lmfFilePathString = primitive["file_path"].get<std::string>();
+				fs::path lmfFilePath(lmfFilePathString);
+				if (lmfFilePath.is_relative()) {
+					lmfFilePath = m_jsonPath.parent_path() / lmfFilePath;
+				}
 
-				FILE *file = fopen(lmfFilePath.c_str(), "rb");
+				FILE *file = fopen(lmfFilePath.u8string().c_str(), "rb");
 				if (!file) {
-					printf("Unable to open \"%s\" for reading\n", lmfFilePath.c_str());
+					printf("Unable to open \"%s\" for reading\n", lmfFilePath.u8string().c_str());
 					continue;
 				}
 
