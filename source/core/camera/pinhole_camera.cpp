@@ -26,12 +26,12 @@ PinholeCamera::PinholeCamera()
 	FrameBuffer.Reset();
 }
 
-PinholeCamera::PinholeCamera(float phi, float theta, float radius, float clientWidth, float clientHeight, float fov, ReconstructionFilter::Type filterType)
+PinholeCamera::PinholeCamera(float phi, float theta, float radius, float clientWidth, float clientHeight, float3 target, float fov, ReconstructionFilter::Type filterType)
 		: m_phi(phi),
 		  m_theta(theta),
 		  m_radius(radius),
 		  m_up(1.0f),
-		  m_target(0.0f, 0.0f, 0.0f),
+		  m_target(target),
 		  m_tanFovXDiv2(std::tanf(fov * 0.5f)),
 		  m_tanFovYDiv2(std::tanf(fov * 0.5f * clientHeight / clientWidth)),
 		  FrameBuffer(clientWidth, clientHeight),
@@ -75,7 +75,7 @@ void PinholeCamera::Zoom(float distance) {
 	// If it does, re-project our target down the look vector
 	if (m_radius <= 0.0f) {
 		m_radius = 30.0f;
-		m_target += m_zAxis * 30.0f;
+		m_target -= m_zAxis * 30.0f;
 	}
 
 	UpdateOrigin();

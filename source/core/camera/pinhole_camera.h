@@ -21,7 +21,7 @@ namespace Lantern {
 class PinholeCamera {
 public:
 	PinholeCamera();
-	PinholeCamera(float phi, float theta, float radius, float clientWidth, float clientHeight, float fov = M_PI_2, ReconstructionFilter::Type filterType = ReconstructionFilter::Type::Tent);
+	PinholeCamera(float phi, float theta, float radius, float clientWidth, float clientHeight, float3 target = float3(0.0f), float fov = M_PI_2, ReconstructionFilter::Type filterType = ReconstructionFilter::Type::Tent);
 	
 public:
 	// Frame Data

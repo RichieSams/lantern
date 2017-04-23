@@ -36,6 +36,10 @@
 				"fov" : {
 					"description" : "",
 					"type" : "number"
+				},
+				"target" : {
+					"description" : "",
+					"$ref" : "#/definitions/float3"
 				}
 			}
 		},

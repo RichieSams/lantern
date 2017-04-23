@@ -150,6 +150,7 @@ bool Scene::ParseJSON() {
 	float theta = 0.0f;
 	float cameraRadius = 10.0f;
 	float fov = M_PI_4;
+	float3 target(0.0f);
 
 	float clientWidth = camera["client_width"].get<float>();
 	float clientHeight = camera["client_height"].get<float>();
@@ -165,8 +166,11 @@ bool Scene::ParseJSON() {
 	if (camera.count("fov") == 1) {
 		fov = camera["fov"].get<float>();
 	}
+	if (camera.count("target") == 1) {
+		target = float3(camera["target"][0].get<float>(), camera["target"][1].get<float>(), camera["target"][2].get<float>());
+	}
 
-	Camera = new PinholeCamera(phi, theta, cameraRadius, clientWidth, clientHeight, fov);
+	Camera = new PinholeCamera(phi, theta, cameraRadius, clientWidth, clientHeight, target, fov);
 
 	std::unordered_map<std::string, BSDF *> bsdfMap;
 	std::unordered_map<std::string, Medium *> mediaMap;
