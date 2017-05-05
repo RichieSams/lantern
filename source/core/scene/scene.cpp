@@ -281,6 +281,7 @@ bool Scene::ParseJSON() {
 
 				FILE *file = fopen(lmfFilePath.u8string().c_str(), "rb");
 				if (!file) {
+					perror("Error");
 					printf("Unable to open \"%s\" for reading\n", lmfFilePath.u8string().c_str());
 					continue;
 				}
@@ -289,6 +290,8 @@ bool Scene::ParseJSON() {
 				if (!ReadLMF(file, &lmf)) {
 					continue;
 				}
+				fclose(file);
+
 				meshId = AddLMF(&lmf, transform, &surfaceArea, &boundingSphere);
 				primitiveMap[name] = meshId;
 			} else if (type == "grid") {
