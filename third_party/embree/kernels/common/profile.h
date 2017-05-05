@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2017 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -159,7 +159,7 @@ namespace embree
   template<typename Closure>
     void profile(ProfileTimer& timer, const size_t numSkip, const size_t numIter, const size_t numElements, const Closure& closure) 
     {
-      new (&timer) ProfileTimer(numSkip);
+      timer = ProfileTimer(numSkip);
       
       for (size_t i=0; i<numSkip+numIter; i++) 
       {

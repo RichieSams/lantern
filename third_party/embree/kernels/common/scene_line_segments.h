@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2017 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -18,7 +18,6 @@
 
 #include "default.h"
 #include "geometry.h"
-#include "primref.h"
 #include "buffer.h"
 
 namespace embree
@@ -34,14 +33,11 @@ namespace embree
     /*! line segments construction */
     LineSegments (Scene* parent, RTCGeometryFlags flags, size_t numPrimitives, size_t numVertices, size_t numTimeSteps);
 
-    /*! writes the bezier segment geometry to disk */
-    void write(std::ofstream& file);
-
   public:
     void enabling();
     void disabling();
     void setMask (unsigned mask);
-    void setBuffer(RTCBufferType type, void* ptr, size_t offset, size_t stride);
+    void setBuffer(RTCBufferType type, void* ptr, size_t offset, size_t stride, size_t size);
     void* map(RTCBufferType type);
     void unmap(RTCBufferType type);
     void immutable ();
@@ -62,109 +58,123 @@ namespace embree
     }
 
     /*! returns the i'th segment */
-    __forceinline const int& segment(size_t i) const {
+    __forceinline const unsigned int& segment(size_t i) const {
       return segments[i];
     }
 
-    /*! returns i'th vertex of j'th timestep */
-    __forceinline Vec3fa vertex(size_t i, size_t j = 0) const {
-      return vertices[j][i];
+     /*! returns i'th vertex of the first time step */
+    __forceinline Vec3fa vertex(size_t i) const {
+      return vertices0[i];
     }
 
-    /*! returns i'th vertex of j'th timestep */
-    __forceinline const char* vertexPtr(size_t i, size_t j = 0) const {
-      return vertices[j].getPtr(i);
+    /*! returns i'th vertex of the first time step */
+    __forceinline const char* vertexPtr(size_t i) const {
+      return vertices0.getPtr(i);
     }
 
-    /*! returns i'th radius of j'th timestep */
-    __forceinline float radius(size_t i, size_t j = 0) const {
-      return vertices[j][i].w;
+    /*! returns i'th radius of the first time step */
+    __forceinline float radius(size_t i) const {
+      return vertices0[i].w;
     }
 
-    /*! check if the i'th primitive is valid */
-    __forceinline bool valid(size_t i, BBox3fa* bbox = nullptr) const
+    /*! returns i'th vertex of itime'th timestep */
+    __forceinline Vec3fa vertex(size_t i, size_t itime) const {
+      return vertices[itime][i];
+    }
+
+    /*! returns i'th vertex of itime'th timestep */
+    __forceinline const char* vertexPtr(size_t i, size_t itime) const {
+      return vertices[itime].getPtr(i);
+    }
+
+    /*! returns i'th radius of itime'th timestep */
+    __forceinline float radius(size_t i, size_t itime) const {
+      return vertices[itime][i].w;
+    }
+
+    /*! calculates bounding box of i'th line segment */
+    __forceinline BBox3fa bounds(size_t i) const
     {
-      const int index = segment(i);
-      if (index < 0 || index+1 >= numVertices()) return false;
+      const unsigned int index = segment(i);
+      const float r0 = radius(index+0);
+      const float r1 = radius(index+1);
+      const Vec3fa v0 = vertex(index+0);
+      const Vec3fa v1 = vertex(index+1);
+      const BBox3fa b = merge(BBox3fa(v0),BBox3fa(v1));
+      return enlarge(b,Vec3fa(max(r0,r1)));
+    }
 
-      for (size_t j=0; j<numTimeSteps; j++)
+    /*! calculates bounding box of i'th line segment for the itime'th time step */
+    __forceinline BBox3fa bounds(size_t i, size_t itime) const
+    {
+      const unsigned int index = segment(i);
+      const float r0 = radius(index+0,itime);
+      const float r1 = radius(index+1,itime);
+      const Vec3fa v0 = vertex(index+0,itime);
+      const Vec3fa v1 = vertex(index+1,itime);
+      const BBox3fa b = merge(BBox3fa(v0),BBox3fa(v1));
+      return enlarge(b,Vec3fa(max(r0,r1)));
+    }
+
+    /*! check if the i'th primitive is valid at the itime'th timestep */
+    __forceinline bool valid(size_t i, size_t itime) const {
+      return valid(i, make_range(itime, itime));
+    }
+
+    /*! check if the i'th primitive is valid between the specified time range */
+    __forceinline bool valid(size_t i, const range<size_t>& itime_range) const
+    {
+      const unsigned int index = segment(i);
+      if (index+1 >= numVertices()) return false;
+      
+      for (size_t itime = itime_range.begin(); itime <= itime_range.end(); itime++)
       {
-        const float r0 = radius(index+0,j);
-        const float r1 = radius(index+1,j);
-        if (!isvalid(r0) || !isvalid(r1))
-          return false;
-        if (min(r0,r1) < 0.0f)
-          return false;
-
-        const Vec3fa v0 = vertex(index+0,j);
-        const Vec3fa v1 = vertex(index+1,j);
-        if (!isvalid(v0) || !isvalid(v1))
-          return false;
+        const Vec3fa v0 = vertex(index+0,itime); if (unlikely(!isvalid((vfloat4)v0))) return false;
+        const Vec3fa v1 = vertex(index+1,itime); if (unlikely(!isvalid((vfloat4)v1))) return false;
+        if (min(v0.w,v1.w) < 0.0f) return false;
       }
-
-      if (bbox) *bbox = bounds(i);
       return true;
     }
 
-    /*! calculates bounding box of i'th line segment */
-    __forceinline BBox3fa bounds(size_t i, size_t j = 0) const
+    /*! calculates the linear bounds of the i'th primitive at the itimeGlobal'th time segment */
+    __forceinline LBBox3fa linearBounds(size_t i, size_t itimeGlobal, size_t numTimeStepsGlobal) const
     {
-      const int index = segment(i);
-      const float r0 = radius(index+0,j);
-      const float r1 = radius(index+1,j);
-      const Vec3fa v0 = vertex(index+0,j);
-      const Vec3fa v1 = vertex(index+1,j);
-      const BBox3fa b = merge(BBox3fa(v0),BBox3fa(v1));
-      return enlarge(b,Vec3fa(max(r0,r1)));
+      return Geometry::linearBounds([&] (size_t itime) { return bounds(i, itime); },
+                                    itimeGlobal, numTimeStepsGlobal, numTimeSteps);
     }
 
-    /*! calculates bounding box of i'th line segment */
-    __forceinline BBox3fa bounds(const AffineSpace3fa& space, size_t i, size_t j = 0) const
+    /*! calculates the build bounds of the i'th primitive, if it's valid */
+    __forceinline bool buildBounds(size_t i, BBox3fa* bbox) const
     {
-      const int index = segment(i);
-      const float r0 = radius(index+0,j);
-      const float r1 = radius(index+1,j);
-      const Vec3fa v0 = xfmPoint(space,vertex(index+0,j));
-      const Vec3fa v1 = xfmPoint(space,vertex(index+1,j));
-      const BBox3fa b = merge(BBox3fa(v0),BBox3fa(v1));
-      return enlarge(b,Vec3fa(max(r0,r1)));
+      if (!valid(i,0)) return false;
+      *bbox = bounds(i); 
+      return true;
     }
 
-#if defined(__MIC__)
-
-    __forceinline const Vec3fa* fristVertexPtr(size_t i) const { // FIXME: remove, use buffer to access vertices instead!
-      return (const Vec3fa*) vertices[0].getPtr(segment(i));
-    }
-
-    /*! calculates bounding box of i'th bezier segment */
-    __forceinline Vec2vf16 bounds_Vec2f16(size_t i) const
+    /*! calculates the build bounds of the i'th primitive at the itime'th time segment, if it's valid */
+    __forceinline bool buildBounds(size_t i, size_t itime, BBox3fa& bbox) const
     {
-      const int index = segment(i);
-      const float* cp0 = (float*) vertices[0].getPtr(index+0);
-      const float* cp1 = (float*) vertices[0].getPtr(index+1);
-      const float* cp2 = (float*) vertices[0].getPtr(index+2);
-      const float* cp3 = (float*) vertices[0].getPtr(index+3);
-
-      const vbool16 m_4f = 0xf;
-      const vfloat16 v0 = shuffle4<0,0,0,0>(vfloat16::loadu(m_4f,cp0));
-      const vfloat16 v1 = shuffle4<0,0,0,0>(vfloat16::loadu(m_4f,cp1));
-      const vfloat16 v2 = shuffle4<0,0,0,0>(vfloat16::loadu(m_4f,cp2));
-      const vfloat16 v3 = shuffle4<0,0,0,0>(vfloat16::loadu(m_4f,cp3));
-
-      const vfloat16 b_min = min(min(v0,v1),min(v2,v3));
-      const vfloat16 b_max = max(max(v0,v1),max(v2,v3));
-
-      const vfloat16 b_min_r = b_min - swDDDD(b_max);
-      const vfloat16 b_max_r = b_max + swDDDD(b_max);
-
-      return Vec2vf16(b_min_r,b_max_r);
+      if (!valid(i,itime+0) || !valid(i,itime+1)) return false;
+      bbox = bounds(i,itime);  // use bounds of first time step in builder
+      return true;
     }
 
-#endif
+    /*! calculates the build bounds of the i'th primitive at the itimeGlobal'th time segment, if it's valid */
+    __forceinline bool buildBounds(size_t i, size_t itimeGlobal, size_t numTimeStepsGlobal, BBox3fa& bbox) const
+    {
+      return Geometry::buildBounds([&] (size_t itime, BBox3fa& bbox) -> bool
+                                   {
+                                     if (unlikely(!valid(i, itime))) return false;
+                                     bbox = bounds(i, itime);
+                                     return true;
+                                   },
+                                   itimeGlobal, numTimeStepsGlobal, numTimeSteps, bbox);
+    }
 
   public:
-    BufferT<int> segments;                          //!< array of line segment indices
-    array_t<BufferT<Vec3fa>,2> vertices;            //!< vertex array
-    array_t<std::unique_ptr<Buffer>,2> userbuffers; //!< user buffers
+    APIBuffer<unsigned int> segments;                 //!< array of line segment indices
+    BufferRefT<Vec3fa> vertices0;                     //!< fast access to first vertex buffer
+    vector<APIBuffer<Vec3fa>> vertices;               //!< vertex array for each timestep
+    vector<APIBuffer<char>> userbuffers;              //!< user buffers
   };
 }

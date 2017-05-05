@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2017 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -34,7 +34,7 @@ namespace embree
 
       /*! outputs triangle indices */
       __forceinline friend std::ostream &operator<<(std::ostream& cout, const Triangle& t) {
-        return cout << "{ tri " << t.v[0] << ", " << t.v[1] << ", " << t.v[2] << " }";
+        return cout << "Triangle { " << t.v[0] << ", " << t.v[1] << ", " << t.v[2] << " }";
       }
     };
 
@@ -45,19 +45,14 @@ namespace embree
 
       __forceinline Edge() {}
 
-      __forceinline Edge(const uint32_t &v0,
-                         const uint32_t &v1)
-      {
+      __forceinline Edge(const uint32_t& v0, const uint32_t& v1) {
         e = v0 < v1 ? (((uint64_t)v1 << 32) | (uint64_t)v0) : (((uint64_t)v0 << 32) | (uint64_t)v1);
       }
 
-      __forceinline friend bool operator==( const Edge& a, const Edge& b ) 
-      { return a.e == b.e; };
-
+      __forceinline friend bool operator==( const Edge& a, const Edge& b ) { 
+        return a.e == b.e; 
+      }
     };
-
-
-
 
     /* last edge of triangle 0 is shared */
     static __forceinline unsigned int pair_order(const unsigned int tri0_vtx_index0,
@@ -84,8 +79,6 @@ namespace embree
       const Edge tri1_edge1(tri1.v[1],tri1.v[2]);
       const Edge tri1_edge2(tri1.v[2],tri1.v[0]);
 
-      int opp_vtx = -1;
-
       /* rotate triangle 0 to force shared edge between the first and last vertex */
 
       if (unlikely(tri0_edge0 == tri1_edge0)) return pair_order(1,2,0, 2); 
@@ -103,21 +96,17 @@ namespace embree
       return -1;
     }
 
-    
   public:
 
     /*! triangle mesh construction */
     TriangleMesh (Scene* parent, RTCGeometryFlags flags, size_t numTriangles, size_t numVertices, size_t numTimeSteps); 
-  
-    /*! writes the triangle mesh geometry to disk */
-    void write(std::ofstream& file);
 
     /* geometry interface */
   public:
     void enabling();
     void disabling();
     void setMask (unsigned mask);
-    void setBuffer(RTCBufferType type, void* ptr, size_t offset, size_t stride);
+    void setBuffer(RTCBufferType type, void* ptr, size_t offset, size_t stride, size_t size);
     void* map(RTCBufferType type);
     void unmap(RTCBufferType type);
     void immutable ();
@@ -142,27 +131,25 @@ namespace embree
       return triangles[i];
     }
 
-    /*! returns i'th vertex of j'th timestep */
-    __forceinline const Vec3fa vertex(size_t i, size_t j = 0) const {
-      return vertices[j][i];
+    /*! returns i'th vertex of the first time step  */
+    __forceinline const Vec3fa vertex(size_t i) const {
+      return vertices0[i];
     }
 
-    /*! returns i'th vertex of j'th timestep */
-    __forceinline const char* vertexPtr(size_t i, size_t j = 0) const {
-      return vertices[j].getPtr(i);
+    /*! returns i'th vertex of the first time step */
+    __forceinline const char* vertexPtr(size_t i) const {
+      return vertices0.getPtr(i);
     }
 
-#if defined(__MIC__)    
-    /*! returns the stride in bytes of the triangle buffer */
-    __forceinline size_t getTriangleBufferStride() const {
-      return triangles.getBufferStride();
+    /*! returns i'th vertex of itime'th timestep */
+    __forceinline const Vec3fa vertex(size_t i, size_t itime) const {
+      return vertices[itime][i];
     }
 
-    /*! returns the stride in butes of the vertex buffer */
-    __forceinline size_t getVertexBufferStride() const {
-      return vertices[0].getBufferStride();
+    /*! returns i'th vertex of itime'th timestep */
+    __forceinline const char* vertexPtr(size_t i, size_t itime) const {
+      return vertices[itime].getPtr(i);
     }
-#endif
 
     /*! calculates the bounds of the i'th triangle */
     __forceinline BBox3fa bounds(size_t i) const 
@@ -174,90 +161,115 @@ namespace embree
       return BBox3fa(min(v0,v1,v2),max(v0,v1,v2));
     }
 
-    /*! check if the i'th primitive is valid */
-    __forceinline bool valid(size_t i, BBox3fa* bbox = nullptr) const 
+    /*! calculates the bounds of the i'th triangle at the itime'th timestep */
+    __forceinline BBox3fa bounds(size_t i, size_t itime) const
     {
       const Triangle& tri = triangle(i);
-      if (tri.v[0] >= numVertices()) return false;
-      if (tri.v[1] >= numVertices()) return false;
-      if (tri.v[2] >= numVertices()) return false;
+      const Vec3fa v0 = vertex(tri.v[0],itime);
+      const Vec3fa v1 = vertex(tri.v[1],itime);
+      const Vec3fa v2 = vertex(tri.v[2],itime);
+      return BBox3fa(min(v0,v1,v2),max(v0,v1,v2));
+    }
 
-      for (size_t j=0; j<numTimeSteps; j++) 
+    /*! calculates the interpolated bounds of the i'th triangle at the specified time */
+    __forceinline BBox3fa bounds(size_t i, float time) const
+    {
+      float ftime; size_t itime = getTimeSegment(time, fnumTimeSegments, ftime);
+      const BBox3fa b0 = bounds(i, itime+0);
+      const BBox3fa b1 = bounds(i, itime+1);
+      return lerp(b0, b1, ftime);
+    }
+
+    /*! check if the i'th primitive is valid at the itime'th timestep */
+    __forceinline bool valid(size_t i, size_t itime) const {
+      return valid(i, make_range(itime, itime));
+    }
+
+    /*! check if the i'th primitive is valid between the specified time range */
+    __forceinline bool valid(size_t i, const range<size_t>& itime_range) const
+    {
+      const Triangle& tri = triangle(i);
+      if (unlikely(tri.v[0] >= numVertices())) return false;
+      if (unlikely(tri.v[1] >= numVertices())) return false;
+      if (unlikely(tri.v[2] >= numVertices())) return false;
+
+      for (size_t itime = itime_range.begin(); itime <= itime_range.end(); itime++)
       {
-        const Vec3fa v0 = vertex(tri.v[0],j);
-        const Vec3fa v1 = vertex(tri.v[1],j);
-        const Vec3fa v2 = vertex(tri.v[2],j);
-        if (!isvalid(v0) || !isvalid(v1) || !isvalid(v2))
+        if (!isvalid(vertex(tri.v[0],itime))) return false;
+        if (!isvalid(vertex(tri.v[1],itime))) return false;
+        if (!isvalid(vertex(tri.v[2],itime))) return false;
+      }
+
+      return true;
+    }
+
+    /*! calculates the linear bounds of the i'th primitive at the itimeGlobal'th time segment */
+    __forceinline LBBox3fa linearBounds(size_t i, size_t itimeGlobal, size_t numTimeStepsGlobal) const
+    {
+      return Geometry::linearBounds([&] (size_t itime) { return bounds(i, itime); },
+                                    itimeGlobal, numTimeStepsGlobal, numTimeSteps);
+    }
+
+    /*! calculates the build bounds of the i'th primitive, if it's valid */
+    __forceinline bool buildBounds(size_t i, BBox3fa* bbox = nullptr) const
+    {
+      const Triangle& tri = triangle(i);
+      if (unlikely(tri.v[0] >= numVertices())) return false;
+      if (unlikely(tri.v[1] >= numVertices())) return false;
+      if (unlikely(tri.v[2] >= numVertices())) return false;
+
+      for (size_t t=0; t<numTimeSteps; t++)
+      {
+        const Vec3fa v0 = vertex(tri.v[0],t);
+        const Vec3fa v1 = vertex(tri.v[1],t);
+        const Vec3fa v2 = vertex(tri.v[2],t);
+        if (unlikely(!isvalid(v0) || !isvalid(v1) || !isvalid(v2)))
           return false;
       }
 
-      if (bbox) 
+      if (likely(bbox)) 
         *bbox = bounds(i);
 
       return true;
     }
 
-#if defined(__MIC__)
+    /*! calculates the build bounds of the i'th primitive at the itime'th time segment, if it's valid */
+    __forceinline bool buildBounds(size_t i, size_t itime, BBox3fa& bbox) const
+    {
+      const Triangle& tri = triangle(i);
+      if (unlikely(tri.v[0] >= numVertices())) return false;
+      if (unlikely(tri.v[1] >= numVertices())) return false;
+      if (unlikely(tri.v[2] >= numVertices())) return false;
 
+      assert(itime+1 < numTimeSteps);
+      const Vec3fa a0 = vertex(tri.v[0],itime+0); if (unlikely(!isvalid(a0))) return false;
+      const Vec3fa a1 = vertex(tri.v[1],itime+0); if (unlikely(!isvalid(a1))) return false;
+      const Vec3fa a2 = vertex(tri.v[2],itime+0); if (unlikely(!isvalid(a2))) return false;
+      const Vec3fa b0 = vertex(tri.v[0],itime+1); if (unlikely(!isvalid(b0))) return false;
+      const Vec3fa b1 = vertex(tri.v[1],itime+1); if (unlikely(!isvalid(b1))) return false;
+      const Vec3fa b2 = vertex(tri.v[2],itime+1); if (unlikely(!isvalid(b2))) return false;
+      
+      /* use bounds of first time step in builder */
+      bbox = BBox3fa(min(a0,a1,a2),max(a0,a1,a2));
+      return true;
+    }
 
-    template<unsigned int HINT=0>
-      __forceinline Vec3vf16 getTriangleVertices(const Triangle &tri,const size_t dim=0) const 
-      {
-	assert( tri.v[0] < numVertices() );
-	assert( tri.v[1] < numVertices() );
-	assert( tri.v[2] < numVertices() );
-
-#if !defined(RTCORE_BUFFER_STRIDE)
-	
-	const float *__restrict__ const vptr0 = (float*) vertices[dim].getPtr(tri.v[0]);
-	const float *__restrict__ const vptr1 = (float*) vertices[dim].getPtr(tri.v[1]);
-	const float *__restrict__ const vptr2 = (float*) vertices[dim].getPtr(tri.v[2]);
-
-	const vfloat16 v0 = broadcast4to16f(vptr0); 
-	const vfloat16 v1 = broadcast4to16f(vptr1); 
- 	const vfloat16 v2 = broadcast4to16f(vptr2); 
-	return Vec3vf16(v0,v1,v2);
-#else
-	const vint16 stride = vertices[dim].getBufferStride();
-
-	const vint16 offset0_64 = mul_uint64_t(stride,vint16(tri.v[0]));
-	const vint16 offset1_64 = mul_uint64_t(stride,vint16(tri.v[1]));
-	const vint16 offset2_64 = mul_uint64_t(stride,vint16(tri.v[2]));
-
-	const char  *__restrict__ const base  = vertices[dim].getPtr();
-	const size_t off0 = offset0_64.uint64_t(0);
-	const size_t off1 = offset1_64.uint64_t(0);
-	const size_t off2 = offset2_64.uint64_t(0);
-
-	const float *__restrict__ const vptr0_64 = (float*)(base + off0);
-	const float *__restrict__ const vptr1_64 = (float*)(base + off1);
-	const float *__restrict__ const vptr2_64 = (float*)(base + off2);
-
-	if (HINT)
-	{
-	  prefetch<HINT>(vptr1_64);
-	  prefetch<HINT>(vptr2_64);
-	}
-
-	assert( vptr0_64 == (float*)vertexPtr(tri.v[0],dim) );
-	assert( vptr1_64 == (float*)vertexPtr(tri.v[1],dim) );
-	assert( vptr2_64 == (float*)vertexPtr(tri.v[2],dim) );
-	
-	const vbool16 m_3f = 0x7;
-	const vfloat16 v0 = shuffle4<0,0,0,0>(vfloat16::loadu(m_3f,vptr0_64));
-	const vfloat16 v1 = shuffle4<0,0,0,0>(vfloat16::loadu(m_3f,vptr1_64));
-	const vfloat16 v2 = shuffle4<0,0,0,0>(vfloat16::loadu(m_3f,vptr2_64));
-
-	return Vec3vf16(select(0x7777,v0,vfloat16::zero()),select(0x7777,v1,vfloat16::zero()),select(0x7777,v2,vfloat16::zero()));
-#endif	
-      }
-    
-#endif
+    /*! calculates the build bounds of the i'th primitive at the itimeGlobal'th time segment, if it's valid */
+    __forceinline bool buildBounds(size_t i, size_t itimeGlobal, size_t numTimeStepsGlobal, BBox3fa& bbox) const
+    {
+      return Geometry::buildBounds([&] (size_t itime, BBox3fa& bbox) -> bool
+                                   {
+                                     if (unlikely(!valid(i, itime))) return false;
+                                     bbox = bounds(i, itime);
+                                     return true;
+                                   },
+                                   itimeGlobal, numTimeStepsGlobal, numTimeSteps, bbox);
+    }
     
   public:
-    BufferT<Triangle> triangles;                    //!< array of triangles
-    array_t<BufferT<Vec3fa>,2> vertices;            //!< vertex array
-    array_t<std::unique_ptr<Buffer>,2> userbuffers; //!< user buffers
-
+    APIBuffer<Triangle> triangles;                    //!< array of triangles
+    BufferRefT<Vec3fa> vertices0;                     //!< fast access to first vertex buffer
+    vector<APIBuffer<Vec3fa>> vertices;               //!< vertex array for each timestep
+    vector<APIBuffer<char>> userbuffers;         //!< user buffers
   };
 }

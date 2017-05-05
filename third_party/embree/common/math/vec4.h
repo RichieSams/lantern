@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2017 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -46,6 +46,8 @@ namespace embree
 
     template<typename T1> __forceinline Vec4( const Vec4<T1>& a ) : x(T(a.x)), y(T(a.y)), z(T(a.z)), w(T(a.w)) {}
     template<typename T1> __forceinline Vec4& operator =(const Vec4<T1>& other) { x = other.x; y = other.y; z = other.z; w = other.w; return *this; }
+
+    __forceinline operator Vec3<T> () const { return Vec3<T>(x,y,z); }
 
     ////////////////////////////////////////////////////////////////////////////////
     /// Constants
@@ -94,6 +96,20 @@ namespace embree
   template<typename T> __forceinline Vec4<T> max(const Vec4<T>& a, const Vec4<T>& b) { return Vec4<T>(max(a.x, b.x), max(a.y, b.y), max(a.z, b.z), max(a.w, b.w)); }
 
   ////////////////////////////////////////////////////////////////////////////////
+  /// Ternary Operators
+  ////////////////////////////////////////////////////////////////////////////////
+
+  template<typename T> __forceinline const Vec4<T> madd  ( const Vec4<T>& a, const Vec4<T>& b, const Vec4<T>& c) { return Vec4<T>( madd(a.x,b.x,c.x), madd(a.y,b.y,c.y), madd(a.z,b.z,c.z), madd(a.w,b.w,c.w)); }
+  template<typename T> __forceinline const Vec4<T> msub  ( const Vec4<T>& a, const Vec4<T>& b, const Vec4<T>& c) { return Vec4<T>( msub(a.x,b.x,c.x), msub(a.y,b.y,c.y), msub(a.z,b.z,c.z), msub(a.w,b.w,c.w)); }
+  template<typename T> __forceinline const Vec4<T> nmadd ( const Vec4<T>& a, const Vec4<T>& b, const Vec4<T>& c) { return Vec4<T>(nmadd(a.x,b.x,c.x),nmadd(a.y,b.y,c.y),nmadd(a.z,b.z,c.z),nmadd(a.w,b.w,c.w)); }
+  template<typename T> __forceinline const Vec4<T> nmsub ( const Vec4<T>& a, const Vec4<T>& b, const Vec4<T>& c) { return Vec4<T>(nmsub(a.x,b.x,c.x),nmsub(a.y,b.y,c.y),nmsub(a.z,b.z,c.z),nmsub(a.w,b.w,c.w)); }
+
+  template<typename T> __forceinline const Vec4<T> madd  ( const T& a, const Vec4<T>& b, const Vec4<T>& c) { return Vec4<T>( madd(a,b.x,c.x), madd(a,b.y,c.y), madd(a,b.z,c.z), madd(a,b.w,c.w)); }
+  template<typename T> __forceinline const Vec4<T> msub  ( const T& a, const Vec4<T>& b, const Vec4<T>& c) { return Vec4<T>( msub(a,b.x,c.x), msub(a,b.y,c.y), msub(a,b.z,c.z), msub(a,b.w,c.w)); }
+  template<typename T> __forceinline const Vec4<T> nmadd ( const T& a, const Vec4<T>& b, const Vec4<T>& c) { return Vec4<T>(nmadd(a,b.x,c.x),nmadd(a,b.y,c.y),nmadd(a,b.z,c.z),nmadd(a,b.w,c.w)); }
+  template<typename T> __forceinline const Vec4<T> nmsub ( const T& a, const Vec4<T>& b, const Vec4<T>& c) { return Vec4<T>(nmsub(a,b.x,c.x),nmsub(a,b.y,c.y),nmsub(a,b.z,c.z),nmsub(a,b.w,c.w)); }
+
+  ////////////////////////////////////////////////////////////////////////////////
   /// Assignment Operators
   ////////////////////////////////////////////////////////////////////////////////
 
@@ -126,6 +142,14 @@ namespace embree
   }
 
   ////////////////////////////////////////////////////////////////////////////////
+  /// Shift Operators
+  ////////////////////////////////////////////////////////////////////////////////
+
+  template<typename T> __forceinline Vec4<T> shift_right_1( const Vec4<T>& a ) {
+    return Vec4<T>(shift_right_1(a.x),shift_right_1(a.y),shift_right_1(a.z),shift_right_1(a.w));
+  }
+
+  ////////////////////////////////////////////////////////////////////////////////
   /// Euclidian Space Operators
   ////////////////////////////////////////////////////////////////////////////////
 
@@ -141,6 +165,19 @@ namespace embree
 
   template<typename T> __forceinline Vec4<T> select ( bool s, const Vec4<T>& t, const Vec4<T>& f ) {
     return Vec4<T>(select(s,t.x,f.x),select(s,t.y,f.y),select(s,t.z,f.z),select(s,t.w,f.w));
+  }
+
+  template<typename T> __forceinline Vec4<T> select ( const Vec4<bool>& s, const Vec4<T>& t, const Vec4<T>& f ) {
+    return Vec4<T>(select(s.x,t.x,f.x),select(s.y,t.y,f.y),select(s.z,t.z,f.z),select(s.w,t.w,f.w));
+  }
+
+  template<typename T> __forceinline Vec4<T> select ( const typename T::Bool& s, const Vec4<T>& t, const Vec4<T>& f ) {
+    return Vec4<T>(select(s,t.x,f.x),select(s,t.y,f.y),select(s,t.z,f.z),select(s,t.w,f.w));
+  }
+
+  template<typename T>
+    __forceinline Vec4<T> lerp(const Vec4<T>& v0, const Vec4<T>& v1, const T& t) {
+    return madd(Vec4<T>(T(1.0f)-t),v0,t*v1);
   }
 
   ////////////////////////////////////////////////////////////////////////////////
@@ -161,15 +198,9 @@ namespace embree
   typedef Vec4<float        > Vec4f;
 }
 
-#if defined(__MIC__)
-#include "vec3ba_mic.h"
-#include "vec3ia_mic.h"
-#include "vec3fa_mic.h"
-#else
 #include "vec3ba.h"
 #include "vec3ia.h"
 #include "vec3fa.h"
-#endif
 
 ////////////////////////////////////////////////////////////////////////////////
 /// SSE / AVX / MIC specializations
@@ -183,7 +214,7 @@ namespace embree
 #include "../simd/avx.h"
 #endif
 
-#if defined __MIC__
+#if defined __AVX512F__
 #include "../simd/avx512.h"
 #endif
 
@@ -191,10 +222,17 @@ namespace embree
 {
   template<> __forceinline Vec4<float>::Vec4( const Vec3fa& a ) { x = a.x; y = a.y; z = a.z; w = a.w; }
 
-#if defined (__SSE__)
+#if defined(__AVX__)
+  template<> __forceinline Vec4<vfloat4>::Vec4( const Vec3fa& a ) {
+    x = a.x; y = a.y; z = a.z; w = a.w;
+  }
+#elif defined(__SSE__)
   template<> __forceinline Vec4<vfloat4>::Vec4( const Vec3fa& a ) {
     const vfloat4 v = vfloat4(a); x = shuffle<0,0,0,0>(v); y = shuffle<1,1,1,1>(v); z = shuffle<2,2,2,2>(v); w = shuffle<3,3,3,3>(v);
   }
+#endif
+
+#if defined(__SSE__)
   __forceinline Vec4<vfloat4> broadcast4f( const Vec4<vfloat4>& a, const size_t k ) {
     return Vec4<vfloat4>(vfloat4::broadcast(&a.x[k]), vfloat4::broadcast(&a.y[k]), vfloat4::broadcast(&a.z[k]), vfloat4::broadcast(&a.w[k]));
   }
@@ -215,7 +253,7 @@ namespace embree
   }
 #endif
 
-#if defined(__MIC__) || defined(__AVX512F__)
+#if defined(__AVX512F__)
   template<> __forceinline Vec4<vfloat16>::Vec4( const Vec3fa& a ) : x(a.x), y(a.y), z(a.z), w(a.w) {}
 #endif
 }

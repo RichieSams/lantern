@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2017 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -34,22 +34,46 @@ namespace embree
       typedef const T& const_reference;
       typedef std::size_t size_type;
       typedef std::ptrdiff_t difference_type;
-
+      
       __forceinline aligned_monitored_allocator(MemoryMonitorInterface* device) 
         : device(device) {}
 
       __forceinline pointer allocate( size_type n ) 
       {
-        assert(device);
-        device->memoryMonitor(n*sizeof(T),false);
+        if (n) {
+          assert(device);
+          device->memoryMonitor(n*sizeof(T),false);
+        }
+#if defined(__LINUX__) && defined(__AVX512ER__) // KNL
+        if (n*sizeof(value_type) >= 14 * PAGE_SIZE_2M)
+        {
+          pointer p =  (pointer) os_malloc(n*sizeof(value_type));
+          assert(p);
+          return p;
+        }
+#endif
         return (pointer) alignedMalloc(n*sizeof(value_type),alignment);
       }
 
       __forceinline void deallocate( pointer p, size_type n ) 
       {
-        assert(device);
-        alignedFree(p);
-        device->memoryMonitor(-n*sizeof(T),true);
+        if (p)
+        {
+#if defined(__LINUX__) && defined(__AVX512ER__) // KNL
+          if (n*sizeof(value_type) >= 14 * PAGE_SIZE_2M)
+            os_free(p,n*sizeof(value_type)); 
+          else
+            alignedFree(p);
+#else
+          alignedFree(p);
+#endif
+        }
+        else assert(n == 0);
+
+        if (n) {
+          assert(device);
+          device->memoryMonitor(-ssize_t(n)*sizeof(T),true);
+        }
       }
 
       __forceinline void construct( pointer p, const_reference val ) {
@@ -69,7 +93,7 @@ namespace embree
 #define VECTOR_INIT_ALLOCATOR
 #define vector_t mvector
 #define allocator_t aligned_monitored_allocator<T,std::alignment_of<T>::value>
-#include "../../common/sys/vector_t.h"
+#include "../common/sys/vector_t.h"
 #undef vector_t
 #undef allocator_t
 #undef VECTOR_INIT_ALLOCATOR

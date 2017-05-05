@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2017 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -13,15 +13,11 @@
 // See the License for the specific language governing permissions and      //
 // limitations under the License.                                           //
 // ======================================================================== //
+
 #include "config.h"
 #include "alloc.h"
 #include "intrinsics.h"
-#if defined(TASKING_TBB)
-#  define TBB_IMPLEMENT_CPP0X 0
-#  define __TBB_NO_IMPLICIT_LINKAGE 1
-#  define __TBBMALLOC_NO_IMPLICIT_LINKAGE 1
-#  include "tbb/scalable_allocator.h"
-#endif
+#include "sysinfo.h"
 
 ////////////////////////////////////////////////////////////////////////////////
 /// Windows Platform
@@ -35,9 +31,9 @@
 
 namespace embree
 {
-  void* os_malloc(size_t bytes, const int additional_flags) 
+  void* os_malloc(size_t bytes) 
   {
-    int flags = MEM_COMMIT|MEM_RESERVE|additional_flags;
+    int flags = MEM_COMMIT | MEM_RESERVE;
     char* ptr = (char*) VirtualAlloc(nullptr,bytes,flags,PAGE_READWRITE);
     if (ptr == nullptr) throw std::bad_alloc();
     return ptr;
@@ -66,8 +62,14 @@ namespace embree
 
   void os_free(void* ptr, size_t bytes) {
     if (bytes == 0) return;
-    VirtualFree(ptr,0,MEM_RELEASE);
+    if (!VirtualFree(ptr,0,MEM_RELEASE))
+      /*throw std::bad_alloc()*/ return;  // we on purpose do not throw an exception when an error occurs, to avoid throwing an exception during error handling
   }
+
+  void os_advise(void *ptr, size_t bytes)
+  {
+  }
+
 }
 #endif
 
@@ -82,31 +84,12 @@ namespace embree
 #include <stdlib.h>
 #include <string.h>
 
-#if defined(RTCORE_MEMKIND_ALLOCATOR)
-#include <hbwmalloc.h>
-#include <memkind.h>
-#endif
-
-/* hint for transparent huge pages (THP) */
-#if defined(__MACOSX__)
-#define USE_MADVISE 0
-#else
-#define USE_MADVISE 1
-#endif
-
 #define UPGRADE_TO_2M_PAGE_LIMIT (256*1024) 
-#define PAGE_SIZE_2M (2*1024*1024)
-#define PAGE_SIZE_4K (4*1024)
 
 namespace embree
 {
-
   __forceinline bool isHugePageCandidate(const size_t bytes) 
   {
-#if defined(__MIC__)
-    return true;
-#endif
-
     /* try to use huge pages for large allocations */
     if (bytes >= PAGE_SIZE_2M)
     {
@@ -119,65 +102,38 @@ namespace embree
     return false;
   }
 
-#if defined(RTCORE_MEMKIND_ALLOCATOR)
-  void* mk_malloc(size_t bytes)
-  {
-    assert(hbw_check_available());
-    void *ptr = NULL;
-    ptr = memkind_malloc(MEMKIND_HBW_HUGETLB, bytes);
-    if (ptr) return ptr;
-    ptr = memkind_malloc(MEMKIND_HBW, bytes);
-    if (ptr) return ptr;
-    perror("memkind_malloc()");
-    return NULL;
-  }
-
-  void mk_free(void* ptr) 
-  {
-    assert(ptr);
-    memkind_free(MEMKIND_DEFAULT,ptr);
-  }
-#endif
-
-// ============================================
-// ============================================
-// ============================================
-
+#if !defined(__MACOSX__)
   static bool tryDirectHugePageAllocation = true;
-
-#if USE_MADVISE
-  void os_madvise(void *ptr, size_t bytes)
-  {
-#ifdef MADV_HUGEPAGE
-    int res = madvise(ptr,bytes,MADV_HUGEPAGE); 
-#if defined(DEBUG)
-    if (res) perror("madvise failed: ");
 #endif
+
+  /* hint for transparent huge pages (THP) */
+  void os_advise(void *pptr, size_t bytes)
+  {
+#if defined(MADV_HUGEPAGE)
+    if (isHugePageCandidate(bytes)) 
+      madvise(pptr,bytes,MADV_HUGEPAGE); 
 #endif
   }
-#endif
   
-  void* os_malloc(size_t bytes, const int additional_flags)
+  void* os_malloc(size_t bytes)
   {
-    int flags = MAP_PRIVATE | MAP_ANON | additional_flags;
+    int flags = MAP_PRIVATE | MAP_ANON;
         
-#if defined(RTCORE_MEMKIND_ALLOCATOR)
-    char *memkind_ptr = (char*)mk_malloc(bytes);
-    if (memkind_ptr) return memkind_ptr;
-#endif
-
     if (isHugePageCandidate(bytes)) 
     {
-#if defined(__MIC__)
-      flags |= MAP_POPULATE;
-#endif
       bytes = (bytes+PAGE_SIZE_2M-1)&ssize_t(-PAGE_SIZE_2M);
-
 #if !defined(__MACOSX__)
       /* try direct huge page allocation first */
       if (tryDirectHugePageAllocation)
       {
-        void* ptr = mmap(0, bytes, PROT_READ | PROT_WRITE, flags | MAP_HUGETLB, -1, 0);
+        int huge_flags = flags;
+#ifdef MAP_HUGETLB
+        huge_flags |= MAP_HUGETLB;
+#endif
+#ifdef MAP_ALIGNED_SUPER
+        huge_flags |= MAP_ALIGNED_SUPER;
+#endif
+        void* ptr = mmap(0, bytes, PROT_READ | PROT_WRITE, huge_flags, -1, 0);
         
         if (ptr == nullptr || ptr == MAP_FAILED)
         {
@@ -197,17 +153,13 @@ namespace embree
     assert( ptr != MAP_FAILED );
     if (ptr == nullptr || ptr == MAP_FAILED) throw std::bad_alloc();
 
-#if USE_MADVISE
     /* advise huge page hint for THP */
-    os_madvise(ptr,bytes);
-#endif
-
+    os_advise(ptr,bytes);
     return ptr;
   }
 
   void* os_reserve(size_t bytes) 
   {
-
     /* linux always allocates pages on demand, thus just call allocate */
     return os_malloc(bytes);
   }
@@ -217,24 +169,25 @@ namespace embree
 
   size_t os_shrink(void* ptr, size_t bytesNew, size_t bytesOld) 
   {
-#if defined(RTCORE_MEMKIND_ALLOCATOR)
-    return bytesOld;
-#endif
-
-    size_t pageSize = PAGE_SIZE_4K;
-    if (isHugePageCandidate(bytesOld)) 
-      pageSize = PAGE_SIZE_2M;
-
-    bytesNew = (bytesNew+pageSize-1) & ~(pageSize-1);
-
+    /* first try with 4KB pages */
+    bytesNew = (bytesNew+PAGE_SIZE_4K-1) & ~(PAGE_SIZE_4K-1);
     assert(bytesNew <= bytesOld);
     if (bytesNew >= bytesOld)
       return bytesOld;
 
-    if (munmap((char*)ptr+bytesNew,bytesOld-bytesNew) == -1)
-      throw std::bad_alloc();
+    if (munmap((char*)ptr+bytesNew,bytesOld-bytesNew) != -1)
+      return bytesNew;
 
-    return bytesNew;
+    /* now try with 2MB pages */
+    bytesNew = (bytesNew+PAGE_SIZE_2M-1) & ~(PAGE_SIZE_2M-1);
+    assert(bytesNew <= bytesOld);
+    if (bytesNew >= bytesOld)
+      return bytesOld;
+
+    if (munmap((char*)ptr+bytesNew,bytesOld-bytesNew) != -1)
+      return bytesNew; // this may be too small in case we really used 2MB pages
+
+    throw std::bad_alloc();
   }
 
   void os_free(void* ptr, size_t bytes) 
@@ -242,18 +195,13 @@ namespace embree
     if (bytes == 0)
       return;
 
-#if defined(RTCORE_MEMKIND_ALLOCATOR)
-    mk_free(ptr);
-    return;
-#endif
-
     size_t pageSize = PAGE_SIZE_4K;
     if (isHugePageCandidate(bytes)) 
       pageSize = PAGE_SIZE_2M;
 
     bytes = (bytes+pageSize-1)&ssize_t(-pageSize);
     if (munmap(ptr,bytes) == -1)
-      throw std::bad_alloc();
+      /*throw std::bad_alloc()*/ return;  // we on purpose do not throw an exception when an error occurs, to avoid throwing an exception during error handling
   }
 }
 
@@ -268,30 +216,15 @@ namespace embree
   void* alignedMalloc(size_t size, size_t align) 
   {
     assert((align & (align-1)) == 0);
-//#if defined(TASKING_TBB) // FIXME: have to disable this for now as the TBB allocator itself seems to access some uninitialized value when using valgrind
-//    return scalable_aligned_malloc(size,align);
-//#else
+    void* ptr = _mm_malloc(size,align);
 
-// #if USE_MADVISE
-//     if (size >= 16*PAGE_SIZE_2M) 
-//     {
-//       align = PAGE_SIZE_2M;
-//       void *ptr = _mm_malloc(size,align);
-//       os_madvise(ptr,size);
-//       return ptr;
-//      }
-// #endif
-
-    return _mm_malloc(size,align);
-//#endif
+    if (size != 0 && ptr == nullptr) 
+      throw std::bad_alloc();
+    
+    return ptr;
   }
   
-  void alignedFree(void* ptr) 
-  {
-//#if defined(TASKING_TBB)
-//    scalable_aligned_free(ptr);
-//#else
+  void alignedFree(void* ptr) {
     _mm_free(ptr);
-//#endif
   }
 }

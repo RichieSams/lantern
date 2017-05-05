@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2017 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -131,6 +131,20 @@ namespace embree
 
   template<typename L> __forceinline bool operator ==( const AffineSpaceT<L>& a, const AffineSpaceT<L>& b ) { return a.l == b.l && a.p == b.p; }
   template<typename L> __forceinline bool operator !=( const AffineSpaceT<L>& a, const AffineSpaceT<L>& b ) { return a.l != b.l || a.p != b.p; }
+
+  ////////////////////////////////////////////////////////////////////////////////
+  /// Select
+  ////////////////////////////////////////////////////////////////////////////////
+
+  template<typename L> __forceinline AffineSpaceT<L> select ( const typename L::Vector::Scalar::Bool& s, const AffineSpaceT<L>& t, const AffineSpaceT<L>& f ) {
+    return AffineSpaceT<L>(select(s,t.l,f.l),select(s,t.p,f.p));
+  }
+
+  /*! blending */
+  template<typename T>
+    __forceinline AffineSpaceT<T> lerp(const AffineSpaceT<T>& l0, const AffineSpaceT<T>& l1, const float t) {
+    return AffineSpaceT<T>(lerp(l0.l,l1.l,t),lerp(l0.p,l1.p,t));
+  }
 
   ////////////////////////////////////////////////////////////////////////////////
   // Output Operators

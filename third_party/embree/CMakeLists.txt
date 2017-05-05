@@ -1,5 +1,5 @@
 ## ======================================================================== ##
-## Copyright 2009-2015 Intel Corporation                                    ##
+## Copyright 2009-2017 Intel Corporation                                    ##
 ##                                                                          ##
 ## Licensed under the Apache License, Version 2.0 (the "License");          ##
 ## you may not use this file except in compliance with the License.         ##
@@ -15,22 +15,38 @@
 ## ======================================================================== ##
 
 SET(EMBREE_VERSION_MAJOR 2)
-SET(EMBREE_VERSION_MINOR 9)
+SET(EMBREE_VERSION_MINOR 15)
 SET(EMBREE_VERSION_PATCH 0)
 SET(EMBREE_VERSION_NOTE "")
 SET(EMBREE_VERSION ${EMBREE_VERSION_MAJOR}.${EMBREE_VERSION_MINOR}.${EMBREE_VERSION_PATCH})
 MATH(EXPR EMBREE_VERSION_NUMBER "10000*${EMBREE_VERSION_MAJOR} + 100*${EMBREE_VERSION_MINOR} + ${EMBREE_VERSION_PATCH}")
 SET(CPACK_RPM_PACKAGE_RELEASE 1)
 
-
 PROJECT(embree${EMBREE_VERSION_MAJOR})
 
 CMAKE_MINIMUM_REQUIRED(VERSION 2.8.11)
+
+
+# find git version
+IF(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/.git)
+  FIND_PACKAGE(Git)
+  IF(GIT_FOUND)
+    EXECUTE_PROCESS(
+      COMMAND ${GIT_EXECUTABLE} rev-parse HEAD
+      WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+      OUTPUT_VARIABLE "EMBREE_HASH"
+      ERROR_QUIET
+      OUTPUT_STRIP_TRAILING_WHITESPACE)
+  ELSE()
+    SET(EMBREE_HASH 0)
+  ENDIF()
+ENDIF()
+
 CONFIGURE_FILE(
   "${PROJECT_SOURCE_DIR}/kernels/version.h.in"
   "${PROJECT_BINARY_DIR}/version.h"
 )
-INCLUDE_DIRECTORIES("${PROJECT_BINARY_DIR}")
+FILE(WRITE "${PROJECT_BINARY_DIR}/hash" "${EMBREE_HASH}")
 
 IF(COMMAND cmake_policy)
   if (POLICY CMP0003)
@@ -56,63 +72,69 @@ SET(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/common/cmake ${CMAKE_MODULE_PA
 INCLUDE(test)
 
 ##############################################################
-# Create Binary Packages
-##############################################################
-include(package)
-
-##############################################################
 # Embree configuration
 ##############################################################
 
-OPTION(ENABLE_STATIC_LIB "Build Embree as a static library." OFF)
-IF (ENABLE_STATIC_LIB)
+OPTION(EMBREE_STATIC_LIB "Build Embree as a static library." OFF)
+IF (EMBREE_STATIC_LIB)
   SET(EMBREE_LIB_TYPE STATIC)
-  ADD_DEFINITIONS(-DENABLE_STATIC_LIB)
+  ADD_DEFINITIONS(-DEMBREE_STATIC_LIB)
 ELSE()
   SET(EMBREE_LIB_TYPE SHARED)
 ENDIF()
 
-OPTION(ENABLE_ISPC_SUPPORT "Build Embree with support for ISPC applications." ON)
-OPTION(ENABLE_TUTORIALS    "Enable to build Embree tutorials" ON)
-
-# only support Xeon Phi on Linux
-IF (NOT WIN32 AND NOT APPLE)
-  OPTION(ENABLE_XEON_PHI_SUPPORT "Generates code path for Xeon Phi.")
-ELSE()
-  SET(ENABLE_XEON_PHI_SUPPORT OFF CACHE INTERNAL "Xeon Phi only supported on Linux.")
-ENDIF()
-
-IF (ENABLE_XEON_PHI_SUPPORT)
-  SET(ENABLE_ISPC_SUPPORT ON CACHE BOOL "Build Embree with support for ISPC applications." FORCE)
-ENDIF ()
+OPTION(EMBREE_ISPC_SUPPORT "Build Embree with support for ISPC applications." ON)
+OPTION(EMBREE_TUTORIALS    "Enable to build Embree tutorials" ON)
 
 ##############################################################################
 # Configurations (add configurations also to common/cmake/embree-config-default.cmake)
 
-OPTION(RTCORE_RAY_MASK "Enables ray mask support.")
-OPTION(RTCORE_STAT_COUNTERS "Enables statistic counters.")
-OPTION(RTCORE_BACKFACE_CULLING "Enables backface culling.")
-OPTION(RTCORE_INTERSECTION_FILTER "Enables intersection filter callback." ON)
-OPTION(RTCORE_INTERSECTION_FILTER_RESTORE "Restores previous hit when hit is filtered out." ON)
-OPTION(RTCORE_BUFFER_STRIDE "Enables buffer strides." ON)
+OPTION(EMBREE_STAT_COUNTERS "Enables statistic counters.")
 
-OPTION(RTCORE_EXPORT_ALL_SYMBOLS "Lets Embree library export all symbols.")
-OPTION(RTCORE_ENABLE_RAYSTREAM_LOGGER "Enables ray stream logger.")
-OPTION(RTCORE_IGNORE_INVALID_RAYS "Ignores invalid rays." OFF) # FIXME: enable by default?
-OPTION(RTCORE_RAY_PACKETS "Enabled support for ray packets." ON)
-OPTION(RTCORE_MEMKIND_ALLOCATOR "Enables memory allocation through the memkind library." OFF)
+OPTION(EMBREE_RAY_MASK "Enables ray mask support.")
+OPTION(EMBREE_BACKFACE_CULLING "Enables backface culling.")
+OPTION(EMBREE_INTERSECTION_FILTER "Enables intersection filter callback." ON)
+OPTION(EMBREE_INTERSECTION_FILTER_RESTORE "Restores previous hit when hit is filtered out." ON)
+OPTION(EMBREE_IGNORE_INVALID_RAYS "Ignores invalid rays." OFF) # FIXME: enable by default?
 
-SET(RTCORE_TASKING_SYSTEM "TBB" CACHE STRING "Selects tasking system")
-SET_PROPERTY(CACHE RTCORE_TASKING_SYSTEM PROPERTY STRINGS TBB INTERNAL)
+OPTION(EMBREE_GEOMETRY_TRIANGLES "Enables support for triangle geometries." ON)
+OPTION(EMBREE_GEOMETRY_QUADS "Enables support for quad geometries." ON)
+OPTION(EMBREE_GEOMETRY_LINES "Enables support for line geometries." ON)
+OPTION(EMBREE_GEOMETRY_HAIR "Enables support for hair geometries." ON)
+OPTION(EMBREE_GEOMETRY_SUBDIV "Enables support for subdiv geometries." ON)
+OPTION(EMBREE_GEOMETRY_USER "Enables support for user geometries." ON)
+OPTION(EMBREE_RAY_PACKETS "Enabled support for ray packets." ON)
 
-###############################################################################
-
-IF (RTCORE_TASKING_SYSTEM STREQUAL "TBB")
-  SET(TASKING_TBB ON)
-  FIND_PACKAGE(TBB REQUIRED)
-  INCLUDE_DIRECTORIES(${TBB_INCLUDE_DIRS})
+SET(EMBREE_NATIVE_SPLINE_BASIS BEZIER CACHE STRING "Sets the basis for curves which Embree uses internally. Other types are converted and need more memory.")
+SET_PROPERTY(CACHE EMBREE_NATIVE_SPLINE_BASIS PROPERTY STRINGS BSPLINE BEZIER)
+IF (EMBREE_NATIVE_SPLINE_BASIS STREQUAL "BSPLINE")
+  SET(EMBREE_NATIVE_CURVE_BSPLINE ON)
 ELSE()
-  SET(TASKING_INTERNAL ON)
+  SET(EMBREE_NATIVE_CURVE_BSPLINE OFF)
+ENDIF()
+
+SET(EMBREE_TASKING_SYSTEM "TBB" CACHE STRING "Selects tasking system")
+IF (WIN32)
+  SET_PROPERTY(CACHE EMBREE_TASKING_SYSTEM PROPERTY STRINGS TBB INTERNAL PPL)
+ELSE()
+  SET_PROPERTY(CACHE EMBREE_TASKING_SYSTEM PROPERTY STRINGS TBB INTERNAL)
+ENDIF()
+
+IF (EMBREE_TASKING_SYSTEM STREQUAL "TBB")
+  SET(TASKING_TBB      ON )
+  SET(TASKING_INTERNAL OFF)
+  SET(TASKING_PPL      OFF )
+  ADD_DEFINITIONS(-DTASKING_TBB)
+ELSEIF (EMBREE_TASKING_SYSTEM STREQUAL "PPL")
+  SET(TASKING_PPL      ON )
+  SET(TASKING_TBB      OFF )
+  SET(TASKING_INTERNAL OFF)
+  ADD_DEFINITIONS(-DTASKING_PPL)
+ELSE()
+  SET(TASKING_INTERNAL ON )
+  SET(TASKING_TBB      OFF)
+  SET(TASKING_PPL      OFF )
+  ADD_DEFINITIONS(-DTASKING_INTERNAL)
 ENDIF()
 
 CONFIGURE_FILE(
@@ -164,111 +186,121 @@ ENDIF (WIN32)
 # ISA configuration
 ##############################################################
 
-IF(APPLE)
-  SET(XEON_ISA "AVX2" CACHE STRING "Selects highest ISA to support.")
-ELSEIF(NOT COMPILER STREQUAL "ICC")
-  SET(XEON_ISA "AVX2" CACHE STRING "Selects highest ISA to support.")
+SET(EMBREE_MAX_ISA "AVX2" CACHE STRING "Selects highest ISA to support.")
+SET_PROPERTY(CACHE EMBREE_MAX_ISA PROPERTY STRINGS NONE SSE2 SSE4.2 AVX AVX2 AVX512KNL AVX512SKX)
+
+IF (EMBREE_MAX_ISA STREQUAL "NONE")
+  SET(EMBREE_ISA_SSE2  ON)
+  SET(EMBREE_ISA_SSE42 "OFF" CACHE BOOL "Enables SSE4.2 ISA.")
+  SET(EMBREE_ISA_AVX "OFF" CACHE BOOL "Enables AVX ISA.")
+  SET(EMBREE_ISA_AVX2 "OFF" CACHE BOOL "Enables AVX2 ISA.")
+  SET(EMBREE_ISA_AVX512KNL "OFF" CACHE BOOL "Enables AVX512 ISA for Knights Landing.")
+  SET(EMBREE_ISA_AVX512SKX "OFF" CACHE BOOL "Enables AVX512 ISA for Skylake.")
 ELSE()
-  SET(XEON_ISA "AVX512KNL" CACHE STRING "Selects highest ISA to support.")
-ENDIF ()
+  UNSET(EMBREE_ISA_SSE2 CACHE)
+  UNSET(EMBREE_ISA_SSE42 CACHE)
+  UNSET(EMBREE_ISA_AVX CACHE)
+  UNSET(EMBREE_ISA_AVX2 CACHE)
+  UNSET(EMBREE_ISA_AVX512KNL CACHE)
+  UNSET(EMBREE_ISA_AVX512SKX CACHE)
 
-SET_PROPERTY(CACHE XEON_ISA PROPERTY STRINGS SSE2 SSE3 SSSE3 SSE4.1 SSE4.2 AVX AVX-I AVX2 AVX512KNL)
+  IF(EMBREE_MAX_ISA STREQUAL "SSE2")
+    SET(ISA  1)
+  ELSEIF(EMBREE_MAX_ISA STREQUAL "SSE4.2")
+    SET(ISA  2)
+  ELSEIF(EMBREE_MAX_ISA STREQUAL "AVX")
+    SET(ISA  3)
+  ELSEIF(EMBREE_MAX_ISA STREQUAL "AVX2")
+    SET(ISA  4)
+  ELSEIF(EMBREE_MAX_ISA STREQUAL "AVX512KNL")
+    SET(ISA  5)
+  ELSEIF(EMBREE_MAX_ISA STREQUAL "AVX512SKX")
+    SET(ISA 6)
+  ELSE()
+    MESSAGE(FATAL_ERROR "Unsupported ISA specified: " ${EMBREE_MAX_ISA})
+  ENDIF()
 
-IF (XEON_ISA STREQUAL "SSE2")
-  SET(ISA  1)
-ENDIF ()
+  SET(EMBREE_ISA_SSE2 OFF)
+  SET(EMBREE_ISA_SSE42 OFF)
+  SET(EMBREE_ISA_AVX OFF)
+  SET(EMBREE_ISA_AVX2 OFF)
+  SET(EMBREE_ISA_AVX512KNL OFF)
+  SET(EMBREE_ISA_AVX512SKX OFF)
 
-IF (XEON_ISA STREQUAL "SSE3")
-  SET(ISA  2)
-ENDIF ()
+  IF (ISA GREATER 0)
+    SET(EMBREE_ISA_SSE2  ON)
+  ENDIF ()
+  IF (ISA GREATER 1)
+    SET(EMBREE_ISA_SSE42  ON)
+  ENDIF ()
+  IF (ISA GREATER 2)
+    SET(EMBREE_ISA_AVX  ON)
+  ENDIF ()
+  IF (ISA GREATER 3)
+    SET(EMBREE_ISA_AVX2  ON)
+  ENDIF ()
+  IF (ISA GREATER 4)
+    SET(EMBREE_ISA_AVX512KNL  ON)
+  ENDIF ()
+  IF (ISA GREATER 5)
+    SET(EMBREE_ISA_AVX512SKX  ON)
+  ENDIF ()
+ENDIF()
 
-IF (XEON_ISA STREQUAL "SSSE3")
-  SET(ISA  3)
-ENDIF ()
+IF (EMBREE_ISA_SSE2)
+  ADD_DEFINITIONS(-D__TARGET_SSE2__)
+  LIST(APPEND ISPC_TARGETS "sse2")
+ENDIF()
 
-IF (XEON_ISA STREQUAL "SSE4.1")
-  SET(ISA  4)
-ENDIF ()
-
-IF (XEON_ISA STREQUAL "SSE4.2")
-  SET(ISA  5)
-ENDIF ()
-
-IF (XEON_ISA STREQUAL "AVX")
-  SET(ISA  6)
-ENDIF ()
-
-IF (XEON_ISA STREQUAL "AVX-I")
-  SET(ISA  7)
-ENDIF ()
-
-IF (XEON_ISA STREQUAL "AVX2")
-  SET(ISA  8)
-ENDIF ()
-
-IF (XEON_ISA STREQUAL "AVX512KNL")
-  SET(ISA  9)
-ENDIF ()
-
-SET(TARGET_SSE2  OFF)
-SET(TARGET_SSE3  OFF)
-SET(TARGET_SSSE3  OFF)
-SET(TARGET_SSE41  OFF)
-SET(TARGET_SSE42  OFF)
-SET(TARGET_AVX  OFF)
-SET(TARGET_AVX2  OFF)
-SET(TARGET_AVX512KNL OFF)
-
-IF (ISA GREATER 0)
-  SET(TARGET_SSE2  ON)
-  SET(ISPC_TARGETS "sse2")
-ENDIF ()
-
-IF (ISA GREATER 1)
-  SET(TARGET_SSE3  ON)
-ENDIF ()
-
-IF (ISA GREATER 2)
-  SET(TARGET_SSSE3  ON)
-ENDIF ()
-
-IF (ISA GREATER 3)
-  SET(TARGET_SSE41  ON)
+IF (EMBREE_ISA_SSE42)
+  ADD_DEFINITIONS(-D__TARGET_SSE42__)
   LIST(APPEND ISPC_TARGETS "sse4")
 ENDIF ()
 
-IF (ISA GREATER 4)
-  SET(TARGET_SSE42  ON)
-ENDIF ()
-
-IF (ISA GREATER 5)
-  SET(TARGET_AVX  ON)
+IF (EMBREE_ISA_AVX)
+  ADD_DEFINITIONS(-D__TARGET_AVX__)
   LIST(APPEND ISPC_TARGETS "avx")
 ENDIF ()
 
-IF (ISA GREATER 7)
-  SET(TARGET_AVX2  ON)
+IF (EMBREE_ISA_AVX2)
+  ADD_DEFINITIONS(-D__TARGET_AVX2__)
   LIST(APPEND ISPC_TARGETS "avx2")
 ENDIF ()
 
-IF (ISA GREATER 8)
-  SET(TARGET_AVX512KNL  ON)
+IF (EMBREE_ISA_AVX512KNL)
+  ADD_DEFINITIONS(-D__TARGET_AVX512KNL__)
   LIST(APPEND ISPC_TARGETS "avx512knl-i32x16")
+ENDIF ()
+
+IF (EMBREE_ISA_AVX512SKX)
+  ADD_DEFINITIONS(-D__TARGET_AVX512SKX__)
+  LIST(APPEND ISPC_TARGETS "avx512skx-i32x16")
 ENDIF ()
 
 INCLUDE (ispc)
 
 ##############################################################
+# Create Binary Packages (uses above config options)
+##############################################################
+include(package)
+
+##############################################################
 # Search paths
 ##############################################################
 INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR}/include)
+INCLUDE_DIRECTORIES("${PROJECT_BINARY_DIR}")
+INCLUDE_DIRECTORIES_ISPC("${PROJECT_BINARY_DIR}")
+IF (TASKING_TBB)
+  FIND_PACKAGE(TBB REQUIRED)
+  INCLUDE_DIRECTORIES(${TBB_INCLUDE_DIRS})
+ENDIF()
 
 ##############################################################
 # Output paths
 ##############################################################
-SET(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
-SET(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
-SET(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
+SET(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
+SET(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
+SET(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
 
 ##############################################################
 # Directories to compile
@@ -277,17 +309,9 @@ SET(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
 ADD_SUBDIRECTORY(common)
 ADD_SUBDIRECTORY(kernels)
 
-IF (ENABLE_TUTORIALS)
+IF (EMBREE_TUTORIALS)
   ADD_SUBDIRECTORY(tutorials)
 ENDIF()
-
-  SET (__XEON__ 1)
-  ADD_SUBDIRECTORY(tests)
-
-  IF (ENABLE_XEON_PHI_SUPPORT)
-    SET (__XEON__ 0)
-    ADD_SUBDIRECTORY(tests tests_xeonphi)
-  ENDIF ()
 
 ##############################################################
 # Uninstall
@@ -298,10 +322,10 @@ configure_file(
     "${CMAKE_CURRENT_BINARY_DIR}/uninstall.cmake"
     IMMEDIATE @ONLY)
 
-add_custom_target(UNINSTALL
+add_custom_target(uninstall
     COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/uninstall.cmake)
 
-SET_PROPERTY(TARGET UNINSTALL PROPERTY FOLDER CMakePredefinedTargets)
+SET_PROPERTY(TARGET uninstall PROPERTY FOLDER CMakePredefinedTargets)
 	
 ##############################################################
 # Has to be last

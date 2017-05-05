@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2017 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -20,7 +20,6 @@
 #include "../sys/intrinsics.h"
 #include "../math/constants.h"
 #include "varying.h"
-#include "sse_special.h"
 
 namespace embree 
 {
@@ -38,6 +37,10 @@ namespace embree
   extern const __m128d _mm_lookupmask_pd[4];
 }
 
+#if defined(__AVX512VL__)
+#include "vboolf4_avx512.h"
+#else
 #include "vboolf4_sse2.h"
+#endif
 #include "vint4_sse2.h"
 #include "vfloat4_sse2.h"

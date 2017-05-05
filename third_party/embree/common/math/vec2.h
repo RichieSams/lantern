@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2017 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -66,13 +66,18 @@ namespace embree
   template<typename T> __forceinline Vec2<T> rcp       ( const Vec2<T>& a ) { return Vec2<T>(rcp  (a.x), rcp  (a.y)); }
   template<typename T> __forceinline Vec2<T> rsqrt     ( const Vec2<T>& a ) { return Vec2<T>(rsqrt(a.x), rsqrt(a.y)); }
   template<typename T> __forceinline Vec2<T> sqrt      ( const Vec2<T>& a ) { return Vec2<T>(sqrt (a.x), sqrt (a.y)); }
+  template<typename T> __forceinline Vec2<T> frac      ( const Vec2<T>& a ) { return Vec2<T>(frac (a.x), frac (a.y)); }
 
   ////////////////////////////////////////////////////////////////////////////////
   /// Binary Operators
   ////////////////////////////////////////////////////////////////////////////////
 
   template<typename T> __forceinline Vec2<T> operator +( const Vec2<T>& a, const Vec2<T>& b ) { return Vec2<T>(a.x + b.x, a.y + b.y); }
+  template<typename T> __forceinline Vec2<T> operator +( const Vec2<T>& a, const       T& b ) { return Vec2<T>(a.x + b  , a.y + b  ); }
+  template<typename T> __forceinline Vec2<T> operator +( const       T& a, const Vec2<T>& b ) { return Vec2<T>(a   + b.x, a   + b.y); }
   template<typename T> __forceinline Vec2<T> operator -( const Vec2<T>& a, const Vec2<T>& b ) { return Vec2<T>(a.x - b.x, a.y - b.y); }
+  template<typename T> __forceinline Vec2<T> operator -( const Vec2<T>& a, const       T& b ) { return Vec2<T>(a.x - b  , a.y - b  ); }
+  template<typename T> __forceinline Vec2<T> operator -( const       T& a, const Vec2<T>& b ) { return Vec2<T>(a   - b.x, a   - b.y); }
   template<typename T> __forceinline Vec2<T> operator *( const Vec2<T>& a, const Vec2<T>& b ) { return Vec2<T>(a.x * b.x, a.y * b.y); }
   template<typename T> __forceinline Vec2<T> operator *( const       T& a, const Vec2<T>& b ) { return Vec2<T>(a   * b.x, a   * b.y); }
   template<typename T> __forceinline Vec2<T> operator *( const Vec2<T>& a, const       T& b ) { return Vec2<T>(a.x * b  , a.y * b  ); }
@@ -91,6 +96,11 @@ namespace embree
   template<typename T> __forceinline const Vec2<T> msub  ( const Vec2<T>& a, const Vec2<T>& b, const Vec2<T>& c) { return Vec2<T>( msub(a.x,b.x,c.x), msub(a.y,b.y,c.y) ); }
   template<typename T> __forceinline const Vec2<T> nmadd ( const Vec2<T>& a, const Vec2<T>& b, const Vec2<T>& c) { return Vec2<T>(nmadd(a.x,b.x,c.x),nmadd(a.y,b.y,c.y) ); }
   template<typename T> __forceinline const Vec2<T> nmsub ( const Vec2<T>& a, const Vec2<T>& b, const Vec2<T>& c) { return Vec2<T>(nmsub(a.x,b.x,c.x),nmsub(a.y,b.y,c.y) ); }
+
+  template<typename T> __forceinline const Vec2<T> madd  ( const T& a, const Vec2<T>& b, const Vec2<T>& c) { return Vec2<T>( madd(a,b.x,c.x), madd(a,b.y,c.y) ); }
+  template<typename T> __forceinline const Vec2<T> msub  ( const T& a, const Vec2<T>& b, const Vec2<T>& c) { return Vec2<T>( msub(a,b.x,c.x), msub(a,b.y,c.y) ); }
+  template<typename T> __forceinline const Vec2<T> nmadd ( const T& a, const Vec2<T>& b, const Vec2<T>& c) { return Vec2<T>(nmadd(a,b.x,c.x),nmadd(a,b.y,c.y) ); }
+  template<typename T> __forceinline const Vec2<T> nmsub ( const T& a, const Vec2<T>& b, const Vec2<T>& c) { return Vec2<T>(nmsub(a,b.x,c.x),nmsub(a,b.y,c.y) ); }
 
   ////////////////////////////////////////////////////////////////////////////////
   /// Assignment Operators
@@ -155,7 +165,8 @@ namespace embree
 
   template<typename T> __forceinline int maxDim ( const Vec2<T>& a )
   {
-    if (a.x > a.y) return 0;
+    const Vec2<T> b = abs(a);
+    if (b.x > b.y) return 0;
     else return 1;
   }
 

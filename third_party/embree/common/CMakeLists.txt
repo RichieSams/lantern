@@ -1,5 +1,5 @@
 ## ======================================================================== ##
-## Copyright 2009-2015 Intel Corporation                                    ##
+## Copyright 2009-2017 Intel Corporation                                    ##
 ##                                                                          ##
 ## Licensed under the Apache License, Version 2.0 (the "License");          ##
 ## you may not use this file except in compliance with the License.         ##
@@ -14,16 +14,8 @@
 ## limitations under the License.                                           ##
 ## ======================================================================== ##
 
-SET(__XEON__ 1)
 ADD_SUBDIRECTORY(sys)
 ADD_SUBDIRECTORY(simd)
 ADD_SUBDIRECTORY(lexers)
 ADD_SUBDIRECTORY(tasking)
-
-IF (ENABLE_XEON_PHI_SUPPORT)
-  SET(__XEON__ 0)
-  ADD_SUBDIRECTORY(sys sys_xeonphi)
-  ADD_SUBDIRECTORY(simd simd_xeonphi)
-  ADD_SUBDIRECTORY(lexers lexers_xeonphi)
-  ADD_SUBDIRECTORY(tasking tasking_xeonphi)
-ENDIF ()
+ADD_SUBDIRECTORY(algorithms)

@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2017 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -31,27 +31,31 @@ namespace embree
     void add(Accel* accel);
 
   public:
-    static void intersect (void* ptr, RTCRay& ray);
-    static void intersect4 (const void* valid, void* ptr, RTCRay4& ray);
-    static void intersect8 (const void* valid, void* ptr, RTCRay8& ray);
-    static void intersect16 (const void* valid, void* ptr, RTCRay16& ray);
+    static void intersect (void* ptr, RTCRay& ray, IntersectContext* context);
+    static void intersect4 (const void* valid, void* ptr, RTCRay4& ray, IntersectContext* context);
+    static void intersect8 (const void* valid, void* ptr, RTCRay8& ray, IntersectContext* context);
+    static void intersect16 (const void* valid, void* ptr, RTCRay16& ray, IntersectContext* context);
+    static void intersectN (void* ptr, RTCRay** ray, const size_t N, IntersectContext* context);
 
   public:
-    static void occluded (void* ptr, RTCRay& ray);
-    static void occluded4 (const void* valid, void* ptr, RTCRay4& ray);
-    static void occluded8 (const void* valid, void* ptr, RTCRay8& ray);
-    static void occluded16 (const void* valid, void* ptr, RTCRay16& ray);
+    static void occluded (void* ptr, RTCRay& ray, IntersectContext* context);
+    static void occluded4 (const void* valid, void* ptr, RTCRay4& ray, IntersectContext* context);
+    static void occluded8 (const void* valid, void* ptr, RTCRay8& ray, IntersectContext* context);
+    static void occluded16 (const void* valid, void* ptr, RTCRay16& ray, IntersectContext* context);
+    static void occludedN (void* ptr, RTCRay** ray, const size_t N, IntersectContext* context);
 
   public:
     void print(size_t ident);
     void immutable();
-    void build (size_t threadIndex, size_t threadCount);
+    void build ();
     void select(bool filter4, bool filter8, bool filter16, bool filterN);
     void deleteGeometry(size_t geomID);
     void clear ();
-      
+    __forceinline bool validIsecN() { return validIntersectorN; }
+
   public:
     darray_t<Accel*,16> accels;
     darray_t<Accel*,16> validAccels;
+    bool validIntersectorN;
   };
 }

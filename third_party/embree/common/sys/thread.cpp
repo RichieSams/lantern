@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2017 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -102,12 +102,13 @@ namespace embree
     void* arg;
   };
 
-  static void* threadStartup(ThreadStartupData* parg)
+  DWORD WINAPI threadStartup(LPVOID ptr)
   {
+    ThreadStartupData* parg = (ThreadStartupData*) ptr;
     _mm_setcsr(_mm_getcsr() | /*FTZ:*/ (1<<15) | /*DAZ:*/ (1<<6));
     parg->f(parg->arg);
     delete parg;
-    return nullptr;
+    return 0;
   }
 
 #if !defined(PTHREADS_WIN32)
@@ -115,7 +116,7 @@ namespace embree
   /*! creates a hardware thread running on specific core */
   thread_t createThread(thread_func f, void* arg, size_t stack_size, ssize_t threadID)
   {
-    HANDLE thread = CreateThread(nullptr, stack_size, (LPTHREAD_START_ROUTINE)threadStartup, new ThreadStartupData(f,arg), 0, nullptr);
+    HANDLE thread = CreateThread(nullptr, stack_size, threadStartup, new ThreadStartupData(f,arg), 0, nullptr);
     if (thread == nullptr) FATAL("CreateThread failed");
     if (threadID >= 0) setAffinity(thread, threadID);
     return thread_t(thread);
@@ -167,88 +168,93 @@ namespace embree
 ////////////////////////////////////////////////////////////////////////////////
 
 #if defined(__LINUX__)
-/* to parse thread topology */
+
+#include <fstream>
 #include <sstream>
+#include <algorithm>
 
 namespace embree
 {
-
-  ssize_t mapThreadID(ssize_t threadID)
+  /* changes thread ID mapping such that we first fill up all thread on one core */
+  size_t mapThreadID(size_t threadID)
   {
-#if !defined(__MIC__)
-    static std::vector<int> threadIDs;
+    static MutexSys mutex;
+    Lock<MutexSys> lock(mutex);
+    static std::vector<size_t> threadIDs;
 
     if (threadIDs.size() == 0)
     {
       /* parse thread/CPU topology */
       for (size_t cpuID=0;;cpuID++)
       {
+        std::fstream fs;
         std::string cpu = std::string("/sys/devices/system/cpu/cpu") + std::to_string((long long)cpuID) + std::string("/topology/thread_siblings_list");
-        FILE *file = fopen(cpu.c_str(), "r");
-        if(file)
+        fs.open (cpu.c_str(), std::fstream::in);
+        if (fs.fail()) break;
+
+        int i;
+        while (fs >> i) 
         {
-          char buffer[256];
-          if (fgets(buffer,256,file) != NULL)
-          {
-            std::stringstream threads_config(buffer);
-            int i;
-            while (threads_config >> i)
-            {
-              bool found = false;
-              for (size_t j=0;j<threadIDs.size();j++)
-                if (threadIDs[j] == i)
-                {
-                  found = true;
-                  break;
-                }
-              if (!found)
-                threadIDs.push_back(i);
-              if (threads_config.peek() == ',')
-                threads_config.ignore();
-            }
-          }
-          fclose(file);
+          if (std::none_of(threadIDs.begin(),threadIDs.end(),[&] (int id) { return id == i; }))
+            threadIDs.push_back(i);
+          if (fs.peek() == ',') 
+            fs.ignore();
         }
-        else
-          break;
-
+        fs.close();
       }
-
-      for (size_t i=0;i<threadIDs.size();i++)
-        for (size_t j=0;j<threadIDs.size();j++)
-          if (i != j)
-            if (threadIDs[i] == threadIDs[j])
-            {
-              PRINT(i);
-              PRINT(j);
-              PRINT(threadIDs[i]);
-              PRINT(threadIDs[j]);
-              FATAL("threadID error");
-            }
 
 #if 0
       for (size_t i=0;i<threadIDs.size();i++)
-        std::cout << "i " << i << " threadIDs[i] " << threadIDs[i] << std::endl;
+        std::cout << i << " -> " << threadIDs[i] << std::endl;
 #endif
+
+      /* verify the mapping and do not use it if the mapping has errors */
+      for (size_t i=0;i<threadIDs.size();i++) {
+        for (size_t j=0;j<threadIDs.size();j++) {
+          if (i != j && threadIDs[i] == threadIDs[j]) {
+            threadIDs.clear();
+          }
+        }
+      }
     }
 
-    ssize_t ID = threadID;
-
+    /* re-map threadIDs if mapping is available */
+    size_t ID = threadID;
     if (threadID < threadIDs.size())
       ID = threadIDs[threadID];
 
-#else
-    ssize_t ID = threadID;
-    //std::cout << threadID << " -> " << ID << std::endl;
-#endif
     return ID;
   }
+
   /*! set affinity of the calling thread */
   void setAffinity(ssize_t affinity)
   {
     cpu_set_t cset;
     CPU_ZERO(&cset);
     CPU_SET(mapThreadID(affinity), &cset);
+
+    if (pthread_setaffinity_np(pthread_self(), sizeof(cset), &cset) != 0)
+      WARNING("pthread_setaffinity_np failed"); // on purpose only a warning
+  }
+}
+#endif
+
+////////////////////////////////////////////////////////////////////////////////
+/// FreeBSD Platform
+////////////////////////////////////////////////////////////////////////////////
+
+#if defined(__FreeBSD__)
+
+#include <pthread_np.h>
+
+namespace embree
+{
+  /*! set affinity of the calling thread */
+  void setAffinity(ssize_t affinity)
+  {
+    cpuset_t cset;
+    CPU_ZERO(&cset);
+    CPU_SET(affinity, &cset);
 
     if (pthread_setaffinity_np(pthread_self(), sizeof(cset), &cset) != 0)
       WARNING("pthread_setaffinity_np failed"); // on purpose only a warning
@@ -308,8 +314,9 @@ namespace embree
   static void* threadStartup(ThreadStartupData* parg)
   {
     _mm_setcsr(_mm_getcsr() | /*FTZ:*/ (1<<15) | /*DAZ:*/ (1<<6));
-
-#if !defined(__LINUX__)
+    
+    /*! Mac OS X does not support setting affinity at thread creation time */
+#if defined(__MACOSX__)
     if (parg->affinity >= 0)
 	setAffinity(parg->affinity);
 #endif
@@ -322,10 +329,6 @@ namespace embree
   /*! creates a hardware thread running on specific core */
   thread_t createThread(thread_func f, void* arg, size_t stack_size, ssize_t threadID)
   {
-#ifdef __MIC__
-    threadID++; // start counting at 1 on MIC
-#endif
-
     /* set stack size */
     pthread_attr_t attr;
     pthread_attr_init(&attr);
@@ -333,8 +336,12 @@ namespace embree
 
     /* create thread */
     pthread_t* tid = new pthread_t;
-    if (pthread_create(tid,&attr,(void*(*)(void*))threadStartup,new ThreadStartupData(f,arg,threadID)) != 0)
+    if (pthread_create(tid,&attr,(void*(*)(void*))threadStartup,new ThreadStartupData(f,arg,threadID)) != 0) {
+      pthread_attr_destroy(&attr);
+      delete tid; 
       FATAL("pthread_create failed");
+    }
+    pthread_attr_destroy(&attr);
 
     /* set affinity */
 #if defined(__LINUX__)
@@ -342,7 +349,15 @@ namespace embree
       cpu_set_t cset;
       CPU_ZERO(&cset);
       CPU_SET(mapThreadID(threadID), &cset);
-      if (pthread_setaffinity_np(*tid,sizeof(cpu_set_t),&cset))
+      if (pthread_setaffinity_np(*tid, sizeof(cset), &cset))
+        WARNING("pthread_setaffinity_np failed"); // on purpose only a warning
+    }
+#elif defined(__FreeBSD__)
+    if (threadID >= 0) {
+      cpuset_t cset;
+      CPU_ZERO(&cset);
+      CPU_SET(threadID, &cset);
+      if (pthread_setaffinity_np(*tid, sizeof(cset), &cset))
         WARNING("pthread_setaffinity_np failed"); // on purpose only a warning
     }
 #endif
@@ -369,11 +384,13 @@ namespace embree
   }
 
   /*! creates thread local storage */
-  tls_t createTls() {
-    static int cntr = 0;
+  tls_t createTls() 
+  {
     pthread_key_t* key = new pthread_key_t;
-    if (pthread_key_create(key,nullptr) != 0)
+    if (pthread_key_create(key,nullptr) != 0) {
+      delete key;
       FATAL("pthread_key_create failed");
+    }
 
     return tls_t(key);
   }
@@ -404,3 +421,12 @@ namespace embree
 }
 
 #endif
+
+////////////////////////////////////////////////////////////////////////////////
+/// All Platforms
+////////////////////////////////////////////////////////////////////////////////
+
+namespace embree
+{
+  ThreadLocalStorage ThreadLocalStorage::single_instance;
+}

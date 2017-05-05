@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2017 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -28,8 +28,8 @@ namespace embree
     union {                   // data
       __m256d v;
       struct { __m128d vl,vh; };
-      int64_t i[4];
-    };  
+      long long i[4];
+    };
 
     ////////////////////////////////////////////////////////////////////////////////
     /// Constructors, Assignment & Cast Operators
@@ -40,6 +40,8 @@ namespace embree
     __forceinline vboold4& operator=( const vboold4& a ) { v = a.v; return *this; }
 
     __forceinline vboold( const __m256d a ) : v(a) {}
+    __forceinline vboold( const __m256i a ) : v(_mm256_castsi256_pd(a)) {}
+
     __forceinline operator const __m256( void ) const { return _mm256_castpd_ps(v); }
     __forceinline operator const __m256i( void ) const { return _mm256_castpd_si256(v); }
     __forceinline operator const __m256d( void ) const { return v; }
@@ -71,8 +73,8 @@ namespace embree
     /// Array Access
     ////////////////////////////////////////////////////////////////////////////////
 
-    __forceinline bool  operator []( const size_t index ) const { assert(index < 4); return (_mm256_movemask_pd(v) >> index) & 1; }
-    __forceinline int64_t& operator []( const size_t index )       { assert(index < 4); return i[index]; }
+    __forceinline bool       operator []( const size_t index ) const { assert(index < 4); return (_mm256_movemask_pd(v) >> index) & 1; }
+    __forceinline long long& operator []( const size_t index )       { assert(index < 4); return i[index]; }
   };
 
   ////////////////////////////////////////////////////////////////////////////////
@@ -134,7 +136,7 @@ namespace embree
   __forceinline bool any       ( const vboold4& a ) { return !_mm256_testz_pd(a,a); }
   __forceinline bool none      ( const vboold4& a ) { return _mm256_testz_pd(a,a) != 0; }
 
-  __forceinline bool all       ( const vboold4& valid, const vboold4& b ) { return all(!valid | b); }
+  __forceinline bool all       ( const vboold4& valid, const vboold4& b ) { return all((!valid) | b); }
   __forceinline bool any       ( const vboold4& valid, const vboold4& b ) { return any( valid & b); }
   __forceinline bool none      ( const vboold4& valid, const vboold4& b ) { return none(valid & b); }
 

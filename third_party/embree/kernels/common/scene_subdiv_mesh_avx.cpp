@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2017 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -16,8 +16,8 @@
 
 #include "scene_subdiv_mesh.h"
 #include "scene.h"
-#include "subdiv/patch_eval.h"
-#include "subdiv/patch_eval_simd.h"
+#include "../subdiv/patch_eval.h"
+#include "../subdiv/patch_eval_simd.h"
 
 namespace embree
 {
@@ -33,50 +33,58 @@ namespace embree
 #endif
 
     /* calculate base pointer and stride */
-    assert((buffer >= RTC_VERTEX_BUFFER0 && buffer <= RTC_VERTEX_BUFFER1) ||
-           (buffer >= RTC_USER_VERTEX_BUFFER0 && buffer <= RTC_USER_VERTEX_BUFFER1));
+    assert((buffer >= RTC_VERTEX_BUFFER0 && buffer < RTCBufferType(RTC_VERTEX_BUFFER0 + RTC_MAX_TIME_STEPS)) ||
+           (buffer >= RTC_USER_VERTEX_BUFFER0 && RTCBufferType(RTC_USER_VERTEX_BUFFER0 + RTC_MAX_USER_VERTEX_BUFFERS)));
     const char* src = nullptr; 
     size_t stride = 0;
     size_t bufID = buffer&0xFFFF;
     std::vector<SharedLazyTessellationCache::CacheEntry>* baseEntry = nullptr;
+    Topology* topo = nullptr;
     if (buffer >= RTC_USER_VERTEX_BUFFER0) {
-      src    = userbuffers[buffer&0xFFFF]->getPtr();
-      stride = userbuffers[buffer&0xFFFF]->getStride();
+      assert(bufID < userbuffers.size());
+      src    = userbuffers[bufID].getPtr();
+      stride = userbuffers[bufID].getStride();
       baseEntry = &user_buffer_tags[bufID];
+      int topologyID = userbuffers[bufID].userdata;
+      topo = &topology[topologyID];
     } else {
-      src    = vertices[buffer&0xFFFF].getPtr();
-      stride = vertices[buffer&0xFFFF].getStride();
+      assert(bufID < numTimeSteps);
+      src    = vertices[bufID].getPtr();
+      stride = vertices[bufID].getStride();
       baseEntry = &vertex_buffer_tags[bufID];
+      topo = &topology[0];
     }
 
-    auto alloc = [](size_t bytes) { return SharedLazyTessellationCache::malloc(bytes); };
-    
+    bool has_P = P;
+    bool has_dP = dPdu;     assert(!has_dP  || dPdv);
+    bool has_ddP = ddPdudu; assert(!has_ddP || (ddPdvdv && ddPdudu));
+
     for (size_t i=0,slot=0; i<numFloats; slot++)
     {
       if (i+4 >= numFloats)
       {
         vfloat4 Pt, dPdut, dPdvt, ddPdudut, ddPdvdvt, ddPdudvt;; 
         isa::PatchEval<vfloat4>(baseEntry->at(interpolationSlot(primID,slot,stride)),parent->commitCounterSubdiv,
-                                getHalfEdge(primID),src+i*sizeof(float),stride,u,v,
-                                P ? &Pt : nullptr, 
-                                dPdu ? &dPdut : nullptr, 
-                                dPdv ? &dPdvt : nullptr,
-                                ddPdudu ? &ddPdudut : nullptr, 
-                                ddPdvdv ? &ddPdvdvt : nullptr, 
-                                ddPdudv ? &ddPdudvt : nullptr);
+                                topo->getHalfEdge(primID),src+i*sizeof(float),stride,u,v,
+                                has_P ? &Pt : nullptr, 
+                                has_dP ? &dPdut : nullptr, 
+                                has_dP ? &dPdvt : nullptr,
+                                has_ddP ? &ddPdudut : nullptr, 
+                                has_ddP ? &ddPdvdvt : nullptr, 
+                                has_ddP ? &ddPdudvt : nullptr);
         
-        if (P) {
+        if (has_P) {
           for (size_t j=i; j<min(i+4,numFloats); j++) 
             P[j] = Pt[j-i];
         }
-        if (dPdu) 
+        if (has_dP) 
         {
           for (size_t j=i; j<min(i+4,numFloats); j++) {
             dPdu[j] = dPdut[j-i];
             dPdv[j] = dPdvt[j-i];
           }
         }
-        if (ddPdudu) 
+        if (has_ddP) 
         {
           for (size_t j=i; j<min(i+4,numFloats); j++) {
             ddPdudu[j] = ddPdudut[j-i];
@@ -90,26 +98,26 @@ namespace embree
       {
         vfloat8 Pt, dPdut, dPdvt, ddPdudut, ddPdvdvt, ddPdudvt; 
         isa::PatchEval<vfloat8>(baseEntry->at(interpolationSlot(primID,slot,stride)),parent->commitCounterSubdiv,
-                                getHalfEdge(primID),src+i*sizeof(float),stride,u,v,
-                                P ? &Pt : nullptr, 
-                                dPdu ? &dPdut : nullptr, 
-                                dPdv ? &dPdvt : nullptr,
-                                ddPdudu ? &ddPdudut : nullptr, 
-                                ddPdvdv ? &ddPdvdvt : nullptr, 
-                                ddPdudv ? &ddPdudvt : nullptr);
+                                topo->getHalfEdge(primID),src+i*sizeof(float),stride,u,v,
+                                has_P ? &Pt : nullptr, 
+                                has_dP ? &dPdut : nullptr, 
+                                has_dP ? &dPdvt : nullptr,
+                                has_ddP ? &ddPdudut : nullptr, 
+                                has_ddP ? &ddPdvdvt : nullptr, 
+                                has_ddP ? &ddPdudvt : nullptr);
                                     
-        if (P) {
+        if (has_P) {
           for (size_t j=i; j<i+8; j++) 
             P[j] = Pt[j-i];
         }
-        if (dPdu) 
+        if (has_dP) 
         {
           for (size_t j=i; j<i+8; j++) {
             dPdu[j] = dPdut[j-i];
             dPdv[j] = dPdvt[j-i];
           }
         }
-        if (ddPdudu) 
+        if (has_ddP) 
         {
           for (size_t j=i; j<i+8; j++) {
             ddPdudu[j] = ddPdudut[j-i];
@@ -128,20 +136,26 @@ namespace embree
                                         RTCBufferType buffer, float* P, float* dPdu, float* dPdv, float* ddPdudu, float* ddPdvdv, float* ddPdudv, size_t numFloats)
   {
     /* calculate base pointer and stride */
-    assert((buffer >= RTC_VERTEX_BUFFER0 && buffer <= RTC_VERTEX_BUFFER1) ||
-           (buffer >= RTC_USER_VERTEX_BUFFER0 && buffer <= RTC_USER_VERTEX_BUFFER1));
+     assert((buffer >= RTC_VERTEX_BUFFER0 && buffer < RTCBufferType(RTC_VERTEX_BUFFER0 + RTC_MAX_TIME_STEPS)) ||
+           (buffer >= RTC_USER_VERTEX_BUFFER0 && RTCBufferType(RTC_USER_VERTEX_BUFFER0 + RTC_MAX_USER_VERTEX_BUFFERS)));
     const char* src = nullptr; 
     size_t stride = 0;
     size_t bufID = buffer&0xFFFF;
     std::vector<SharedLazyTessellationCache::CacheEntry>* baseEntry = nullptr;
+    Topology* topo = nullptr;
     if (buffer >= RTC_USER_VERTEX_BUFFER0) {
-      src    = userbuffers[bufID]->getPtr();
-      stride = userbuffers[bufID]->getStride();
+      assert(bufID < userbuffers.size());
+      src    = userbuffers[bufID].getPtr();
+      stride = userbuffers[bufID].getStride();
       baseEntry = &user_buffer_tags[bufID];
+      int topologyID = userbuffers[bufID].userdata;
+      topo = &topology[topologyID];
     } else {
+      assert(bufID < numTimeSteps);
       src    = vertices[bufID].getPtr();
       stride = vertices[bufID].getStride();
       baseEntry = &vertex_buffer_tags[bufID];
+      topo = &topology[0];
     }
 
     foreach_unique(valid1,primID,[&](const vbool& valid1, const int primID) 
@@ -152,7 +166,7 @@ namespace embree
         {
           const size_t M = min(size_t(4),numFloats-j);
           isa::PatchEvalSimd<vbool,vint,vfloat,vfloat4>(baseEntry->at(interpolationSlot(primID,slot,stride)),parent->commitCounterSubdiv,
-                                                        getHalfEdge(primID),src+j*sizeof(float),stride,valid1,uu,vv,
+                                                        topo->getHalfEdge(primID),src+j*sizeof(float),stride,valid1,uu,vv,
                                                         P ? P+j*numUVs : nullptr,
                                                         dPdu ? dPdu+j*numUVs : nullptr,
                                                         dPdv ? dPdv+j*numUVs : nullptr,
@@ -166,7 +180,7 @@ namespace embree
         {
           const size_t M = min(size_t(8),numFloats-j);
           isa::PatchEvalSimd<vbool,vint,vfloat,vfloat8>(baseEntry->at(interpolationSlot(primID,slot,stride)),parent->commitCounterSubdiv,
-                                                        getHalfEdge(primID),src+j*sizeof(float),stride,valid1,uu,vv,
+                                                        topo->getHalfEdge(primID),src+j*sizeof(float),stride,valid1,uu,vv,
                                                         P ? P+j*numUVs : nullptr,
                                                         dPdu ? dPdu+j*numUVs : nullptr,
                                                         dPdv ? dPdv+j*numUVs : nullptr,
@@ -194,7 +208,7 @@ namespace embree
     {
       if (i+4 >= numUVs)
       {
-        vbool4 valid1 = vint4(i)+vint4(step) < vint4(numUVs);
+        vbool4 valid1 = vint4(int(i))+vint4(step) < vint4(numUVs);
         if (valid) valid1 &= vint4::loadu(&valid[i]) == vint4(-1);
         if (none(valid1)) { i+=4; continue; }
         interpolateHelper(valid1,vint4::loadu(&primIDs[i]),vfloat4::loadu(&u[i]),vfloat4::loadu(&v[i]),numUVs,buffer, 
@@ -209,7 +223,7 @@ namespace embree
       }
       else
       {
-        vbool8 valid1 = vint8(i)+vint8(step) < vint8(numUVs);
+        vbool8 valid1 = vint8(int(i))+vint8(step) < vint8(int(numUVs));
         if (valid) valid1 &= vint8::loadu(&valid[i]) == vint8(-1);
         if (none(valid1)) { i+=8; continue; }
         interpolateHelper(valid1,vint8::loadu(&primIDs[i]),vfloat8::loadu(&u[i]),vfloat8::loadu(&v[i]),numUVs,buffer, 

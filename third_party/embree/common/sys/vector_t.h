@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2017 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -20,48 +20,72 @@ namespace embree
     class vector_t
     {
     public:
-
+      typedef T value_type;
+      typedef T* iterator;
+      typedef const T* const_iterator;
+    
 #if defined(VECTOR_INIT_ALLOCATOR)
     template<typename M>
-    vector_t (M alloc) 
-      : alloc(alloc), size_active(0), size_alloced(0), items(nullptr) {}
+    __forceinline vector_t (M alloc) 
+    : alloc(alloc), size_active(0), size_alloced(0), items(nullptr) {}
 
     template<typename M>
-    vector_t (M alloc, size_t sz) 
-      : alloc(alloc), size_active(0), size_alloced(0), items(nullptr) { resize(sz); }
+    __forceinline vector_t (M alloc, size_t sz) 
+      : alloc(alloc), size_active(0), size_alloced(0), items(nullptr) { internal_resize_init(sz); }
 
 #else
-      vector_t () 
+      __forceinline vector_t () 
         : size_active(0), size_alloced(0), items(nullptr) {}
     
-      vector_t (size_t sz) 
-        : size_active(0), size_alloced(0), items(nullptr) { resize(sz); }
+      __forceinline explicit vector_t (size_t sz) 
+        : size_active(0), size_alloced(0), items(nullptr) { internal_resize_init(sz); }
 #endif
-
       
-      ~vector_t() {
+      __forceinline ~vector_t() {
         clear();
       }
-
-      vector_t (const vector_t& other)
+    
+      __forceinline vector_t (const vector_t& other)
       {
         size_active = other.size_active;
         size_alloced = other.size_alloced;
         items = alloc.allocate(size_alloced);
-        for (size_t i=0; i<size_active; i++) items[i] = other.items[i];
+        for (size_t i=0; i<size_active; i++) 
+          ::new (&items[i]) value_type(other.items[i]);
+      }
+    
+      __forceinline vector_t (vector_t&& other)
+        : alloc(std::move(other.alloc))
+      {
+        size_active = other.size_active; other.size_active = 0;
+        size_alloced = other.size_alloced; other.size_alloced = 0;
+        items = other.items; other.items = nullptr;
       }
 
-      vector_t& operator=(const vector_t& other) 
+      __forceinline vector_t& operator=(const vector_t& other) 
       {
         resize(other.size_active);
-        for (size_t i=0; i<size_active; i++) items[i] = other.items[i];
+        for (size_t i=0; i<size_active; i++) 
+          ::new (&items[i]) value_type(other.items[i]);
+        return *this;
+      }
+
+      __forceinline vector_t& operator=(vector_t&& other) 
+      {
+        alloc = std::move(other.alloc);
+        size_active = other.size_active; other.size_active = 0;
+        size_alloced = other.size_alloced; other.size_alloced = 0;
+        items = other.items; other.items = nullptr;
         return *this;
       }
 
       /********************** Iterators  ****************************/
+    
+      __forceinline       iterator begin()       { return items; };
+      __forceinline const_iterator begin() const { return items; };
 
-      __forceinline T* begin() const { return items; };
-      __forceinline T* end  () const { return items+size_active; };
+      __forceinline       iterator end  ()       { return items+size_active; };
+      __forceinline const_iterator end  () const { return items+size_active; };
 
 
       /********************** Capacity ****************************/
@@ -71,11 +95,11 @@ namespace embree
       __forceinline size_t capacity () const { return size_alloced; }
 
 
-      void resize(size_t new_size) {
+      __forceinline void resize(size_t new_size) {
         internal_resize(new_size,size_alloced < new_size ? new_size : size_alloced);
       }
 
-      void reserve(size_t new_alloced) 
+      __forceinline void reserve(size_t new_alloced) 
       {
         /* do nothing if container already large enough */
         if (new_alloced <= size_alloced) 
@@ -85,7 +109,7 @@ namespace embree
         internal_resize(size_active,new_alloced);
       }
 
-      void shrink_to_fit() {
+      __forceinline void shrink_to_fit() {
         internal_resize(size_active,size_active);
       }
 
@@ -110,51 +134,92 @@ namespace embree
       {
         const T v = nt; // need local copy as input reference could point to this vector
         internal_grow(size_active+1);
-        items[size_active++] = v;
+        ::new (&items[size_active++]) T(v);
       }
 
-      __forceinline void pop_back() {
+      __forceinline void pop_back() 
+      {
         assert(!empty());
         size_active--;
+        alloc.destroy(&items[size_active]);
       }
 
-      void clear() 
+      __forceinline void clear() 
       {
         /* destroy elements */
         for (size_t i=0; i<size_active; i++)
           alloc.destroy(&items[i]);
         
         /* free memory */
-        alloc.deallocate(items,size_alloced); items = nullptr;
+        alloc.deallocate(items,size_alloced); 
+        items = nullptr;
         size_active = size_alloced = 0;
       }
 
+    /******************** Comparisons **************************/
+    
+    friend bool operator== (const vector_t& a, const vector_t& b) 
+    {
+      if (a.size() != b.size()) return false;
+      for (size_t i=0; i<a.size(); i++)
+        if (a[i] != b[i])
+          return false;
+      return true;
+    }
+
+    friend bool operator!= (const vector_t& a, const vector_t& b) {
+      return !(a==b);
+    }
+
     private:
 
-      void internal_resize(size_t new_active, size_t new_alloced)
+      __forceinline void internal_resize_init(size_t new_active)
+      {
+        assert(size_active == 0); 
+        assert(size_alloced == 0);
+        assert(items == nullptr);
+        if (new_active == 0) return;
+        items = alloc.allocate(new_active);
+        for (size_t i=0; i<new_active; i++) ::new (&items[i]) T();
+        size_active = new_active;
+        size_alloced = new_active;
+      }
+
+      __forceinline void internal_resize(size_t new_active, size_t new_alloced)
       {
         assert(new_active <= new_alloced); 
 
         /* destroy elements */
-        for (size_t i=new_active; i<size_active; i++)
-          alloc.destroy(&items[i]);
-
-        size_t size_copy = new_active < size_active ? new_active : size_active;
-        size_active = new_active;
+        if (new_active < size_active) 
+        {
+          for (size_t i=new_active; i<size_active; i++)
+            alloc.destroy(&items[i]);
+          size_active = new_active;
+        }
 
         /* only reallocate if necessary */
-        if (new_alloced == size_alloced) 
+        if (new_alloced == size_alloced) {
+          for (size_t i=size_active; i<new_active; i++) ::new (&items[i]) T;
+          size_active = new_active;
           return;
-        
+        }
+
         /* reallocate and copy items */
         T* old_items = items;
         items = alloc.allocate(new_alloced);
-        for (size_t i=0; i<size_copy; i++) items[i] = old_items[i];
+        for (size_t i=0; i<size_active; i++) {
+          ::new (&items[i]) T(std::move(old_items[i]));
+          alloc.destroy(&old_items[i]);
+        }
+        for (size_t i=size_active; i<new_active; i++) {
+          ::new (&items[i]) T;
+        }
         alloc.deallocate(old_items,size_alloced);
+        size_active = new_active;
         size_alloced = new_alloced;
       }
 
-      void internal_grow(size_t new_alloced)
+      __forceinline void internal_grow(size_t new_alloced)
       {
         /* do nothing if container already large enough */
         if (new_alloced <= size_alloced) 

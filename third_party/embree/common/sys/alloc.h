@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2017 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -17,23 +17,21 @@
 #pragma once
 
 #include "platform.h"
+#include <vector>
 
 namespace embree
 {
-#define ALIGN_PTR(ptr,alignment) \
-  ((((size_t)ptr)+alignment-1)&((size_t)-(ssize_t)alignment))
-
 #define ALIGNED_STRUCT                                           \
   void* operator new(size_t size) { return alignedMalloc(size); }       \
   void operator delete(void* ptr) { alignedFree(ptr); }      \
   void* operator new[](size_t size) { return alignedMalloc(size); }  \
-  void operator delete[](void* ptr) { alignedFree(ptr); }    \
+  void operator delete[](void* ptr) { alignedFree(ptr); }
 
 #define ALIGNED_STRUCT_(align)                                           \
   void* operator new(size_t size) { return alignedMalloc(size,align); } \
   void operator delete(void* ptr) { alignedFree(ptr); }                 \
   void* operator new[](size_t size) { return alignedMalloc(size,align); } \
-  void operator delete[](void* ptr) { alignedFree(ptr); }               \
+  void operator delete[](void* ptr) { alignedFree(ptr); }
 
 #define ALIGNED_CLASS                                                \
   public:                                                            \
@@ -49,12 +47,6 @@ namespace embree
   void* alignedMalloc(size_t size, size_t align = 64);
   void alignedFree(void* ptr);
   
-  /*! alloca that returns aligned data */
-  template<class T>
-    __forceinline T* aligned_alloca(size_t elements, const size_t alignment = 64) {
-    return (T*)ALIGN_PTR(alloca(elements * sizeof(T) + alignment),alignment);
-  }
-
   /*! allocator that performs aligned allocations */
   template<typename T, size_t alignment = 64>
     struct aligned_allocator
@@ -85,11 +77,12 @@ namespace embree
     };
 
   /*! allocates pages directly from OS */
-  void* os_malloc (size_t bytes, const int additional_flags = 0);
+  void* os_malloc (size_t bytes);
   void* os_reserve(size_t bytes);
   void  os_commit (void* ptr, size_t bytes);
   size_t os_shrink (void* ptr, size_t bytesNew, size_t bytesOld);
   void  os_free   (void* ptr, size_t bytes);
+  void  os_advise (void* ptr, size_t bytes);
 
   /*! allocator that performs OS allocations */
   template<typename T>
@@ -118,6 +111,46 @@ namespace embree
       __forceinline void destroy( pointer p ) {
         p->~T();
       }
+    };
+
+  /*! allocator for IDs */
+  template<typename T>
+    struct IDPool
+    {
+      typedef T value_type;
+
+      IDPool ()
+      : nextID(0) {}
+
+      __forceinline T allocate() 
+      {
+        /* return ID from list */
+        if (IDs.size()) 
+        {
+          T id = IDs.back();
+          IDs.pop_back();
+          return id;
+        } 
+
+        /* allocate new ID */
+        else {
+          return nextID++;
+        }
+      }
+
+      __forceinline void deallocate( T id ) 
+      {
+        assert(id < nextID);
+        IDs.push_back(id);
+      }
+
+      __forceinline size_t size() const {
+        return nextID;
+      }
+
+    private:
+      std::vector<T> IDs;   //!< stores deallocated IDs to be reused
+      size_t nextID;        //!< next ID to use when IDs vector is empty
     };
 }
 

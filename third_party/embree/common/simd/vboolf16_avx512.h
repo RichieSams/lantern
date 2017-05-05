@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2017 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -27,7 +27,7 @@ namespace embree
     typedef vfloat16 Float;
 
     enum { size = 16 }; // number of SIMD elements
-    __mmask16 v;          // data
+    __mmask16 v;        // data
     
     ////////////////////////////////////////////////////////////////////////////////
     /// Constructors, Assignment & Cast Operators
@@ -37,26 +37,34 @@ namespace embree
     __forceinline vboolf(const vboolf16 &t) { v = t.v; }
     __forceinline vboolf16& operator=(const vboolf16 &f) { v = f.v; return *this; }
 
-    __forceinline vboolf(const __mmask &t) { v = t; }
-    __forceinline operator __mmask () const { return v; }
+    __forceinline vboolf(const __mmask16 &t) { v = t; }
+    __forceinline operator __mmask16 () const { return v; }
     
     __forceinline vboolf(bool b) { v = b ? 0xFFFF : 0x0000; }
-    __forceinline vboolf(int t ) { v = (__mmask)t; }
-    __forceinline vboolf(unsigned int t ) { v = (__mmask)t; }
+    __forceinline vboolf(int t ) { v = (__mmask16)t; }
+    __forceinline vboolf(unsigned int t ) { v = (__mmask16)t; }
 
     /* return int8 mask */
-    __forceinline __m128i mask8() const { 
-      const __m512i f = _mm512_set_1to16_epi32(0);
-      const __m512i t = _mm512_set_1to16_epi32(-1);
-      const __m512i m =  _mm512_mask_or_epi32(f,v,t,t); 
+    __forceinline __m128i mask8() const {
+#if defined(__AVX512BW__)
+      return _mm_movm_epi8(v);
+#else
+      const __m512i f = _mm512_set1_epi32(0);
+      const __m512i t = _mm512_set1_epi32(-1);
+      const __m512i m =  _mm512_mask_or_epi32(f,v,t,t);
       return _mm512_cvtepi32_epi8(m);
+#endif
     }
 
     /* return int32 mask */
-    __forceinline __m512i mask32() const { 
-      const __m512i f = _mm512_set_1to16_epi32(0);
-      const __m512i t = _mm512_set_1to16_epi32(-1);
-      return _mm512_mask_or_epi32(f,v,t,t); 
+    __forceinline __m512i mask32() const {
+#if defined(__AVX512DQ__)
+      return _mm512_movm_epi32(v);
+#else
+      const __m512i f = _mm512_set1_epi32(0);
+      const __m512i t = _mm512_set1_epi32(-1);
+      return _mm512_mask_or_epi32(f,v,t,t);
+#endif
     }
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -66,7 +74,13 @@ namespace embree
     __forceinline vboolf( FalseTy ) : v(0x0000) {}
     __forceinline vboolf( TrueTy  ) : v(0xffff) {}
 
-    static unsigned int shift1[32];
+    ////////////////////////////////////////////////////////////////////////////////
+    /// Array Access
+    ////////////////////////////////////////////////////////////////////////////////
+  
+    __forceinline bool operator []( const size_t index ) const { 
+      assert(index < 16); return (_mm512_mask2int(v) >> index) & 1;
+    }
   };
 
   ////////////////////////////////////////////////////////////////////////////////
@@ -112,12 +126,12 @@ namespace embree
   __forceinline int any (const vboolf16 &a) { return  _mm512_kortestz(a,a) == 0; }
   __forceinline int none(const vboolf16 &a) { return  _mm512_kortestz(a,a) != 0; }
 
-  __forceinline int all ( const vboolf16& valid, const vboolf16& b ) { return all(!valid | b); }
+  __forceinline int all ( const vboolf16& valid, const vboolf16& b ) { return all((!valid) | b); }
   __forceinline int any ( const vboolf16& valid, const vboolf16& b ) { return any( valid & b); }
   __forceinline int none( const vboolf16& valid, const vboolf16& b ) { return none(valid & b); }
   
   __forceinline size_t movemask( const vboolf16& a ) { return _mm512_kmov(a); }
-  __forceinline size_t popcnt  ( const vboolf16& a ) { return _mm_countbits_32(a.v); }
+  __forceinline size_t popcnt  ( const vboolf16& a ) { return __popcnt(a.v); }
   
   ////////////////////////////////////////////////////////////////////////////////
   /// Convertion Operations

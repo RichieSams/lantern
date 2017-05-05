@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2017 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -26,8 +26,11 @@ namespace embree
   /*! virtual interface for all hierarchy builders */
   class Builder : public RefCount {
   public:
+
+    static const size_t DEFAULT_SINGLE_THREAD_THRESHOLD = 1024;
+
     /*! initiates the hierarchy builder */
-    virtual void build(size_t threadIndex = 0, size_t threadCount = 0) = 0;
+    virtual void build() = 0;
 
     /*! notifies the builder about the deletion of some geometry */
     virtual void deleteGeometry(size_t geomID) {};
@@ -38,7 +41,7 @@ namespace embree
 
   /*! virtual interface for progress monitor class */
   struct BuildProgressMonitor {
-    virtual void operator() (size_t dn) = 0;
+    virtual void operator() (size_t dn) const = 0;
   };
 
   /*! build the progress monitor interface from a closure */
@@ -47,9 +50,9 @@ namespace embree
   {
   public:
     ProgressMonitorClosure (const Closure& closure) : closure(closure) {}
-    void operator() (size_t dn) { closure(dn); }
+    void operator() (size_t dn) const { closure(dn); }
   private:
-    const Closure& closure;
+    const Closure closure;
   };
   template<typename Closure> __forceinline const ProgressMonitorClosure<Closure> BuildProgressMonitorFromClosure(const Closure& closure) {
     return ProgressMonitorClosure<Closure>(closure);
@@ -57,8 +60,14 @@ namespace embree
 
   struct LineSegments;
   struct TriangleMesh;
+  struct QuadMesh;
+  class AccelSet;
+
   class Scene;
 
   typedef void (*createLineSegmentsAccelTy)(LineSegments* mesh, AccelData*& accel, Builder*& builder);
   typedef void (*createTriangleMeshAccelTy)(TriangleMesh* mesh, AccelData*& accel, Builder*& builder);
+  typedef void (*createQuadMeshAccelTy)(QuadMesh* mesh, AccelData*& accel, Builder*& builder);
+  typedef void (*createAccelSetAccelTy)(AccelSet* mesh, AccelData*& accel, Builder*& builder);
+
 }

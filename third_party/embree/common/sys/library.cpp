@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2017 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -72,7 +72,14 @@ namespace embree
     if (lib) return lib_t(lib);
     FileName executable = getExecutableFileName();
     lib = dlopen((executable.path() + fullName).c_str(),RTLD_NOW);
-    if (lib == nullptr) THROW_RUNTIME_ERROR(dlerror());
+    if (lib == nullptr) {
+      const char* error = dlerror();
+      if (error) { 
+        THROW_RUNTIME_ERROR(error);
+      } else {
+        THROW_RUNTIME_ERROR("could not load library "+executable.str());
+      }
+    }
     return lib_t(lib);
   }
 

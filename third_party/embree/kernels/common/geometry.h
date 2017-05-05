@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2017 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -39,9 +39,6 @@ namespace embree
     /*! Geometry destructor */
     virtual ~Geometry();
 
-    /*! writes geometry to disk */
-    virtual void write(std::ofstream& file);
-
     /*! updates intersection filter function counts in scene */
     void updateIntersectionFilters(bool enable);
 
@@ -80,6 +77,15 @@ namespace embree
     /*! returns number of primitives */
     __forceinline size_t size() const { return numPrimitives; }
 
+    /*! sets the number of primitives */
+    __forceinline void setNumPrimitives(size_t numPrimitives_in)
+    { 
+      if ((ssize_t)numPrimitives_in == -1) return;
+      if (numPrimitives_in == numPrimitives) return;
+      numPrimitives = numPrimitives_in;
+      numPrimitivesChanged = true;
+    }
+
     /*! for all geometries */
   public:
 
@@ -109,6 +115,12 @@ namespace embree
     /*! called if geometry is switching from enabled to disabled state */
     virtual void disabling() = 0;
 
+    /*! called before every build */
+    virtual void preCommit();
+
+    /*! called after every build */
+    virtual void postCommit();
+
     /*! sets constant tessellation rate for the geometry */
     virtual void setTessellationRate(float N) {
       throw_RTCError(RTC_INVALID_OPERATION,"operation not supported for this geometry"); 
@@ -133,7 +145,11 @@ namespace embree
 
     /*! for subdivision surfaces only */
   public:
-    virtual void setBoundaryMode (RTCBoundaryMode mode) {
+    virtual void setSubdivisionMode (unsigned topologyID, RTCSubdivisionMode mode) {
+      throw_RTCError(RTC_INVALID_OPERATION,"operation not supported for this geometry"); 
+    }
+
+    virtual void setIndexBuffer(RTCBufferType vertexBuffer, RTCBufferType indexBuffer) {
       throw_RTCError(RTC_INVALID_OPERATION,"operation not supported for this geometry"); 
     }
 
@@ -157,12 +173,17 @@ namespace embree
     }
 
     /*! Sets specified buffer. */
-    virtual void setBuffer(RTCBufferType type, void* ptr, size_t offset, size_t stride) { 
+    virtual void setBuffer(RTCBufferType type, void* ptr, size_t offset, size_t stride, size_t size) { 
       throw_RTCError(RTC_INVALID_OPERATION,"operation not supported for this geometry"); 
     }
 
     /*! Set displacement function. */
     virtual void setDisplacementFunction (RTCDisplacementFunc filter, RTCBounds* bounds) {
+      throw_RTCError(RTC_INVALID_OPERATION,"operation not supported for this geometry"); 
+    }
+
+    /*! Set displacement function. */
+    virtual void setDisplacementFunction2 (RTCDisplacementFunc2 filter, RTCBounds* bounds) {
       throw_RTCError(RTC_INVALID_OPERATION,"operation not supported for this geometry"); 
     }
 
@@ -178,6 +199,9 @@ namespace embree
     /*! Set intersection filter function for ray packets of size 16. */
     virtual void setIntersectionFilterFunction16 (RTCFilterFunc16 filter16, bool ispc = false);
 
+    /*! Set intersection filter function for ray packets of size N. */
+    virtual void setIntersectionFilterFunctionN (RTCFilterFuncN filterN);
+
     /*! Set occlusion filter function for single rays. */
     virtual void setOcclusionFilterFunction (RTCFilterFunc filter, bool ispc = false);
     
@@ -189,6 +213,9 @@ namespace embree
     
     /*! Set occlusion filter function for ray packets of size 16. */
     virtual void setOcclusionFilterFunction16 (RTCFilterFunc16 filter16, bool ispc = false);
+
+    /*! Set occlusion filter function for ray packets of size N. */
+    virtual void setOcclusionFilterFunctionN (RTCFilterFuncN filterN);
 
     /*! for instances only */
   public:
@@ -208,6 +235,11 @@ namespace embree
 
     /*! Set bounds function. */
     virtual void setBoundsFunction2 (RTCBoundsFunc2 bounds, void* userPtr) { 
+      throw_RTCError(RTC_INVALID_OPERATION,"operation not supported for this geometry"); 
+    }
+
+    /*! Set bounds function. */
+    virtual void setBoundsFunction3 (RTCBoundsFunc3 bounds, void* userPtr) { 
       throw_RTCError(RTC_INVALID_OPERATION,"operation not supported for this geometry"); 
     }
 
@@ -231,6 +263,16 @@ namespace embree
       throw_RTCError(RTC_INVALID_OPERATION,"operation not supported for this geometry"); 
     }
 
+    /*! Set intersect function for streams of single rays. */
+    virtual void setIntersectFunction1Mp (RTCIntersectFunc1Mp intersect) { 
+      throw_RTCError(RTC_INVALID_OPERATION,"operation not supported for this geometry"); 
+    }
+
+    /*! Set intersect function for ray packets of size N. */
+    virtual void setIntersectFunctionN (RTCIntersectFuncN intersect) { 
+      throw_RTCError(RTC_INVALID_OPERATION,"operation not supported for this geometry"); 
+    }
+    
     /*! Set occlusion function for single rays. */
     virtual void setOccludedFunction (RTCOccludedFunc occluded, bool ispc = false) { 
       throw_RTCError(RTC_INVALID_OPERATION,"operation not supported for this geometry"); 
@@ -251,24 +293,200 @@ namespace embree
       throw_RTCError(RTC_INVALID_OPERATION,"operation not supported for this geometry"); 
     }
 
+    /*! Set occlusion function for streams of single rays. */
+    virtual void setOccludedFunction1Mp (RTCOccludedFunc1Mp occluded) { 
+      throw_RTCError(RTC_INVALID_OPERATION,"operation not supported for this geometry"); 
+    }
+
+    /*! Set occlusion function for ray packets of size N. */
+    virtual void setOccludedFunctionN (RTCOccludedFuncN occluded) { 
+      throw_RTCError(RTC_INVALID_OPERATION,"operation not supported for this geometry"); 
+    }
+
+    /*! returns number of time segments */
+    __forceinline unsigned numTimeSegments () const {
+      return numTimeSteps-1;
+    }
+
   public:
-    __forceinline bool hasIntersectionFilter1() const { return intersectionFilter1 != nullptr; }
-    __forceinline bool hasOcclusionFilter1() const { return occlusionFilter1 != nullptr; }
+    __forceinline bool hasIntersectionFilter1() const { return (hasIntersectionFilterMask & (HAS_FILTER1 | HAS_FILTERN)) != 0;  }
+    __forceinline bool hasOcclusionFilter1   () const { return (hasOcclusionFilterMask    & (HAS_FILTER1 | HAS_FILTERN)) != 0; }
     template<typename simd> __forceinline bool hasIntersectionFilter() const;
     template<typename simd> __forceinline bool hasOcclusionFilter() const;
+
+    template<typename simd> __forceinline bool hasISPCIntersectionFilter() const;
+    template<typename simd> __forceinline bool hasISPCOcclusionFilter() const;
+
+  public:
+
+    /*! calculates the linear bounds of a primitive at the itimeGlobal'th time segment */
+    template<typename BoundsFunc>
+    __forceinline static LBBox3fa linearBounds(const BoundsFunc& bounds, size_t itimeGlobal, size_t numTimeStepsGlobal, size_t numTimeSteps)
+    {
+      if (numTimeStepsGlobal == numTimeSteps)
+      {
+        const BBox3fa bounds0 = bounds(itimeGlobal+0);
+        const BBox3fa bounds1 = bounds(itimeGlobal+1);
+
+        return LBBox3fa(bounds0, bounds1);
+      }
+
+      const int timeSegments = int(numTimeSteps-1);
+      const int timeSegmentsGlobal = int(numTimeStepsGlobal-1);
+      const float invTimeSegmentsGlobal = rcp(float(timeSegmentsGlobal));
+
+      const int itimeScaled = int(itimeGlobal) * timeSegments;
+
+      const int itime0 = itimeScaled / timeSegmentsGlobal;
+      const int rtime0 = itimeScaled % timeSegmentsGlobal;
+      const float ftime0 = float(rtime0) * invTimeSegmentsGlobal;
+      const int rtime1 = rtime0 + timeSegments;
+
+      if (rtime1 <= timeSegmentsGlobal)
+      {
+        const BBox3fa b0 = bounds(itime0+0);
+        const BBox3fa b1 = bounds(itime0+1);
+
+        const float ftime1 = float(rtime1) * invTimeSegmentsGlobal;
+
+        return LBBox3fa(lerp(b0, b1, ftime0), lerp(b0, b1, ftime1));
+      }
+
+      const BBox3fa b0 = bounds(itime0+0);
+      const BBox3fa b1 = bounds(itime0+1);
+      const BBox3fa b2 = bounds(itime0+2);
+
+      const float ftime1 = float(rtime1-timeSegmentsGlobal) * invTimeSegmentsGlobal;
+
+      BBox3fa bounds0 = lerp(b0, b1, ftime0);
+      BBox3fa bounds1 = lerp(b1, b2, ftime1);
+
+      const BBox3fa b1Lerp = lerp(bounds0, bounds1, float(timeSegmentsGlobal-rtime0) * rcp(float(timeSegments)));
+
+      bounds0.lower = min(bounds0.lower, bounds0.lower - (b1Lerp.lower - b1.lower));
+      bounds1.lower = min(bounds1.lower, bounds1.lower - (b1Lerp.lower - b1.lower));
+
+      bounds0.upper = max(bounds0.upper, bounds0.upper + (b1.upper - b1Lerp.upper));
+      bounds1.upper = max(bounds1.upper, bounds1.upper + (b1.upper - b1Lerp.upper));
+
+      return LBBox3fa(bounds0, bounds1);
+    }
+
+    /*! calculates the linear bounds of a primitive at the itimeGlobal'th time segment, if it's valid */
+    template<typename BoundsFunc>
+    __forceinline static bool linearBounds(const BoundsFunc& bounds, size_t itimeGlobal, size_t numTimeStepsGlobal, size_t numTimeSteps, LBBox3fa& lbbox)
+    {
+      if (numTimeStepsGlobal == numTimeSteps)
+      {
+        BBox3fa bounds0; if (unlikely(!bounds(itimeGlobal+0, bounds0))) return false;
+        BBox3fa bounds1; if (unlikely(!bounds(itimeGlobal+1, bounds1))) return false;
+
+        lbbox = LBBox3fa(bounds0, bounds1);
+        return true;
+      }
+
+      const int timeSegments = int(numTimeSteps-1);
+      const int timeSegmentsGlobal = int(numTimeStepsGlobal-1);
+      const float invTimeSegmentsGlobal = rcp(float(timeSegmentsGlobal));
+
+      const int itimeScaled = int(itimeGlobal) * timeSegments;
+
+      const int itime0 = itimeScaled / timeSegmentsGlobal;
+      const int rtime0 = itimeScaled % timeSegmentsGlobal;
+      const float ftime0 = float(rtime0) * invTimeSegmentsGlobal;
+      const int rtime1 = rtime0 + timeSegments;
+
+      if (rtime1 <= timeSegmentsGlobal)
+      { 
+        BBox3fa b0; if (unlikely(!bounds(itime0+0, b0))) return false;
+        BBox3fa b1; if (unlikely(!bounds(itime0+1, b1))) return false;
+
+        const float ftime1 = float(rtime1) * invTimeSegmentsGlobal;
+
+        lbbox = LBBox3fa(lerp(b0, b1, ftime0), lerp(b0, b1, ftime1));
+        return true;
+      }
+
+      BBox3fa b0; if (unlikely(!bounds(itime0+0, b0))) return false;
+      BBox3fa b1; if (unlikely(!bounds(itime0+1, b1))) return false;
+      BBox3fa b2; if (unlikely(!bounds(itime0+2, b2))) return false;
+
+      const float ftime1 = float(rtime1-timeSegmentsGlobal) * invTimeSegmentsGlobal;
+
+      BBox3fa bounds0 = lerp(b0, b1, ftime0);
+      BBox3fa bounds1 = lerp(b1, b2, ftime1);
+
+      const BBox3fa b1Lerp = lerp(bounds0, bounds1, float(timeSegmentsGlobal-rtime0) * rcp(float(timeSegments)));
+
+      bounds0.lower = min(bounds0.lower, bounds0.lower - (b1Lerp.lower - b1.lower));
+      bounds1.lower = min(bounds1.lower, bounds1.lower - (b1Lerp.lower - b1.lower));
+
+      bounds0.upper = max(bounds0.upper, bounds0.upper + (b1.upper - b1Lerp.upper));
+      bounds1.upper = max(bounds1.upper, bounds1.upper + (b1.upper - b1Lerp.upper));
+
+      lbbox = LBBox3fa(bounds0, bounds1);
+      return true;
+    }
+
+    /*! calculates the build bounds of a primitive at the itimeGlobal'th time segment, if it's valid */
+    template<typename BoundsFunc>
+    __forceinline static bool buildBounds(const BoundsFunc& bounds, size_t itimeGlobal, size_t numTimeStepsGlobal, size_t numTimeSteps, BBox3fa& bbox)
+    {
+      LBBox3fa lbbox;
+      if (!linearBounds(bounds, itimeGlobal, numTimeStepsGlobal, numTimeSteps, lbbox))
+        return false;
+
+      bbox = 0.5f * (lbbox.bounds0 + lbbox.bounds1);
+      return true;
+    }
+
+    /*! checks if a primitive is valid at the itimeGlobal'th time segment */
+    template<typename ValidFunc>
+    __forceinline static bool validLinearBounds(const ValidFunc& valid, size_t itimeGlobal, size_t numTimeStepsGlobal, size_t numTimeSteps)
+    {
+      if (numTimeStepsGlobal == numTimeSteps)
+      {
+        if (unlikely(!valid(itimeGlobal+0))) return false;
+        if (unlikely(!valid(itimeGlobal+1))) return false;
+        return true;
+      }
+
+      const int timeSegments = int(numTimeSteps-1);
+      const int timeSegmentsGlobal = int(numTimeStepsGlobal-1);
+
+      const int itimeScaled = int(itimeGlobal) * timeSegments;
+
+      const int itime0 = itimeScaled / timeSegmentsGlobal;
+      const int rtime0 = itimeScaled % timeSegmentsGlobal;
+      const int rtime1 = rtime0 + timeSegments;
+
+      if (rtime1 <= timeSegmentsGlobal)
+      {
+        if (unlikely(!valid(itime0+0))) return false;
+        if (unlikely(!valid(itime0+1))) return false;
+        return true;
+      }
+
+      if (unlikely(!valid(itime0+0))) return false;
+      if (unlikely(!valid(itime0+1))) return false;
+      if (unlikely(!valid(itime0+2))) return false;
+      return true;
+    }
 
   public:
     Scene* parent;             //!< pointer to scene this mesh belongs to
     unsigned id;               //!< internal geometry ID
     Type type;                 //!< geometry type 
-    ssize_t numPrimitives;     //!< number of primitives of this geometry
-    unsigned numTimeSteps;     //!< number of time steps (1 or 2)
+    size_t numPrimitives;      //!< number of primitives of this geometry
+    bool numPrimitivesChanged; //!< true if number of primitives changed
+    unsigned numTimeSteps;     //!< number of time steps
+    float fnumTimeSegments;    //!< number of time segments (precalculation)
     RTCGeometryFlags flags;    //!< flags of geometry
     bool enabled;              //!< true if geometry is enabled
     bool modified;             //!< true if geometry is modified
     void* userPtr;             //!< user pointer
     unsigned mask;             //!< for masking out geometry
-    atomic_t used;             //!< counts by how many enabled instances this geometry is used
+    std::atomic<size_t> used;  //!< counts by how many enabled instances this geometry is used
     
   public:
     RTCFilterFunc intersectionFilter1;
@@ -283,28 +501,53 @@ namespace embree
     RTCFilterFunc16 intersectionFilter16;
     RTCFilterFunc16 occlusionFilter16;
 
-    bool ispcIntersectionFilter4;	
-    bool ispcOcclusionFilter4;
+    RTCFilterFuncN intersectionFilterN;
+    RTCFilterFuncN occlusionFilterN;
 
-    bool ispcIntersectionFilter8;
-    bool ispcOcclusionFilter8;
-
-    bool ispcIntersectionFilter16;
-    bool ispcOcclusionFilter16;
+  public: 
+    enum { HAS_FILTER1 = 1, HAS_FILTER4 = 2, HAS_FILTER8 = 4, HAS_FILTER16 = 8, HAS_FILTERN = 16 };  
+    int hasIntersectionFilterMask;
+    int hasOcclusionFilterMask;
+    int ispcIntersectionFilterMask;
+    int ispcOcclusionFilterMask;
   };
 
 #if defined(__SSE__)
-  template<> __forceinline bool Geometry::hasIntersectionFilter<vfloat4>() const { return intersectionFilter4 != nullptr; }
-  template<> __forceinline bool Geometry::hasOcclusionFilter   <vfloat4>() const { return occlusionFilter4    != nullptr; }
+  template<> __forceinline bool Geometry::hasIntersectionFilter<vfloat4>() const { return (hasIntersectionFilterMask & (HAS_FILTER4 | HAS_FILTERN)) != 0; }
+  template<> __forceinline bool Geometry::hasOcclusionFilter   <vfloat4>() const { return (hasOcclusionFilterMask    & (HAS_FILTER4 | HAS_FILTERN)) != 0; }
+  template<> __forceinline bool Geometry::hasISPCIntersectionFilter<vfloat4>() const { return (ispcIntersectionFilterMask & HAS_FILTER4) != 0; }
+  template<> __forceinline bool Geometry::hasISPCOcclusionFilter   <vfloat4>() const { return (ispcOcclusionFilterMask    & HAS_FILTER4) != 0; }
 #endif
 
 #if defined(__AVX__)
-  template<> __forceinline bool Geometry::hasIntersectionFilter<vfloat8>() const { return intersectionFilter8 != nullptr; }
-  template<> __forceinline bool Geometry::hasOcclusionFilter   <vfloat8>() const { return occlusionFilter8    != nullptr; }
+  template<> __forceinline bool Geometry::hasIntersectionFilter<vfloat8>() const { return (hasIntersectionFilterMask & (HAS_FILTER8 | HAS_FILTERN)) != 0; }
+  template<> __forceinline bool Geometry::hasOcclusionFilter   <vfloat8>() const { return (hasOcclusionFilterMask    & (HAS_FILTER8 | HAS_FILTERN)) != 0; }
+  template<> __forceinline bool Geometry::hasISPCIntersectionFilter<vfloat8>() const { return (ispcIntersectionFilterMask & HAS_FILTER8) != 0; }
+  template<> __forceinline bool Geometry::hasISPCOcclusionFilter   <vfloat8>() const { return (ispcOcclusionFilterMask    & HAS_FILTER8) != 0; }
 #endif
 
-#if defined(__MIC__) || defined(__AVX512F__)
-  template<> __forceinline bool Geometry::hasIntersectionFilter<vfloat16>() const { return intersectionFilter16 != nullptr; }
-  template<> __forceinline bool Geometry::hasOcclusionFilter   <vfloat16>() const { return occlusionFilter16    != nullptr; }
+#if defined(__AVX512F__)
+  template<> __forceinline bool Geometry::hasIntersectionFilter<vfloat16>() const { return (hasIntersectionFilterMask & (HAS_FILTER16 | HAS_FILTERN)) != 0; }
+  template<> __forceinline bool Geometry::hasOcclusionFilter   <vfloat16>() const { return (hasOcclusionFilterMask    & (HAS_FILTER16 | HAS_FILTERN)) != 0; }
+  template<> __forceinline bool Geometry::hasISPCIntersectionFilter<vfloat16>() const { return (ispcIntersectionFilterMask & HAS_FILTER16) != 0; }
+  template<> __forceinline bool Geometry::hasISPCOcclusionFilter   <vfloat16>() const { return (ispcOcclusionFilterMask    & HAS_FILTER16) != 0; }
 #endif
+
+  /* calculate time segment itime and fractional time ftime */
+  __forceinline int getTimeSegment(float time, float numTimeSegments, float& ftime)
+  {
+    const float timeScaled = time * numTimeSegments;
+    const float itimef = clamp(floor(timeScaled), 0.0f, numTimeSegments-1.0f);
+    ftime = timeScaled - itimef;
+    return int(itimef);
+  }
+
+  template<int N>
+  __forceinline vint<N> getTimeSegment(const vfloat<N>& time, const vfloat<N>& numTimeSegments, vfloat<N>& ftime)
+  {
+    const vfloat<N> timeScaled = time * numTimeSegments;
+    const vfloat<N> itimef = clamp(floor(timeScaled), vfloat<N>(zero), numTimeSegments-1.0f);
+    ftime = timeScaled - itimef;
+    return vint<N>(itimef);
+  }
 }

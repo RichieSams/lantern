@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2017 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -20,6 +20,24 @@
 
 namespace embree
 {
+  class IOStreamStateRestorer 
+  {
+  public:
+    IOStreamStateRestorer(std::ostream& iostream)
+      : iostream(iostream), flags(iostream.flags()), precision(iostream.precision()) {
+    }
+
+    ~IOStreamStateRestorer() {
+      iostream.flags(flags);
+      iostream.precision(precision);
+    }
+    
+  private:
+    std::ostream& iostream;
+    std::ios::fmtflags flags;
+    std::streamsize precision;
+  };
+
   std::string toLowerCase(const std::string& s);
   std::string toUpperCase(const std::string& s);
 }

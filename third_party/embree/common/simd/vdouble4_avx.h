@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2017 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -18,13 +18,15 @@
 
 namespace embree
 { 
-#if defined(__AVX__) && defined(__X86_64__)
-
+#ifndef _MM_SHUF_PERM2
 #define _MM_SHUF_PERM2(e3, e2, e1, e0) \
   ((int)(((e3)<<3) | ((e2)<<2) | ((e1)<<1) | (e0)))
+#endif
 
+#ifndef _MM_SHUF_PERM3
 #define _MM_SHUF_PERM3(e1, e0) \
   ((int)(((e1)<<4) | (e0)))
+#endif
 
   /* 4-wide AVX 64bit double type */
   template<>
@@ -33,7 +35,7 @@ namespace embree
     typedef vboold4 Bool;
 
     enum  { size = 4 }; // number of SIMD elements
-    union {              // data
+    union {             // data
       __m256d v; 
       double i[4]; 
     };
@@ -177,39 +179,69 @@ namespace embree
   /// Comparison Operators + Select
   ////////////////////////////////////////////////////////////////////////////////
 
-  __forceinline const vboold4 operator ==( const vdouble4& a, const vdouble4& b ) { return _mm256_cmp_pd(a,b,_CMP_EQ_UQ); }
+#if defined(__AVX512VL__)
+  __forceinline const vboold4 operator ==( const vdouble4& a, const vdouble4& b ) { return _mm256_cmp_pd_mask(a,b,_MM_CMPINT_EQ); }
+  __forceinline const vboold4 operator !=( const vdouble4& a, const vdouble4& b ) { return _mm256_cmp_pd_mask(a,b,_MM_CMPINT_NE); }
+  __forceinline const vboold4 operator < ( const vdouble4& a, const vdouble4& b ) { return _mm256_cmp_pd_mask(a,b,_MM_CMPINT_LT); }
+  __forceinline const vboold4 operator >=( const vdouble4& a, const vdouble4& b ) { return _mm256_cmp_pd_mask(a,b,_MM_CMPINT_GE); }
+  __forceinline const vboold4 operator > ( const vdouble4& a, const vdouble4& b ) { return _mm256_cmp_pd_mask(a,b,_MM_CMPINT_GT); }
+  __forceinline const vboold4 operator <=( const vdouble4& a, const vdouble4& b ) { return _mm256_cmp_pd_mask(a,b,_MM_CMPINT_LE); }
+#else
+  __forceinline const vboold4 operator ==( const vdouble4& a, const vdouble4& b ) { return _mm256_cmp_pd(a,b,_CMP_EQ_UQ);  }
+  __forceinline const vboold4 operator !=( const vdouble4& a, const vdouble4& b ) { return _mm256_cmp_pd(a,b,_CMP_NEQ_UQ); }
+  __forceinline const vboold4 operator < ( const vdouble4& a, const vdouble4& b ) { return _mm256_cmp_pd(a,b,_CMP_LT_OQ);  }
+  __forceinline const vboold4 operator >=( const vdouble4& a, const vdouble4& b ) { return _mm256_cmp_pd(a,b,_CMP_GE_OQ);  }
+  __forceinline const vboold4 operator > ( const vdouble4& a, const vdouble4& b ) { return _mm256_cmp_pd(a,b,_CMP_GT_OQ);  }
+  __forceinline const vboold4 operator <=( const vdouble4& a, const vdouble4& b ) { return _mm256_cmp_pd(a,b,_CMP_LE_OQ);  }
+#endif
+
   __forceinline const vboold4 operator ==( const vdouble4& a, const double b    ) { return a == vdouble4(b); }
   __forceinline const vboold4 operator ==( const double    a, const vdouble4& b ) { return vdouble4(a) == b; }
-  
-  __forceinline const vboold4 operator !=( const vdouble4& a, const vdouble4& b ) { return _mm256_cmp_pd(a,b,_CMP_NEQ_UQ); }
+
   __forceinline const vboold4 operator !=( const vdouble4& a, const double b    ) { return a != vdouble4(b); }
   __forceinline const vboold4 operator !=( const double    a, const vdouble4& b ) { return vdouble4(a) != b; }
-  
-  __forceinline const vboold4 operator < ( const vdouble4& a, const vdouble4& b ) { return _mm256_cmp_pd(a,b,_CMP_LT_OQ); }
+
   __forceinline const vboold4 operator < ( const vdouble4& a, const double b    ) { return a <  vdouble4(b); }
   __forceinline const vboold4 operator < ( const double    a, const vdouble4& b ) { return vdouble4(a) <  b; }
-  
-  __forceinline const vboold4 operator >=( const vdouble4& a, const vdouble4& b ) { return _mm256_cmp_pd(a,b,_CMP_GE_OQ); }
+
   __forceinline const vboold4 operator >=( const vdouble4& a, const double b    ) { return a >= vdouble4(b); }
   __forceinline const vboold4 operator >=( const double    a, const vdouble4& b ) { return vdouble4(a) >= b; }
 
-  __forceinline const vboold4 operator > ( const vdouble4& a, const vdouble4& b ) { return _mm256_cmp_pd(a,b,_CMP_GT_OQ); }
   __forceinline const vboold4 operator > ( const vdouble4& a, const double b    ) { return a >  vdouble4(b); }
   __forceinline const vboold4 operator > ( const double    a, const vdouble4& b ) { return vdouble4(a) >  b; }
 
-  __forceinline const vboold4 operator <=( const vdouble4& a, const vdouble4& b ) { return _mm256_cmp_pd(a,b,_CMP_LE_OQ); }
   __forceinline const vboold4 operator <=( const vdouble4& a, const double b    ) { return a <= vdouble4(b); }
   __forceinline const vboold4 operator <=( const double    a, const vdouble4& b ) { return vdouble4(a) <= b; }
 
-  __forceinline vboold4 eq(const vdouble4& a, const vdouble4& b) { return _mm256_cmp_pd(a,b,_CMP_EQ_UQ); }
-  __forceinline vboold4 ne(const vdouble4& a, const vdouble4& b) { return _mm256_cmp_pd(a,b,_CMP_NEQ_UQ); }
-  __forceinline vboold4 lt(const vdouble4& a, const vdouble4& b) { return _mm256_cmp_pd(a,b,_CMP_LT_OQ); }
-  __forceinline vboold4 ge(const vdouble4& a, const vdouble4& b) { return _mm256_cmp_pd(a,b,_CMP_GE_OQ); }
-  __forceinline vboold4 gt(const vdouble4& a, const vdouble4& b) { return _mm256_cmp_pd(a,b,_CMP_GT_OQ); }
-  __forceinline vboold4 le(const vdouble4& a, const vdouble4& b) { return _mm256_cmp_pd(a,b,_CMP_LE_OQ); }
+  __forceinline vboold4 eq(const vdouble4& a, const vdouble4& b) { return a == b; }
+  __forceinline vboold4 ne(const vdouble4& a, const vdouble4& b) { return a != b; }
+  __forceinline vboold4 lt(const vdouble4& a, const vdouble4& b) { return a <  b; }
+  __forceinline vboold4 ge(const vdouble4& a, const vdouble4& b) { return a >= b; }
+  __forceinline vboold4 gt(const vdouble4& a, const vdouble4& b) { return a >  b; }
+  __forceinline vboold4 le(const vdouble4& a, const vdouble4& b) { return a <= b; }
+
+#if defined(__AVX512VL__)
+  __forceinline vboold4 eq(const vboold4& mask, const vdouble4& a, const vdouble4& b) { return _mm256_mask_cmp_pd_mask(mask, a, b, _MM_CMPINT_EQ); }
+  __forceinline vboold4 ne(const vboold4& mask, const vdouble4& a, const vdouble4& b) { return _mm256_mask_cmp_pd_mask(mask, a, b, _MM_CMPINT_NE); }
+  __forceinline vboold4 lt(const vboold4& mask, const vdouble4& a, const vdouble4& b) { return _mm256_mask_cmp_pd_mask(mask, a, b, _MM_CMPINT_LT); }
+  __forceinline vboold4 ge(const vboold4& mask, const vdouble4& a, const vdouble4& b) { return _mm256_mask_cmp_pd_mask(mask, a, b, _MM_CMPINT_GE); }
+  __forceinline vboold4 gt(const vboold4& mask, const vdouble4& a, const vdouble4& b) { return _mm256_mask_cmp_pd_mask(mask, a, b, _MM_CMPINT_GT); }
+  __forceinline vboold4 le(const vboold4& mask, const vdouble4& a, const vdouble4& b) { return _mm256_mask_cmp_pd_mask(mask, a, b, _MM_CMPINT_LE); }
+#else
+  __forceinline vboold4 eq(const vboold4& mask, const vdouble4& a, const vdouble4& b) { return mask & (a == b); }
+  __forceinline vboold4 ne(const vboold4& mask, const vdouble4& a, const vdouble4& b) { return mask & (a != b); }
+  __forceinline vboold4 lt(const vboold4& mask, const vdouble4& a, const vdouble4& b) { return mask & (a <  b); }
+  __forceinline vboold4 ge(const vboold4& mask, const vdouble4& a, const vdouble4& b) { return mask & (a >= b); }
+  __forceinline vboold4 gt(const vboold4& mask, const vdouble4& a, const vdouble4& b) { return mask & (a >  b); }
+  __forceinline vboold4 le(const vboold4& mask, const vdouble4& a, const vdouble4& b) { return mask & (a <= b); }
+#endif
  
   __forceinline const vdouble4 select( const vboold4& m, const vdouble4& t, const vdouble4& f ) {
+#if defined(__AVX512VL__)
+    return _mm256_mask_blend_pd(m, f, t);
+#else
     return _mm256_blendv_pd(f, t, m);
+#endif
   }
 
   __forceinline void xchg(const vboold4& m, vdouble4& a, vdouble4& b) {
@@ -217,7 +249,11 @@ namespace embree
   }
 
   __forceinline vboold4 test(const vdouble4& a, const vdouble4& b) {
+#if defined(__AVX512VL__)
+    return _mm256_test_epi64_mask(_mm256_castpd_si256(a),_mm256_castpd_si256(b));
+#else
     return _mm256_testz_si256(_mm256_castpd_si256(a),_mm256_castpd_si256(b));
+#endif
   }
 
   ////////////////////////////////////////////////////////////////////////////////
@@ -275,5 +311,4 @@ namespace embree
     cout << ">";
     return cout;
   }
-#endif
 }

@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2017 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -51,6 +51,11 @@ namespace embree
     __forceinline vboolf( int mask ) {
       assert(mask >= 0 && mask < 16);
       v = _mm_lookupmask_ps[mask];
+    }
+
+    /* return int32 mask */
+    __forceinline __m128i mask32() const { 
+      return _mm_castps_si128(v);
     }
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -120,6 +125,10 @@ namespace embree
     return _mm_shuffle_ps(a, b, _MM_SHUFFLE(i3, i2, i1, i0));
   }
 
+  template<size_t i0> __forceinline const vboolf4 shuffle( const vboolf4& b ) {
+    return shuffle<i0,i0,i0,i0>(b);
+  }
+
 #if defined(__SSE3__)
   template<> __forceinline const vboolf4 shuffle<0, 0, 2, 2>( const vboolf4& a ) { return _mm_moveldup_ps(a); }
   template<> __forceinline const vboolf4 shuffle<1, 1, 3, 3>( const vboolf4& a ) { return _mm_movehdup_ps(a); }
@@ -143,7 +152,7 @@ namespace embree
   __forceinline bool any       ( const vboolf4& b ) { return _mm_movemask_ps(b) != 0x0; }
   __forceinline bool none      ( const vboolf4& b ) { return _mm_movemask_ps(b) == 0x0; }
 
-  __forceinline bool all       ( const vboolf4& valid, const vboolf4& b ) { return all(!valid | b); }
+  __forceinline bool all       ( const vboolf4& valid, const vboolf4& b ) { return all((!valid) | b); }
   __forceinline bool any       ( const vboolf4& valid, const vboolf4& b ) { return any( valid & b); }
   __forceinline bool none      ( const vboolf4& valid, const vboolf4& b ) { return none(valid & b); }
   

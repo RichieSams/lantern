@@ -27,6 +27,14 @@ inline bool any(float3a &a) {
 
 float3a RotateToWorld(float x, float y, float z, float3a &normal);
 
+inline float3a reflect(const float3a &V, const float3a &N) {
+	return 2.0f * dot(V, N) * N - V;
+}
+
+inline float3a refract(const float3a &V, const float3a &N, float VdotN, float eta, float sinSquaredThetaT) {
+	return (eta * VdotN - sqrtf(1.0f - sinSquaredThetaT)) * N - eta * V;
+}
+
 inline float SinSquaredThetaT(float VdotN, float eta) {
 	return eta * eta * (1 - VdotN * VdotN);
 }

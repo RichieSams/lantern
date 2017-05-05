@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2017 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -71,6 +71,16 @@ namespace embree
       return _mm256_broadcast_ss((float*)a); 
     }
 
+    static __forceinline vfloat8 broadcast2( const float* const a, const float* const b ) {
+#if defined(__INTEL_COMPILER)
+      const vfloat8 v0 = _mm256_broadcast_ss(a); 
+      const vfloat8 v1 = _mm256_broadcast_ss(b); 
+      return _mm256_blend_ps(v1, v0, 0xf);
+#else
+      return _mm256_set_ps(*b,*b,*b,*b,*a,*a,*a,*a);
+#endif
+    }
+
     static __forceinline const vfloat8 broadcast4f(const vfloat4* ptr) { 
       return _mm256_broadcast_ps((__m128*)ptr); 
     }
@@ -83,36 +93,27 @@ namespace embree
 #endif
     }
       
-    static __forceinline vfloat8 load( const float* const a) {
-      return _mm256_load_ps(a); 
-    }
-    
-    static __forceinline void store(void* ptr, const vfloat8& f ) {
-      return _mm256_store_ps((float*)ptr,f);
-    }
+    static __forceinline vfloat8 load ( const void* const ptr) { return _mm256_load_ps((float*)ptr); }
+    static __forceinline vfloat8 loadu( const void* const ptr) { return _mm256_loadu_ps((float*)ptr); }
 
-    static __forceinline vfloat8 loadu( const void* const a) {
-      return _mm256_loadu_ps((float*)a); 
-    }
+    static __forceinline void store ( void* ptr, const vfloat8& v) { return _mm256_store_ps((float*)ptr,v); }
+    static __forceinline void storeu( void* ptr, const vfloat8& v) { return _mm256_storeu_ps((float*)ptr,v); }
 
-    static __forceinline vfloat8 loadu( const vbool8& mask, const void* const a) {
-      // FIXME: use mask on AVX512VL
-      return _mm256_loadu_ps((float*)a); 
-    }
-    
-    static __forceinline void storeu(void* ptr, const vfloat8& f ) {
-      return _mm256_storeu_ps((float*)ptr,f);
-    }
+#if defined(__AVX512VL__)
+    static __forceinline vfloat8 load ( const vboolf8& mask, const void* const ptr) { return _mm256_mask_load_ps (_mm256_setzero_ps(),mask,(float*)ptr); }
+    static __forceinline vfloat8 loadu( const vboolf8& mask, const void* const ptr) { return _mm256_mask_loadu_ps(_mm256_setzero_ps(),mask,(float*)ptr); }
 
-    static __forceinline void store( const vboolf8& mask, void* ptr, const vfloat8& f ) {
-      return _mm256_maskstore_ps((float*)ptr,(__m256i)mask,f);
-    }
+    static __forceinline void store ( const vboolf8& mask, void* ptr, const vfloat8& v) { _mm256_mask_store_ps ((float*)ptr,mask,v); }
+    static __forceinline void storeu( const vboolf8& mask, void* ptr, const vfloat8& v) { _mm256_mask_storeu_ps((float*)ptr,mask,v); }
+#else
+    static __forceinline vfloat8 load ( const vboolf8& mask, const void* const ptr) { return _mm256_maskload_ps((float*)ptr,(__m256i)mask); }
+    static __forceinline vfloat8 loadu( const vboolf8& mask, const void* const ptr) { return _mm256_maskload_ps((float*)ptr,(__m256i)mask); }
+
+    static __forceinline void store ( const vboolf8& mask, void* ptr, const vfloat8& v) { _mm256_maskstore_ps((float*)ptr,(__m256i)mask,v); }
+    static __forceinline void storeu( const vboolf8& mask, void* ptr, const vfloat8& v) { _mm256_maskstore_ps((float*)ptr,(__m256i)mask,v); }
+#endif
     
-    static __forceinline void storeu( const vboolf8& mask, void* ptr, const vfloat8& f ) {
-      return _mm256_storeu_ps((float*)ptr,_mm256_blendv_ps(_mm256_loadu_ps((float*)ptr),f,mask));
-    }
-    
-#if defined (__AVX2__)
+#if defined(__AVX2__)
     static __forceinline vfloat8 load_nt(void* ptr) {
       return _mm256_castsi256_ps(_mm256_stream_load_si256((__m256i*)ptr));
     }
@@ -122,8 +123,12 @@ namespace embree
       _mm256_stream_ps((float*)ptr,v);
     }
 
-    static __forceinline void store ( const vboolf8& mask, void* ptr, const vint8& ofs, const vfloat8& v, const int scale = 1 )
+    template<int scale>
+      static __forceinline void scatter(const vboolf8& mask, void* ptr, const vint8& ofs, const vfloat8& v)
     {
+#if defined(__AVX512VL__)
+      _mm256_mask_i32scatter_ps(ptr,mask,ofs,v,scale);
+#else
       if (likely(mask[0])) *(float*)(((char*)ptr)+scale*ofs[0]) = v[0];
       if (likely(mask[1])) *(float*)(((char*)ptr)+scale*ofs[1]) = v[1];
       if (likely(mask[2])) *(float*)(((char*)ptr)+scale*ofs[2]) = v[2];
@@ -132,12 +137,14 @@ namespace embree
       if (likely(mask[5])) *(float*)(((char*)ptr)+scale*ofs[5]) = v[5];
       if (likely(mask[6])) *(float*)(((char*)ptr)+scale*ofs[6]) = v[6];
       if (likely(mask[7])) *(float*)(((char*)ptr)+scale*ofs[7]) = v[7];
+#endif
     }
-    static __forceinline void store ( const vboolf8& mask, char* ptr, const vint8& ofs, const vfloat8& v ) {
-      store(mask,ptr,ofs,v,1);
+
+    static __forceinline void store(const vboolf8& mask, char* ptr, const vint8& ofs, const vfloat8& v) {
+      scatter<1>(mask,ptr,ofs,v);
     }
-    static __forceinline void store ( const vboolf8& mask, float* ptr, const vint8& ofs, const vfloat8& v ) {
-      store(mask,ptr,ofs,v,4);
+    static __forceinline void store(const vboolf8& mask, float* ptr, const vint8& ofs, const vfloat8& v) {
+      scatter<4>(mask,ptr,ofs,v);
     }
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -168,8 +175,14 @@ namespace embree
   __forceinline const vfloat8 signmsk ( const vfloat8& a ) { return _mm256_and_ps(a.v,_mm256_castsi256_ps(_mm256_set1_epi32(0x80000000))); }
 
 
-  __forceinline const vfloat8 rcp  ( const vfloat8& a ) {
-    const vfloat8 r   = _mm256_rcp_ps(a.v);
+  __forceinline const vfloat8 rcp(const vfloat8& a)
+  {
+#if defined(__AVX512VL__)
+    const vfloat8 r = _mm256_rcp14_ps(a.v);
+#else
+    const vfloat8 r = _mm256_rcp_ps(a.v);
+#endif
+
 #if defined(__AVX2__)
     return _mm256_mul_ps(r,_mm256_fnmadd_ps(r, a, vfloat8(2.0f)));
 #else
@@ -178,9 +191,22 @@ namespace embree
   }
   __forceinline const vfloat8 sqr  ( const vfloat8& a ) { return _mm256_mul_ps(a,a); }
   __forceinline const vfloat8 sqrt ( const vfloat8& a ) { return _mm256_sqrt_ps(a.v); }
-  __forceinline const vfloat8 rsqrt( const vfloat8& a ) {
+
+  __forceinline const vfloat8 rsqrt( const vfloat8& a )
+  {
+#if defined(__AVX512VL__)
+    const vfloat8 r = _mm256_rsqrt14_ps(a.v);
+#else
     const vfloat8 r = _mm256_rsqrt_ps(a.v);
-    return _mm256_add_ps(_mm256_mul_ps(_mm256_set1_ps(1.5f), r), _mm256_mul_ps(_mm256_mul_ps(_mm256_mul_ps(a, _mm256_set1_ps(-0.5f)), r), _mm256_mul_ps(r, r))); 
+#endif
+
+#if defined(__AVX2__)
+    return _mm256_fmadd_ps(_mm256_set1_ps(1.5f), r,
+                           _mm256_mul_ps(_mm256_mul_ps(_mm256_mul_ps(a, _mm256_set1_ps(-0.5f)), r), _mm256_mul_ps(r, r))); 
+#else
+    return _mm256_add_ps(_mm256_mul_ps(_mm256_set1_ps(1.5f), r),
+                         _mm256_mul_ps(_mm256_mul_ps(_mm256_mul_ps(a, _mm256_set1_ps(-0.5f)), r), _mm256_mul_ps(r, r)));
+#endif
   }
 
   ////////////////////////////////////////////////////////////////////////////////
@@ -217,6 +243,7 @@ namespace embree
   __forceinline const vfloat8 max( const float    a, const vfloat8& b ) { return _mm256_max_ps(vfloat8(a), b.v); }
 
 #if defined (__AVX2__)
+
     __forceinline vfloat8 mini(const vfloat8& a, const vfloat8& b) {
       const vint8 ai = _mm256_castps_si256(a);
       const vint8 bi = _mm256_castps_si256(b);
@@ -229,6 +256,20 @@ namespace embree
       const vint8 ci = _mm256_max_epi32(ai,bi);
       return _mm256_castsi256_ps(ci);
     }
+
+    __forceinline vfloat8 minui(const vfloat8& a, const vfloat8& b) {
+      const vint8 ai = _mm256_castps_si256(a);
+      const vint8 bi = _mm256_castps_si256(b);
+      const vint8 ci = _mm256_min_epu32(ai,bi);
+      return _mm256_castsi256_ps(ci);
+    }
+    __forceinline vfloat8 maxui(const vfloat8& a, const vfloat8& b) {
+      const vint8 ai = _mm256_castps_si256(a);
+      const vint8 bi = _mm256_castps_si256(b);
+      const vint8 ci = _mm256_max_epu32(ai,bi);
+      return _mm256_castsi256_ps(ci);
+    }
+
 #else
     __forceinline vfloat8 mini(const vfloat8& a, const vfloat8& b) {
       return min(a,b);
@@ -274,50 +315,78 @@ namespace embree
   /// Comparison Operators + Select
   ////////////////////////////////////////////////////////////////////////////////
 
-  __forceinline const vboolf8 operator ==( const vfloat8& a, const vfloat8& b ) { return _mm256_cmp_ps(a.v, b.v, _CMP_EQ_OQ ); }
-  __forceinline const vboolf8 operator ==( const vfloat8& a, const float    b ) { return _mm256_cmp_ps(a.v, vfloat8(b), _CMP_EQ_OQ ); }
-  __forceinline const vboolf8 operator ==( const float    a, const vfloat8& b ) { return _mm256_cmp_ps(vfloat8(a), b.v, _CMP_EQ_OQ ); }
+#if defined(__AVX512VL__)
+  __forceinline const vboolf8 operator ==( const vfloat8& a, const vfloat8& b ) { return _mm256_cmp_ps_mask(a, b, _MM_CMPINT_EQ); }
+  __forceinline const vboolf8 operator !=( const vfloat8& a, const vfloat8& b ) { return _mm256_cmp_ps_mask(a, b, _MM_CMPINT_NE); }
+  __forceinline const vboolf8 operator < ( const vfloat8& a, const vfloat8& b ) { return _mm256_cmp_ps_mask(a, b, _MM_CMPINT_LT); }
+  __forceinline const vboolf8 operator >=( const vfloat8& a, const vfloat8& b ) { return _mm256_cmp_ps_mask(a, b, _MM_CMPINT_GE); }
+  __forceinline const vboolf8 operator > ( const vfloat8& a, const vfloat8& b ) { return _mm256_cmp_ps_mask(a, b, _MM_CMPINT_GT); }
+  __forceinline const vboolf8 operator <=( const vfloat8& a, const vfloat8& b ) { return _mm256_cmp_ps_mask(a, b, _MM_CMPINT_LE); }
 
-  __forceinline const vboolf8 operator !=( const vfloat8& a, const vfloat8& b ) { return _mm256_cmp_ps(a.v, b.v, _CMP_NEQ_OQ); }
-  __forceinline const vboolf8 operator !=( const vfloat8& a, const float    b ) { return _mm256_cmp_ps(a.v, vfloat8(b), _CMP_NEQ_OQ); }
-  __forceinline const vboolf8 operator !=( const float    a, const vfloat8& b ) { return _mm256_cmp_ps(vfloat8(a), b.v, _CMP_NEQ_OQ); }
+  __forceinline const vfloat8 select( const vboolf8& m, const vfloat8& t, const vfloat8& f ) {
+    return _mm256_mask_blend_ps(m, f, t);
+  }
+#else
+  __forceinline const vboolf8 operator ==( const vfloat8& a, const vfloat8& b ) { return _mm256_cmp_ps(a, b, _CMP_EQ_OQ ); }
+  __forceinline const vboolf8 operator !=( const vfloat8& a, const vfloat8& b ) { return _mm256_cmp_ps(a, b, _CMP_NEQ_OQ); }
+  __forceinline const vboolf8 operator < ( const vfloat8& a, const vfloat8& b ) { return _mm256_cmp_ps(a, b, _CMP_LT_OQ ); }
+  __forceinline const vboolf8 operator >=( const vfloat8& a, const vfloat8& b ) { return _mm256_cmp_ps(a, b, _CMP_GE_OQ ); }
+  __forceinline const vboolf8 operator > ( const vfloat8& a, const vfloat8& b ) { return _mm256_cmp_ps(a, b, _CMP_GT_OQ ); }
+  __forceinline const vboolf8 operator <=( const vfloat8& a, const vfloat8& b ) { return _mm256_cmp_ps(a, b, _CMP_LE_OQ ); }
 
-  __forceinline const vboolf8 operator < ( const vfloat8& a, const vfloat8& b ) { return _mm256_cmp_ps(a.v, b.v, _CMP_LT_OQ ); }
-  __forceinline const vboolf8 operator < ( const vfloat8& a, const float    b ) { return _mm256_cmp_ps(a.v, vfloat8(b), _CMP_LT_OQ ); }
-  __forceinline const vboolf8 operator < ( const float    a, const vfloat8& b ) { return _mm256_cmp_ps(vfloat8(a), b.v, _CMP_LT_OQ ); }
-
-  __forceinline const vboolf8 operator >=( const vfloat8& a, const vfloat8& b ) { return _mm256_cmp_ps(a.v, b.v, _CMP_GE_OQ); }
-  __forceinline const vboolf8 operator >=( const vfloat8& a, const float    b ) { return _mm256_cmp_ps(a.v, vfloat8(b), _CMP_GE_OQ); }
-  __forceinline const vboolf8 operator >=( const float    a, const vfloat8& b ) { return _mm256_cmp_ps(vfloat8(a), b.v, _CMP_GE_OQ); }
-
-  __forceinline const vboolf8 operator > ( const vfloat8& a, const vfloat8& b ) { return _mm256_cmp_ps(a.v, b.v, _CMP_GT_OQ); }
-  __forceinline const vboolf8 operator > ( const vfloat8& a, const float    b ) { return _mm256_cmp_ps(a.v, vfloat8(b), _CMP_GT_OQ); }
-  __forceinline const vboolf8 operator > ( const float    a, const vfloat8& b ) { return _mm256_cmp_ps(vfloat8(a), b.v, _CMP_GT_OQ); }
-
-  __forceinline const vboolf8 operator <=( const vfloat8& a, const vfloat8& b ) { return _mm256_cmp_ps(a.v, b.v, _CMP_LE_OQ ); }
-  __forceinline const vboolf8 operator <=( const vfloat8& a, const float    b ) { return _mm256_cmp_ps(a.v, vfloat8(b), _CMP_LE_OQ ); }
-  __forceinline const vboolf8 operator <=( const float    a, const vfloat8& b ) { return _mm256_cmp_ps(vfloat8(a), b.v, _CMP_LE_OQ ); }
-  
   __forceinline const vfloat8 select( const vboolf8& m, const vfloat8& t, const vfloat8& f ) {
     return _mm256_blendv_ps(f, t, m); 
   }
-
-#if defined(__clang__) && !defined(__INTEL_COMPILER) || defined(_MSC_VER) && !defined(__INTEL_COMPILER)
-  __forceinline const vfloat8 select(const int m, const vfloat8& t, const vfloat8& f) {
-    return select(vboolf8(m), t, f); // workaround for clang and Microsoft compiler bugs
-  }
-#else
-  __forceinline const vfloat8 select( const int m, const vfloat8& t, const vfloat8& f ) {
-    return _mm256_blend_ps(f, t, m);
-  }
 #endif
 
-  __forceinline vfloat8  lerp(const vfloat8& a, const vfloat8& b, const vfloat8& t) {
-#if defined(__AVX2__)
-    return madd(t, b, madd(-t, a, a));
+  template<int mask>
+    __forceinline const vfloat8 select( const vfloat8& t, const vfloat8& f ) {
+    return _mm256_blend_ps(f, t, mask);
+  }
+
+  __forceinline const vboolf8 operator ==( const vfloat8& a, const float&   b ) { return a == vfloat8(b); }
+  __forceinline const vboolf8 operator ==( const float&   a, const vfloat8& b ) { return vfloat8(a) == b; }
+
+  __forceinline const vboolf8 operator !=( const vfloat8& a, const float&   b ) { return a != vfloat8(b); }
+  __forceinline const vboolf8 operator !=( const float&   a, const vfloat8& b ) { return vfloat8(a) != b; }
+
+  __forceinline const vboolf8 operator < ( const vfloat8& a, const float&   b ) { return a <  vfloat8(b); }
+  __forceinline const vboolf8 operator < ( const float&   a, const vfloat8& b ) { return vfloat8(a) <  b; }
+
+  __forceinline const vboolf8 operator >=( const vfloat8& a, const float&   b ) { return a >= vfloat8(b); }
+  __forceinline const vboolf8 operator >=( const float&   a, const vfloat8& b ) { return vfloat8(a) >= b; }
+
+  __forceinline const vboolf8 operator > ( const vfloat8& a, const float&   b ) { return a >  vfloat8(b); }
+  __forceinline const vboolf8 operator > ( const float&   a, const vfloat8& b ) { return vfloat8(a) >  b; }
+
+  __forceinline const vboolf8 operator <=( const vfloat8& a, const float&   b ) { return a <= vfloat8(b); }
+  __forceinline const vboolf8 operator <=( const float&   a, const vfloat8& b ) { return vfloat8(a) <= b; }
+
+  __forceinline vboolf8 eq(const vfloat8& a, const vfloat8& b) { return a == b; }
+  __forceinline vboolf8 ne(const vfloat8& a, const vfloat8& b) { return a != b; }
+  __forceinline vboolf8 lt(const vfloat8& a, const vfloat8& b) { return a <  b; }
+  __forceinline vboolf8 ge(const vfloat8& a, const vfloat8& b) { return a >= b; }
+  __forceinline vboolf8 gt(const vfloat8& a, const vfloat8& b) { return a >  b; }
+  __forceinline vboolf8 le(const vfloat8& a, const vfloat8& b) { return a <= b; }
+
+#if defined(__AVX512VL__)
+  __forceinline vboolf8 eq(const vboolf8& mask, const vfloat8& a, const vfloat8& b) { return _mm256_mask_cmp_ps_mask(mask, a, b, _MM_CMPINT_EQ); }
+  __forceinline vboolf8 ne(const vboolf8& mask, const vfloat8& a, const vfloat8& b) { return _mm256_mask_cmp_ps_mask(mask, a, b, _MM_CMPINT_NE); }
+  __forceinline vboolf8 lt(const vboolf8& mask, const vfloat8& a, const vfloat8& b) { return _mm256_mask_cmp_ps_mask(mask, a, b, _MM_CMPINT_LT); }
+  __forceinline vboolf8 ge(const vboolf8& mask, const vfloat8& a, const vfloat8& b) { return _mm256_mask_cmp_ps_mask(mask, a, b, _MM_CMPINT_GE); }
+  __forceinline vboolf8 gt(const vboolf8& mask, const vfloat8& a, const vfloat8& b) { return _mm256_mask_cmp_ps_mask(mask, a, b, _MM_CMPINT_GT); }
+  __forceinline vboolf8 le(const vboolf8& mask, const vfloat8& a, const vfloat8& b) { return _mm256_mask_cmp_ps_mask(mask, a, b, _MM_CMPINT_LE); }
 #else
-    return a + t*(b-a);
+  __forceinline vboolf8 eq(const vboolf8& mask, const vfloat8& a, const vfloat8& b) { return mask & (a == b); }
+  __forceinline vboolf8 ne(const vboolf8& mask, const vfloat8& a, const vfloat8& b) { return mask & (a != b); }
+  __forceinline vboolf8 lt(const vboolf8& mask, const vfloat8& a, const vfloat8& b) { return mask & (a <  b); }
+  __forceinline vboolf8 ge(const vboolf8& mask, const vfloat8& a, const vfloat8& b) { return mask & (a >= b); }
+  __forceinline vboolf8 gt(const vboolf8& mask, const vfloat8& a, const vfloat8& b) { return mask & (a >  b); }
+  __forceinline vboolf8 le(const vboolf8& mask, const vfloat8& a, const vfloat8& b) { return mask & (a <= b); }
 #endif
+
+  __forceinline vfloat8 lerp(const vfloat8& a, const vfloat8& b, const vfloat8& t) {
+    return madd(t,b-a,a);
   }
 
   __forceinline bool isvalid ( const vfloat8& v ) {
@@ -325,21 +394,21 @@ namespace embree
   }
 
   __forceinline bool is_finite ( const vfloat8& a ) {
-    return all((a >= vfloat8(-FLT_MAX) & (a <= vfloat8(+FLT_MAX))));
+    return all((a >= vfloat8(-FLT_MAX)) & (a <= vfloat8(+FLT_MAX)));
   }
 
   __forceinline bool is_finite ( const vboolf8& valid, const vfloat8& a ) {
-    return all(valid, (a >= vfloat8(-FLT_MAX) & (a <= vfloat8(+FLT_MAX))));
+    return all(valid, (a >= vfloat8(-FLT_MAX)) & (a <= vfloat8(+FLT_MAX)));
   }
       
   ////////////////////////////////////////////////////////////////////////////////
   /// Rounding Functions
   ////////////////////////////////////////////////////////////////////////////////
 
-  __forceinline const vfloat8 floor     ( const vfloat8& a ) { return _mm256_round_ps(a, _MM_FROUND_TO_NEG_INF    ); }
-  __forceinline const vfloat8 ceil      ( const vfloat8& a ) { return _mm256_round_ps(a, _MM_FROUND_TO_POS_INF    ); }
-  __forceinline const vfloat8 trunc     ( const vfloat8& a ) { return _mm256_round_ps(a, _MM_FROUND_TO_ZERO       ); }
-  __forceinline const vfloat8 frac      ( const vfloat8& a ) { return a-floor(a); }
+  __forceinline const vfloat8 floor( const vfloat8& a ) { return _mm256_round_ps(a, _MM_FROUND_TO_NEG_INF    ); }
+  __forceinline const vfloat8 ceil ( const vfloat8& a ) { return _mm256_round_ps(a, _MM_FROUND_TO_POS_INF    ); }
+  __forceinline const vfloat8 trunc( const vfloat8& a ) { return _mm256_round_ps(a, _MM_FROUND_TO_ZERO       ); }
+  __forceinline const vfloat8 frac ( const vfloat8& a ) { return a-floor(a); }
 
   ////////////////////////////////////////////////////////////////////////////////
   /// Movement/Shifting/Shuffling Functions
@@ -385,10 +454,12 @@ namespace embree
   __forceinline vfloat8 permute(const vfloat8 &a, const __m256i &index) {
     return _mm256_permutevar8x32_ps(a,index);
   }
+#endif
 
+#if defined(__AVX512VL__)
   template<int i>
   __forceinline vfloat8 align_shift_right(const vfloat8 &a, const vfloat8 &b) {
-    return _mm256_castsi256_ps(_mm256_alignr_epi8(_mm256_castps_si256(a), _mm256_castps_si256(b), i));
+    return _mm256_castsi256_ps(_mm256_alignr_epi32(_mm256_castps_si256(a), _mm256_castps_si256(b), i));
   }  
 #endif
 
@@ -411,6 +482,21 @@ namespace embree
     return vfloat8::broadcast(&a[k]);
   }
 
+#if defined(__AVX512VL__)
+  __forceinline vfloat8 shift_right_1( const vfloat8& x) {
+    return align_shift_right<1>(zero,x);
+  }
+#else
+  __forceinline vfloat8 shift_right_1( const vfloat8& x) {
+    const vfloat8 t0 = shuffle<1,2,3,0>(x);
+    const vfloat8 t1 = shuffle4<1,0>(t0);
+    return _mm256_blend_ps(t0,t1,0x88);
+  }
+#endif
+
+  __forceinline vint8 floori (const vfloat8& a) {
+    return vint8(floor(a));
+  }
   ////////////////////////////////////////////////////////////////////////////////
   /// Transpose
   ////////////////////////////////////////////////////////////////////////////////
@@ -495,7 +581,7 @@ namespace embree
 
 
   ////////////////////////////////////////////////////////////////////////////////
-  /// Euclidian Space Operators
+  /// Euclidian Space Operators (pairs of Vec3fa's)
   ////////////////////////////////////////////////////////////////////////////////
 
   //__forceinline vfloat8 dot ( const vfloat8& a, const vfloat8& b ) {
@@ -515,6 +601,20 @@ namespace embree
     return shuffle<1,2,0,3>(msub(a0,b0,a1*b1));
   }
 
+  //__forceinline float  sqr_length ( const vfloat<8>& a )                { return dot(a,a); }
+  //__forceinline float  rcp_length ( const vfloat<8>& a )                { return rsqrt(dot(a,a)); }
+  //__forceinline float  rcp_length2( const vfloat<8>& a )                { return rcp(dot(a,a)); }
+  //__forceinline float  length   ( const vfloat<8>& a )                  { return sqrt(dot(a,a)); }
+  __forceinline vfloat<8> normalize( const vfloat<8>& a )               { return a*rsqrt(dot(a,a)); }
+  //__forceinline float  distance ( const vfloat<8>& a, const vfloat<8>& b ) { return length(a-b); }
+  //__forceinline float  halfArea ( const vfloat<8>& d )                  { return madd(d.x,(d.y+d.z),d.y*d.z); }
+  //__forceinline float  area     ( const vfloat<8>& d )                  { return 2.0f*halfArea(d); }
+  //__forceinline vfloat<8> reflect  ( const vfloat<8>& V, const vfloat<8>& N ) { return 2.0f*dot(V,N)*N-V; }
+
+  //__forceinline vfloat<8> normalize_safe( const vfloat<8>& a ) { 
+  //  const float d = dot(a,a); if (unlikely(d == 0.0f)) return a; else return a*rsqrt(d);
+  //}
+
   ////////////////////////////////////////////////////////////////////////////////
   /// In Register Sorting
   ////////////////////////////////////////////////////////////////////////////////
@@ -525,27 +625,27 @@ namespace embree
     const vfloat8 b0 = shuffle<1,0,3,2>(a0);
     const vfloat8 c0 = min(a0,b0);
     const vfloat8 d0 = max(a0,b0);
-    const vfloat8 a1 = select(0x99 /* 0b10011001 */,c0,d0);
+    const vfloat8 a1 = select<0x99 /* 0b10011001 */>(c0,d0);
     const vfloat8 b1 = shuffle<2,3,0,1>(a1);
     const vfloat8 c1 = min(a1,b1);
     const vfloat8 d1 = max(a1,b1);
-    const vfloat8 a2 = select(0xc3 /* 0b11000011 */,c1,d1);
+    const vfloat8 a2 = select<0xc3 /* 0b11000011 */>(c1,d1);
     const vfloat8 b2 = shuffle<1,0,3,2>(a2);
     const vfloat8 c2 = min(a2,b2);
     const vfloat8 d2 = max(a2,b2);
-    const vfloat8 a3 = select(0xa5 /* 0b10100101 */,c2,d2);
+    const vfloat8 a3 = select<0xa5 /* 0b10100101 */>(c2,d2);
     const vfloat8 b3 = shuffle4<1,0>(a3);
     const vfloat8 c3 = min(a3,b3);
     const vfloat8 d3 = max(a3,b3);
-    const vfloat8 a4 = select(0xf /* 0b00001111 */,c3,d3);
+    const vfloat8 a4 = select<0xf /* 0b00001111 */>(c3,d3);
     const vfloat8 b4 = shuffle<2,3,0,1>(a4);
     const vfloat8 c4 = min(a4,b4);
     const vfloat8 d4 = max(a4,b4);
-    const vfloat8 a5 = select(0x33 /* 0b00110011 */,c4,d4);
+    const vfloat8 a5 = select<0x33 /* 0b00110011 */>(c4,d4);
     const vfloat8 b5 = shuffle<1,0,3,2>(a5);
     const vfloat8 c5 = min(a5,b5);
     const vfloat8 d5 = max(a5,b5);
-    const vfloat8 a6 = select(0x55 /* 0b01010101 */,c5,d5);
+    const vfloat8 a6 = select<0x55 /* 0b01010101 */>(c5,d5);
     return a6;
   }
 

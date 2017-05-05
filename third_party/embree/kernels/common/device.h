@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2017 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -18,7 +18,7 @@
 
 #include "default.h"
 #include "state.h"
-#include "raystreams/raystreams.h"
+#include "accel.h"
 
 namespace embree
 {
@@ -42,16 +42,19 @@ namespace embree
     void print();
 
     /*! sets the error code */
-    void setErrorCode(RTCError error);
+    void setDeviceErrorCode(RTCError error);
 
     /*! returns and clears the error code */
-    RTCError getErrorCode();
+    RTCError getDeviceErrorCode();
 
-    /*! returns thread local error code storage location */
-    RTCError* getError();
+    /*! sets the error code */
+    static void setThreadErrorCode(RTCError error);
+
+    /*! returns and clears the error code */
+    static RTCError getThreadErrorCode();
 
     /*! processes error codes, do not call directly */
-    void process_error(RTCError error, const char* str);
+    static void process_error(Device* device, RTCError error, const char* str);
 
     /*! invokes the memory monitor callback */
     void memoryMonitor(ssize_t bytes, bool post);
@@ -70,31 +73,30 @@ namespace embree
     /*! initializes the tasking system */
     void initTaskingSystem(size_t numThreads);
 
-    /*! configures tasking system with maximal number of thread set by any device */
-    void configureTaskingSystem();
-
     /*! shuts down the tasking system */
     void exitTaskingSystem();
+
+    /*! some variables that can be set via rtcSetParameter1i for debugging purposes */
+  public:
+    static ssize_t debug_int0;
+    static ssize_t debug_int1;
+    static ssize_t debug_int2;
+    static ssize_t debug_int3;
 
   public:
     bool singledevice;      //!< true if this is the device created implicitely through rtcInit
 
-    InstanceFactory* instance_factory;
-
-#if !defined(__MIC__)
-    BVH4Factory* bvh4_factory;
-#endif
-
+    std::unique_ptr<InstanceFactory> instance_factory;
+    std::unique_ptr<BVH4Factory> bvh4_factory;
 #if defined(__TARGET_AVX__)
-    BVH8Factory* bvh8_factory;
+    std::unique_ptr<BVH8Factory> bvh8_factory;
 #endif
-
+    
 #if USE_TASK_ARENA
-  tbb::task_arena* arena;
+    std::unique_ptr<tbb::task_arena> arena;
 #endif
-
-  /* ray streams filter */
-  RayStreamFilterFuncs rayStreamFilters;
-
+    
+    /* ray streams filter */
+    RayStreamFilterFuncs rayStreamFilters;
   };
 }

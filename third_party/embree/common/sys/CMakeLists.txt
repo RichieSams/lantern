@@ -1,5 +1,5 @@
 ## ======================================================================== ##
-## Copyright 2009-2015 Intel Corporation                                    ##
+## Copyright 2009-2017 Intel Corporation                                    ##
 ##                                                                          ##
 ## Licensed under the Apache License, Version 2.0 (the "License");          ##
 ## you may not use this file except in compliance with the License.         ##
@@ -17,30 +17,6 @@
 SET(CMAKE_THREAD_PREFER_PTHREAD TRUE)
 FIND_PACKAGE(Threads REQUIRED)
 
-IF (__XEON__)
-
-IF (TARGET_AVX)
-  ADD_DEFINITIONS(-D__TARGET_AVX__)
-ENDIF()
-
-IF (TARGET_AVX2)
-  ADD_DEFINITIONS(-D__TARGET_AVX2__)
-ENDIF()
-
-IF (TARGET_AVX512KNL)
-  ADD_DEFINITIONS(-D__TARGET_AVX512KNL__)
-ENDIF()
-
-IF (TASKING_TBB)
-  ADD_DEFINITIONS(-DTASKING_TBB)
-  SET(ADDITIONAL_LIBRARIES ${TBB_LIBRARIES})
-ENDIF()
-
-IF (RTCORE_MEMKIND_ALLOCATOR)
-  ADD_DEFINITIONS(-DMEMKIND_ALLOCATOR)  
-  SET(ADDITIONAL_LIBRARIES ${ADDITIONAL_LIBRARIES} -lmemkind)
-ENDIF()
-
 ADD_LIBRARY(sys STATIC
   sysinfo.cpp
   alloc.cpp
@@ -55,27 +31,5 @@ ADD_LIBRARY(sys STATIC
   barrier.cpp
 )
 
-TARGET_LINK_LIBRARIES(sys ${CMAKE_THREAD_LIBS_INIT} ${CMAKE_DL_LIBS} ${ADDITIONAL_LIBRARIES})
+TARGET_LINK_LIBRARIES(sys ${CMAKE_THREAD_LIBS_INIT} ${CMAKE_DL_LIBS})
 SET_PROPERTY(TARGET sys PROPERTY FOLDER common)
-
-ELSE ()
- 
-INCLUDE(icc_xeonphi)
-
-ADD_LIBRARY(sys_xeonphi STATIC
-  sysinfo.cpp
-  alloc.cpp
-  filename.cpp
-  library.cpp
-  thread.cpp
-  network.cpp
-  string.cpp
-  regression.cpp
-  mutex.cpp
-  condition.cpp
-  barrier.cpp
-)
-
-TARGET_LINK_LIBRARIES(sys_xeonphi ${CMAKE_THREAD_LIBS_INIT} ${CMAKE_DL_LIBS})
-
-ENDIF ()

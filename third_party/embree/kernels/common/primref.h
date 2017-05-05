@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2017 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -17,6 +17,7 @@
 #pragma once
 
 #include "default.h"
+#include "scene_bezier_curves.h"
 
 namespace embree
 {
@@ -31,16 +32,6 @@ namespace embree
     }
     __forceinline void operator=(const PrimRef& v) { 
       vfloat8::store((float*)this,vfloat8::load((float*)&v));
-    }
-#endif
-
-#if defined(__MIC__)
-    __forceinline PrimRef(const PrimRef& v) { 
-      compactustore16f_low(0xff,(float*)this,uload16f_low((float*)&v.lower));
-    }
-    
-    __forceinline void operator=(const PrimRef& v) { 
-      compactustore16f_low(0xff,(float*)this,uload16f_low((float*)&v.lower));
     }
 #endif
 
@@ -71,18 +62,49 @@ namespace embree
       return BBox3fa(lower,upper);
     }
 
-#if defined(__MIC__)
-    __forceinline Vec2vf16 getBounds() const { 
-      return Vec2vf16(broadcast4to16f((float*)&lower),broadcast4to16f((float*)&upper)); 
+    /*! size for bin heuristic is 1 */
+    __forceinline unsigned size() const { 
+      return 1;
     }
-#endif
+
+    /*! returns bounds and centroid used for binning */
+    __forceinline void binBoundsAndCenter(BBox3fa& bounds_o, Vec3fa& center_o) const 
+    {
+      bounds_o = bounds();
+      center_o = embree::center2(bounds_o);
+    }
+
+    /*! returns center for binning */
+    __forceinline Vec3fa binCenter(const AffineSpace3fa& space, void* user) const // only called by hair builder
+    {
+      Scene* scene = (Scene*) user;
+      NativeCurves* mesh = (NativeCurves*) scene->get(geomID());
+      BBox3fa bounds = mesh->bounds(space,primID());
+      return embree::center2(bounds);
+    }
+
+    /*! returns bounds and centroid used for binning */
+    __forceinline void binBoundsAndCenter(BBox3fa& bounds_o, Vec3fa& center_o, const AffineSpace3fa& space, void* user) const // only called by hair builder
+    {
+      Scene* scene = (Scene*) user;
+      NativeCurves* mesh = (NativeCurves*) scene->get(geomID());
+      BBox3fa bounds = mesh->bounds(space,primID());
+      bounds_o = bounds;
+      center_o = embree::center2(bounds);
+    }
 
     /*! returns the geometry ID */
+    __forceinline unsigned& geomID() { 
+      return lower.u;
+    }
     __forceinline unsigned geomID() const { 
       return lower.a;
     }
 
     /*! returns the primitive ID */
+    __forceinline unsigned& primID() { 
+      return upper.u;
+    }
     __forceinline unsigned primID() const { 
       return upper.a;
     }
@@ -124,11 +146,6 @@ namespace embree
     const vfloat8 bb = vfloat8::load((float*)&b);
     vfloat8::store((float*)&a,bb);
     vfloat8::store((float*)&b,aa);
-#elif defined(__MIC__)
-    const vfloat16 aa = uload16f_low((float*)&a.lower);
-    const vfloat16 bb = uload16f_low((float*)&b.lower);
-    compactustore16f_low(0xff,(float*)&b.lower,aa);
-    compactustore16f_low(0xff,(float*)&a.lower,bb);
 #else
     std::swap(a,b);
 #endif

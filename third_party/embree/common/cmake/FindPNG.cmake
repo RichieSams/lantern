@@ -1,5 +1,5 @@
 ## ======================================================================== ##
-## Copyright 2009-2015 Intel Corporation                                    ##
+## Copyright 2009-2017 Intel Corporation                                    ##
 ##                                                                          ##
 ## Licensed under the Apache License, Version 2.0 (the "License");          ##
 ## you may not use this file except in compliance with the License.         ##
@@ -22,4 +22,3 @@ FIND_PACKAGE_HANDLE_STANDARD_ARGS(PNG DEFAULT_MSG PNG_INCLUDE_DIR PNG_LIBRARIES)
 
 MARK_AS_ADVANCED(PNG_INCLUDE_DIR)
 MARK_AS_ADVANCED(PNG_LIBRARIES)
-

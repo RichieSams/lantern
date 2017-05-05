@@ -1,5 +1,5 @@
 ## ======================================================================== ##
-## Copyright 2009-2015 Intel Corporation                                    ##
+## Copyright 2009-2017 Intel Corporation                                    ##
 ##                                                                          ##
 ## Licensed under the Apache License, Version 2.0 (the "License");          ##
 ## you may not use this file except in compliance with the License.         ##
@@ -14,18 +14,10 @@
 ## limitations under the License.                                           ##
 ## ======================================================================== ##
 
-IF (__XEON__)
-  SET(EXT)
-ELSE()
-  INCLUDE(icc_xeonphi)
-  SET(EXT _xeonphi)
-ENDIF()
-
-
-ADD_LIBRARY(lexers${EXT} STATIC
+ADD_LIBRARY(lexers STATIC
  stringstream.cpp
  tokenstream.cpp
 )
 
-TARGET_LINK_LIBRARIES(lexers${EXT} sys${EXT})
-SET_PROPERTY(TARGET lexers${EXT} PROPERTY FOLDER common)
+TARGET_LINK_LIBRARIES(lexers sys)
+SET_PROPERTY(TARGET lexers PROPERTY FOLDER common)

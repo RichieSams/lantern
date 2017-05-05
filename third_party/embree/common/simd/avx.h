@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2017 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -18,18 +18,28 @@
 
 #include "sse.h"
 
+#if defined(__AVX512VL__)
+#include "vboolf8_avx512.h"
+#include "vboold4_avx512.h"
+#else
 #include "vboolf8_avx.h"
 #include "vboold4_avx.h"
+#endif
 
-#if defined (__AVX2__)
+#if defined(__AVX2__)
 #include "vint8_avx2.h"
+#if defined(__X86_64__)
+#include "vllong4_avx2.h"
+#endif
 #else
 #include "vint8_avx.h"
 #endif
 #include "vfloat8_avx.h"
+#if defined(__X86_64__)
 #include "vdouble4_avx.h"
+#endif
 
-#if defined (__AVX512F__)
+#if defined(__AVX512F__)
 #include "avx512.h"
 #endif
 

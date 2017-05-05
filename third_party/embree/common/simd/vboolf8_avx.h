@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2017 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -68,6 +68,11 @@ namespace embree
     __forceinline vboolf ( bool a, bool b) : v(vboolf8(vboolf4(a), vboolf4(b))) {}
     __forceinline vboolf ( bool a, bool b, bool c, bool d) : v(vboolf8(vboolf4(a,b), vboolf4(c,d))) {}
     __forceinline vboolf ( bool a, bool b, bool c, bool d, bool e, bool f, bool g, bool vh ) : v(vboolf8(vboolf4(a,b,c,d), vboolf4(e,f,g,vh))) {}
+
+    /* return int32 mask */
+    __forceinline __m256i mask32() const { 
+      return _mm256_castps_si256(v);
+    }
 
     ////////////////////////////////////////////////////////////////////////////////
     /// Constants
@@ -159,7 +164,7 @@ namespace embree
   __forceinline bool any       ( const vboolf8& a ) { return !_mm256_testz_ps(a,a); }
   __forceinline bool none      ( const vboolf8& a ) { return _mm256_testz_ps(a,a) != 0; }
 
-  __forceinline bool all       ( const vboolf8& valid, const vboolf8& b ) { return all(!valid | b); }
+  __forceinline bool all       ( const vboolf8& valid, const vboolf8& b ) { return all((!valid) | b); }
   __forceinline bool any       ( const vboolf8& valid, const vboolf8& b ) { return any( valid & b); }
   __forceinline bool none      ( const vboolf8& valid, const vboolf8& b ) { return none(valid & b); }
 

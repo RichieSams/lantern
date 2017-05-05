@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2017 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -19,27 +19,27 @@
 
 namespace embree
 {
-
   TriangleMesh::TriangleMesh (Scene* parent, RTCGeometryFlags flags, size_t numTriangles, size_t numVertices, size_t numTimeSteps)
     : Geometry(parent,TRIANGLE_MESH,numTriangles,numTimeSteps,flags)
   {
     triangles.init(parent->device,numTriangles,sizeof(Triangle));
+    vertices.resize(numTimeSteps);
     for (size_t i=0; i<numTimeSteps; i++) {
       vertices[i].init(parent->device,numVertices,sizeof(Vec3fa));
     }
     enabling();
   }
-  
+
   void TriangleMesh::enabling() 
   { 
-    if (numTimeSteps == 1) atomic_add(&parent->world1.numTriangles,triangles.size());
-    else                   atomic_add(&parent->world2.numTriangles,triangles.size());
+    if (numTimeSteps == 1) parent->world.numTriangles += triangles.size();
+    else                   parent->worldMB.numTriangles += triangles.size();
   }
   
   void TriangleMesh::disabling() 
   { 
-    if (numTimeSteps == 1) atomic_add(&parent->world1.numTriangles,-(ssize_t)triangles.size());
-    else                   atomic_add(&parent->world2.numTriangles,-(ssize_t)triangles.size());
+    if (numTimeSteps == 1) parent->world.numTriangles -= triangles.size();
+    else                   parent->worldMB.numTriangles -= triangles.size();
   }
 
   void TriangleMesh::setMask (unsigned mask) 
@@ -51,7 +51,7 @@ namespace embree
     Geometry::update();
   }
 
-  void TriangleMesh::setBuffer(RTCBufferType type, void* ptr, size_t offset, size_t stride) 
+  void TriangleMesh::setBuffer(RTCBufferType type, void* ptr, size_t offset, size_t stride, size_t size) 
   { 
     if (parent->isStatic() && parent->isBuild()) 
       throw_RTCError(RTC_INVALID_OPERATION,"static scenes cannot get modified");
@@ -59,45 +59,47 @@ namespace embree
     /* verify that all accesses are 4 bytes aligned */
     if (((size_t(ptr) + offset) & 0x3) || (stride & 0x3)) 
       throw_RTCError(RTC_INVALID_OPERATION,"data must be 4 bytes aligned");
-
-    switch (type) {
-    case RTC_INDEX_BUFFER  : 
-      triangles.set(ptr,offset,stride); 
-      break;
-    case RTC_VERTEX_BUFFER0: 
-      vertices[0].set(ptr,offset,stride); 
-      vertices[0].checkPadding16();
-      break;
-    case RTC_VERTEX_BUFFER1: 
-      vertices[1].set(ptr,offset,stride); 
-      vertices[1].checkPadding16();
-      break;
-    case RTC_USER_VERTEX_BUFFER0: 
-      if (userbuffers[0] == nullptr) userbuffers[0].reset(new Buffer(parent->device,numVertices(),stride)); 
-      userbuffers[0]->set(ptr,offset,stride);  
-      userbuffers[0]->checkPadding16();
-      break;
-    case RTC_USER_VERTEX_BUFFER1: 
-      if (userbuffers[1] == nullptr) userbuffers[1].reset(new Buffer(parent->device,numVertices(),stride)); 
-      userbuffers[1]->set(ptr,offset,stride);  
-      userbuffers[1]->checkPadding16();
-      break;
-
-    default: 
-      throw_RTCError(RTC_INVALID_ARGUMENT,"unknown buffer type");
+    
+    unsigned bid = type & 0xFFFF;
+    if (type >= RTC_VERTEX_BUFFER0 && type < RTCBufferType(RTC_VERTEX_BUFFER0 + numTimeSteps)) 
+    {
+      size_t t = type - RTC_VERTEX_BUFFER0;
+      vertices[t].set(ptr,offset,stride,size);
+      vertices[t].checkPadding16();
+      vertices0 = vertices[0];
+    } 
+    else if (type >= RTC_USER_VERTEX_BUFFER0 && type < RTC_USER_VERTEX_BUFFER0+RTC_MAX_USER_VERTEX_BUFFERS)
+    {
+      if (bid >= userbuffers.size()) userbuffers.resize(bid+1);
+      userbuffers[bid] = APIBuffer<char>(parent->device,numVertices(),stride);
+      userbuffers[bid].set(ptr,offset,stride,size);
+      userbuffers[bid].checkPadding16();
     }
+    else if (type == RTC_INDEX_BUFFER) 
+    {
+      if (size != (size_t)-1) disabling();
+      triangles.set(ptr,offset,stride,size); 
+      setNumPrimitives(size);
+      if (size != (size_t)-1) enabling();
+    }
+    else 
+      throw_RTCError(RTC_INVALID_ARGUMENT,"unknown buffer type");
   }
 
   void* TriangleMesh::map(RTCBufferType type) 
   {
     if (parent->isStatic() && parent->isBuild())
       throw_RTCError(RTC_INVALID_OPERATION,"static scenes cannot get modified");
-
-    switch (type) {
-    case RTC_INDEX_BUFFER  : return triangles.map(parent->numMappedBuffers);
-    case RTC_VERTEX_BUFFER0: return vertices[0].map(parent->numMappedBuffers);
-    case RTC_VERTEX_BUFFER1: return vertices[1].map(parent->numMappedBuffers);
-    default                : throw_RTCError(RTC_INVALID_ARGUMENT,"unknown buffer type"); return nullptr;
+    
+    if (type == RTC_INDEX_BUFFER) {
+      return triangles.map(parent->numMappedBuffers);
+    }
+    else if (type >= RTC_VERTEX_BUFFER0 && type < RTCBufferType(RTC_VERTEX_BUFFER0 + numTimeSteps)) {
+      return vertices[type - RTC_VERTEX_BUFFER0].map(parent->numMappedBuffers);
+    }
+    else {
+      throw_RTCError(RTC_INVALID_ARGUMENT,"unknown buffer type"); 
+      return nullptr;
     }
   }
 
@@ -106,11 +108,15 @@ namespace embree
     if (parent->isStatic() && parent->isBuild())
       throw_RTCError(RTC_INVALID_OPERATION,"static scenes cannot get modified");
 
-    switch (type) {
-    case RTC_INDEX_BUFFER  : triangles  .unmap(parent->numMappedBuffers); break;
-    case RTC_VERTEX_BUFFER0: vertices[0].unmap(parent->numMappedBuffers); break;
-    case RTC_VERTEX_BUFFER1: vertices[1].unmap(parent->numMappedBuffers); break;
-    default                : throw_RTCError(RTC_INVALID_ARGUMENT,"unknown buffer type"); break;
+    if (type == RTC_INDEX_BUFFER) {
+      triangles.unmap(parent->numMappedBuffers);
+    }
+    else if (type >= RTC_VERTEX_BUFFER0 && type < RTCBufferType(RTC_VERTEX_BUFFER0 + numTimeSteps)) {
+      vertices[type - RTC_VERTEX_BUFFER0].unmap(parent->numMappedBuffers);
+      vertices0 = vertices[0];
+    }
+    else {
+      throw_RTCError(RTC_INVALID_ARGUMENT,"unknown buffer type"); 
     }
   }
 
@@ -119,32 +125,37 @@ namespace embree
     const bool freeTriangles = !parent->needTriangleIndices;
     const bool freeVertices  = !parent->needTriangleVertices;
     if (freeTriangles) triangles.free(); 
-    if (freeVertices ) vertices[0].free();
-    if (freeVertices ) vertices[1].free();
+    if (freeVertices )
+      for (auto& buffer : vertices)
+        buffer.free();
   }
 
   bool TriangleMesh::verify () 
   {
-    /*! verify consistent size of vertex arrays */
-    if (numTimeSteps == 2 && vertices[0].size() != vertices[1].size())
+    /*! verify size of vertex arrays */
+    if (vertices.size() == 0) return false;
+    for (const auto& buffer : vertices)
+      if (buffer.size() != numVertices())
         return false;
 
-    /*! verify proper triangle indices */
+    /*! verify size of user vertex arrays */
+    for (const auto& buffer : userbuffers)
+      if (buffer.size() != numVertices())
+        return false;
+
+    /*! verify triangle indices */
     for (size_t i=0; i<triangles.size(); i++) {     
       if (triangles[i].v[0] >= numVertices()) return false; 
       if (triangles[i].v[1] >= numVertices()) return false; 
       if (triangles[i].v[2] >= numVertices()) return false; 
     }
 
-    /*! verify proper triangle vertices */
-    for (size_t j=0; j<numTimeSteps; j++) 
-    {
-      BufferT<Vec3fa>& verts = vertices[j];
-      for (size_t i=0; i<verts.size(); i++) {
-	if (!isvalid(verts[i])) 
+    /*! verify vertices */
+    for (const auto& buffer : vertices)
+      for (size_t i=0; i<buffer.size(); i++)
+	if (!isvalid(buffer[i])) 
 	  return false;
-      }
-    }
+
     return true;
   }
 
@@ -157,13 +168,13 @@ namespace embree
 #endif
 
     /* calculate base pointer and stride */
-    assert((buffer >= RTC_VERTEX_BUFFER0 && buffer <= RTC_VERTEX_BUFFER1) ||
+    assert((buffer >= RTC_VERTEX_BUFFER0 && buffer < RTCBufferType(RTC_VERTEX_BUFFER0 + numTimeSteps)) ||
            (buffer >= RTC_USER_VERTEX_BUFFER0 && buffer <= RTC_USER_VERTEX_BUFFER1));
     const char* src = nullptr; 
     size_t stride = 0;
     if (buffer >= RTC_USER_VERTEX_BUFFER0) {
-      src    = userbuffers[buffer&0xFFFF]->getPtr();
-      stride = userbuffers[buffer&0xFFFF]->getStride();
+      src    = userbuffers[buffer&0xFFFF].getPtr();
+      stride = userbuffers[buffer&0xFFFF].getStride();
     } else {
       src    = vertices[buffer&0xFFFF].getPtr();
       stride = vertices[buffer&0xFFFF].getStride();
@@ -174,13 +185,13 @@ namespace embree
       size_t ofs = i*sizeof(float);
       const float w = 1.0f-u-v;
       const Triangle& tri = triangle(primID);
-      const vboolx valid = vintx(i)+vintx(step) < vintx(numFloats);
+      const vboolx valid = vintx((int)i)+vintx(step) < vintx(numFloats);
       const vfloatx p0 = vfloatx::loadu(valid,(float*)&src[tri.v[0]*stride+ofs]);
       const vfloatx p1 = vfloatx::loadu(valid,(float*)&src[tri.v[1]*stride+ofs]);
       const vfloatx p2 = vfloatx::loadu(valid,(float*)&src[tri.v[2]*stride+ofs]);
       
       if (P) {
-        vfloatx::storeu(valid,P+i,w*p0 + u*p1 + v*p2);
+        vfloatx::storeu(valid,P+i,madd(w,p0,madd(u,p1,v*p2)));
       }
       if (dPdu) {
         assert(dPdu); vfloatx::storeu(valid,dPdu+i,p1-p0);
@@ -192,25 +203,5 @@ namespace embree
         assert(ddPdudv); vfloatx::storeu(valid,ddPdudv+i,vfloatx(zero));
       }
     }
-  }
-
-  void TriangleMesh::write(std::ofstream& file)
-  {
-    int type = TRIANGLE_MESH;
-    file.write((char*)&type,sizeof(int));
-    file.write((char*)&numTimeSteps,sizeof(int));
-    int numVerts = numVertices();
-    file.write((char*)&numVerts,sizeof(int));
-    int numTriangles = triangles.size();
-    file.write((char*)&numTriangles,sizeof(int));
-
-    for (size_t j=0; j<numTimeSteps; j++) {
-      while ((file.tellp() % 16) != 0) { char c = 0; file.write(&c,1); }
-      for (size_t i=0; i<numVerts; i++) file.write((char*)vertexPtr(i,j),sizeof(Vec3fa));  
-    }
-
-    while ((file.tellp() % 16) != 0) { char c = 0; file.write(&c,1); }
-    for (size_t i=0; i<numTriangles; i++) file.write((char*)&triangle(i),sizeof(Triangle));  
-
   }
 }

@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2017 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -25,20 +25,15 @@ namespace embree
   {
   public:
     AccelInstance (AccelData* accel, Builder* builder, Intersectors& intersectors)
-      : accel(accel), builder(builder), Accel(AccelData::TY_ACCEL_INSTANCE,intersectors) {}
+      : Accel(AccelData::TY_ACCEL_INSTANCE,intersectors), accel(accel), builder(builder) {}
 
     void immutable () {
-      delete builder; builder = nullptr;
-    }
-
-    ~AccelInstance() {
-      delete builder; builder = nullptr;
-      delete accel;   accel = nullptr;
+      builder.reset(nullptr);
     }
 
   public:
-    void build (size_t threadIndex, size_t threadCount) {
-      if (builder) builder->build(threadIndex,threadCount);
+    void build () {
+      if (builder) builder->build();
       bounds = accel->bounds;
     }
 
@@ -53,7 +48,7 @@ namespace embree
     }
 
   private:
-    AccelData* accel;
-    Builder* builder;
+    std::unique_ptr<AccelData> accel;
+    std::unique_ptr<Builder> builder;
   };
 }

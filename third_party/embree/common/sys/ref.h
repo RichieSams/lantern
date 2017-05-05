@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2017 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include "intrinsics.h"
+#include "atomic.h"
 
 namespace embree
 {
@@ -29,10 +29,10 @@ namespace embree
     RefCount(int val = 0) : refCounter(val) {}
     virtual ~RefCount() {};
   
-    virtual void refInc() { atomic_add(&refCounter,1); }
-    virtual void refDec() { if (atomic_add(&refCounter,-1) == 1) delete this; }
+    virtual void refInc() { refCounter.fetch_add(1); }
+    virtual void refDec() { if (refCounter.fetch_add(-1) == 1) delete this; }
   private:
-    atomic_t refCounter;
+    std::atomic<size_t> refCounter;
   };
   
   ////////////////////////////////////////////////////////////////////////////////

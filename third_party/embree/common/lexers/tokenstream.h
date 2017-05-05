@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2017 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -103,12 +103,12 @@ namespace embree
     friend std::ostream& operator<<(std::ostream& cout, const Token& t)
     {
       if (t.ty == TY_EOF) return cout << "eof";
-      if (t.ty == TY_CHAR) return cout << t.c;
-      if (t.ty == TY_INT) return cout << t.i;
-      if (t.ty == TY_FLOAT) return cout << t.f;
-      if (t.ty == TY_IDENTIFIER) return cout << t.str;
-      if (t.ty == TY_STRING) return cout << "\"" + t.str + "\"";
-      if (t.ty == TY_SYMBOL) return cout << t.str;
+      if (t.ty == TY_CHAR) return cout << "Char(" << t.c << ")";
+      if (t.ty == TY_INT) return cout << "Int(" << t.i << ")";
+      if (t.ty == TY_FLOAT) return cout << "Float(" << t.f << ")";
+      if (t.ty == TY_IDENTIFIER) return cout << "Id(" << t.str << ")";
+      if (t.ty == TY_STRING) return cout << "String(" << t.str << ")";
+      if (t.ty == TY_SYMBOL) return cout << "Symbol(" << t.str << ")";
       return cout << "unknown";
     }
 

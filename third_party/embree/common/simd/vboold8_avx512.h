@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2017 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -26,7 +26,7 @@ namespace embree
     typedef vint8   Int;
 
     enum { size = 8 }; // number of SIMD elements
-    __mmask8 v;          // data
+    __mmask8 v;        // data
     
     ////////////////////////////////////////////////////////////////////////////////
     /// Constructors, Assignment & Cast Operators
@@ -37,25 +37,33 @@ namespace embree
     __forceinline vboold8& operator=(const vboold8 &f) { v = f.v; return *this; }
 
     __forceinline vboold(const __mmask8 &t) { v = t; }
-    __forceinline operator __mmask8 () const { return v; }
+    __forceinline operator __mmask8() const { return v; }
     
-    __forceinline vboold(bool b) { v = b ? 0xFF : 0x00; }
-    __forceinline vboold(int t ) { v = (__mmask8)t; }
-    __forceinline vboold(unsigned int t ) { v = (__mmask8)t; }
+    __forceinline vboold(bool b) { v = b ? 0xff : 0x00; }
+    __forceinline vboold(int t)  { v = (__mmask8)t; }
+    __forceinline vboold(unsigned int t) { v = (__mmask8)t; }
 
     /* return int8 mask */
-    __forceinline __m128i mask8() const { 
-      const __m512i f = _mm512_set_1to8_epi64(0);
-      const __m512i t = _mm512_set_1to8_epi64(-1);
+    __forceinline __m128i mask8() const {
+#if defined(__AVX512BW__)
+      return _mm_movm_epi8(v);
+#else
+      const __m512i f = _mm512_set1_epi64(0);
+      const __m512i t = _mm512_set1_epi64(-1);
       const __m512i m =  _mm512_mask_or_epi64(f,v,t,t); 
       return _mm512_cvtepi64_epi8(m);
+#endif
     }
 
     /* return int64 mask */
     __forceinline __m512i mask64() const { 
-      const __m512i f = _mm512_set_1to8_epi64(0);
-      const __m512i t = _mm512_set_1to8_epi64(-1);
+#if defined(__AVX512DQ__)
+      return _mm512_movm_epi64(v);
+#else
+      const __m512i f = _mm512_set1_epi64(0);
+      const __m512i t = _mm512_set1_epi64(-1);
       return _mm512_mask_or_epi64(f,v,t,t); 
+#endif
     }
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -72,15 +80,15 @@ namespace embree
   
   __forceinline vboold8 operator!(const vboold8 &a) { return _mm512_knot(a); }
   
-   ////////////////////////////////////////////////////////////////////////////////
-   /// Binary Operators
-   ////////////////////////////////////////////////////////////////////////////////
+  ////////////////////////////////////////////////////////////////////////////////
+  /// Binary Operators
+  ////////////////////////////////////////////////////////////////////////////////
   
-  __forceinline vboold8 operator&(const vboold8 &a, const vboold8 &b) { return _mm512_kand(a,b); }
-  __forceinline vboold8 operator|(const vboold8 &a, const vboold8 &b) { return _mm512_kor(a,b); }
-  __forceinline vboold8 operator^(const vboold8 &a, const vboold8 &b) { return _mm512_kxor(a,b); }
+  __forceinline vboold8 operator&(const vboold8 &a, const vboold8 &b) { return _mm512_kand(a, b); }
+  __forceinline vboold8 operator|(const vboold8 &a, const vboold8 &b) { return _mm512_kor(a, b); }
+  __forceinline vboold8 operator^(const vboold8 &a, const vboold8 &b) { return _mm512_kxor(a, b); }
 
-  __forceinline vboold8 andn(const vboold8 &a, const vboold8 &b) { return _mm512_kandn(b,a); }
+  __forceinline vboold8 andn(const vboold8 &a, const vboold8 &b) { return _mm512_kandn(b, a); }
   
   ////////////////////////////////////////////////////////////////////////////////
   /// Assignment Operators
@@ -97,31 +105,30 @@ namespace embree
   __forceinline const vboold8 operator !=( const vboold8& a, const vboold8& b ) { return _mm512_kxor(a, b); }
   __forceinline const vboold8 operator ==( const vboold8& a, const vboold8& b ) { return _mm512_kxnor(a, b); }
   
-  __forceinline vboold8 select (const vboold8 &s, const vboold8 &a, const vboold8 &b) {
-    return _mm512_kor(_mm512_kand(s,a),_mm512_kandn(s,b));
+  __forceinline vboold8 select(const vboold8 &s, const vboold8 &a, const vboold8 &b) {
+    return _mm512_kor(_mm512_kand(s, a), _mm512_kandn(s, b));
   }
 
   ////////////////////////////////////////////////////////////////////////////////
   /// Reduction Operations
   ////////////////////////////////////////////////////////////////////////////////
   
-  __forceinline int all (const vboold8 &a) { return  _mm512_kortestc(a,a) != 0; }
-  __forceinline int any (const vboold8 &a) { return  _mm512_kortestz(a,a) == 0; }
-  __forceinline int none(const vboold8 &a) { return  _mm512_kortestz(a,a) != 0; }
+  __forceinline int all (const vboold8 &a) { return a.v == 0xff; }
+  __forceinline int any (const vboold8 &a) { return _mm512_kortestz(a, a) == 0; }
+  __forceinline int none(const vboold8 &a) { return _mm512_kortestz(a, a) != 0; }
 
-  __forceinline int all ( const vboold8& valid, const vboold8& b ) { return all(!valid | b); }
+  __forceinline int all ( const vboold8& valid, const vboold8& b ) { return all((!valid) | b); }
   __forceinline int any ( const vboold8& valid, const vboold8& b ) { return any( valid & b); }
   __forceinline int none( const vboold8& valid, const vboold8& b ) { return none(valid & b); }
   
   __forceinline size_t movemask( const vboold8& a ) { return _mm512_kmov(a); }
-  __forceinline size_t popcnt  ( const vboold8& a ) { return _mm_countbits_64(a.v); }
+  __forceinline size_t popcnt  ( const vboold8& a ) { return __popcnt(a.v); }
   
   ////////////////////////////////////////////////////////////////////////////////
-  /// Convertion Operations
+  /// Conversion Operations
   ////////////////////////////////////////////////////////////////////////////////
 
-  __forceinline unsigned int toInt (const vboold8 &a) { return _mm512_mask2int(a); }
-  __forceinline vboold8      toMask8(const int &a)      { return _mm512_int2mask(a); }
+  __forceinline unsigned int toInt(const vboold8 &a) { return _mm512_mask2int(a); }
 
   ////////////////////////////////////////////////////////////////////////////////
   /// Get/Set Functions

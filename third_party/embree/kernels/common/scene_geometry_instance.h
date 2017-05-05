@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2017 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -26,7 +26,7 @@ namespace embree
     ALIGNED_STRUCT;
   public:
     GeometryInstance (Scene* parent, Geometry* geom); 
-    virtual void build(size_t threadIndex, size_t threadCount) {}
+    virtual void build() {}
     virtual void enabling ();
     virtual void disabling();
     virtual void setMask (unsigned mask);

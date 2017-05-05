@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2017 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -55,7 +55,12 @@ namespace embree
     __forceinline vint            ( int  a, int  b, int  c, int  d, int  e, int  f, int  g, int  h) : v(_mm256_set_epi32(h, g, f, e, d, c, b, a)) {}
 
     __forceinline explicit vint( const __m256 a ) : v(_mm256_cvtps_epi32(a)) {}
+
+#if defined(__AVX512VL__)
+    __forceinline explicit vint( const vboolf8 &a ) : v(_mm256_movm_epi32(a)) {}
+#else
     __forceinline explicit vint( const vboolf8 &a ) : v(_mm256_castps_si256((__m256)a)) {}
+#endif
 
     ////////////////////////////////////////////////////////////////////////////////
     /// Constants
@@ -66,35 +71,34 @@ namespace embree
     __forceinline vint( PosInfTy ) : v(_mm256_set1_epi32(pos_inf)) {}
     __forceinline vint( NegInfTy ) : v(_mm256_set1_epi32(neg_inf)) {}
     __forceinline vint( StepTy   ) : v(_mm256_set_epi32(7, 6, 5, 4, 3, 2, 1, 0)) {}
-    __forceinline vint( TrueTy   ) { /* v = _mm256_undefined_si256(); */ v = _mm256_cmpeq_epi32(v,v); }
 
     ////////////////////////////////////////////////////////////////////////////////
     /// Loads and Stores
     ////////////////////////////////////////////////////////////////////////////////
 
-    static __forceinline vint8 load( const unsigned char* const ptr ) {
-      return _mm256_cvtepu8_epi32(_mm_load_si128((__m128i*)ptr));
-    }
+    static __forceinline const vint8 load( const unsigned char* const ptr ) { return _mm256_cvtepu8_epi32(_mm_load_si128((__m128i*)ptr)); }
 
-    static __forceinline const vint8 load(const int* const i) {
-      return _mm256_load_si256((__m256i*)i); 
-    }
+    static __forceinline const vint8 loadu( const unsigned char* const ptr ) { return _mm256_cvtepu8_epi32(_mm_loadu_si128((__m128i*)ptr)); }
 
-    static __forceinline const vint8 uload(const int* const i) {
-      return _mm256_loadu_si256((__m256i*)i); 
-    }
-    
-    static __forceinline void store(void* ptr, const vint8& i ) {
-      _mm256_store_si256((__m256i*)ptr,i);
-    }
-    
-    static __forceinline void store( const vboolf8& mask, void *ptr, const vint8& i ) {
-      _mm256_maskstore_epi32((int*)ptr,mask,i);
-    }
+    static __forceinline const vint8 load( const void* const ptr ) { return _mm256_load_si256((__m256i*)ptr); }
+    static __forceinline const vint8 loadu(const void* const ptr ) { return _mm256_loadu_si256((__m256i*)ptr); }
 
-    static __forceinline void storeu(void* ptr, const vint8& f ) {
-      _mm256_storeu_ps((float*)ptr,_mm256_castsi256_ps(f));
-    }
+    static __forceinline void store ( void* ptr, const vint8& v ) { _mm256_store_si256((__m256i*)ptr,v); }
+    static __forceinline void storeu( void* ptr, const vint8& v ) { _mm256_storeu_ps((float*)ptr,_mm256_castsi256_ps(v)); }
+
+#if defined(__AVX512VL__)
+    static __forceinline vint8 load ( const vboolf8& mask, const void* const ptr ) { return _mm256_mask_load_epi32 (_mm256_setzero_si256(),mask,ptr); }
+    static __forceinline vint8 loadu( const vboolf8& mask, const void* const ptr ) { return _mm256_mask_loadu_epi32(_mm256_setzero_si256(),mask,ptr); }
+
+    static __forceinline void store ( const vboolf8& mask, void* ptr, const vint8& v ) { _mm256_mask_store_epi32 (ptr,mask,v); }
+    static __forceinline void storeu( const vboolf8& mask, void* ptr, const vint8& v ) { _mm256_mask_storeu_epi32(ptr,mask,v); }
+#else
+    static __forceinline vint8 load ( const vboolf8& mask, const void* const ptr ) { return _mm256_castps_si256(_mm256_maskload_ps((float*)ptr,mask)); }
+    static __forceinline vint8 loadu( const vboolf8& mask, const void* const ptr ) { return _mm256_castps_si256(_mm256_maskload_ps((float*)ptr,mask)); }
+
+    static __forceinline void store ( const vboolf8& mask, void* ptr, const vint8& v ) { _mm256_maskstore_epi32((int*)ptr,mask,v); }
+    static __forceinline void storeu( const vboolf8& mask, void* ptr, const vint8& v ) { _mm256_maskstore_epi32((int*)ptr,mask,v); }
+#endif
     
 #if defined (__AVX2__)
     static __forceinline vint8 load_nt(void* ptr) {
@@ -105,6 +109,20 @@ namespace embree
     static __forceinline void store_nt(void* ptr, const vint8& v) {
       _mm256_stream_ps((float*)ptr,_mm256_castsi256_ps(v));
     }
+
+    static __forceinline void store_uchar( unsigned char* const ptr, const vint8& i ) {
+      __m256i x = i;
+      x = _mm256_packus_epi32(x, x);
+      x = _mm256_packus_epi16(x, x);
+#if defined(__X86_64__)
+      *(size_t*)ptr = _mm_cvtsi128_si64(_mm256_castsi256_si128(x));
+#else
+      for (size_t i = 0; i < 8; i++)
+        ptr[i] = ((unsigned char*)&x)[i];
+#endif
+    }
+
+    static __forceinline vint8 broadcast64(const long long &a) { return _mm256_set1_epi64x(a); }
     
     ////////////////////////////////////////////////////////////////////////////////
     /// Array Access
@@ -156,9 +174,11 @@ namespace embree
   __forceinline const vint8 operator <<( const vint8& a, const vint8& n ) { return _mm256_sllv_epi32(a.v, n); }
   __forceinline const vint8 operator >>( const vint8& a, const vint8& n ) { return _mm256_srav_epi32(a.v, n); }
 
+  __forceinline const vint8 sll ( const vint8& a, const int b ) { return _mm256_slli_epi32(a.v, b); }
   __forceinline const vint8 sra ( const vint8& a, const int b ) { return _mm256_srai_epi32(a.v, b); }
   __forceinline const vint8 srl ( const vint8& a, const int b ) { return _mm256_srli_epi32(a.v, b); }
 
+  __forceinline const vint8 sll ( const vint8& a, const vint8 &b ) { return _mm256_sllv_epi32(a.v, b.v); }
   __forceinline const vint8 sra ( const vint8& a, const vint8 &b ) { return _mm256_srav_epi32(a.v, b.v); }
   __forceinline const vint8 srl ( const vint8& a, const vint8 &b ) { return _mm256_srlv_epi32(a.v, b.v); }
   
@@ -199,42 +219,74 @@ namespace embree
   /// Comparison Operators + Select
   ////////////////////////////////////////////////////////////////////////////////
 
-  __forceinline const vboolf8 operator ==( const vint8& a, const vint8& b ) { return _mm256_castsi256_ps(_mm256_cmpeq_epi32 (a.v, b.v)); }
+#if defined(__AVX512VL__)
+  __forceinline const vboolf8 operator ==( const vint8& a, const vint8& b ) { return _mm256_cmp_epi32_mask(a,b,_MM_CMPINT_EQ); }
+  __forceinline const vboolf8 operator !=( const vint8& a, const vint8& b ) { return _mm256_cmp_epi32_mask(a,b,_MM_CMPINT_NE); }
+  __forceinline const vboolf8 operator < ( const vint8& a, const vint8& b ) { return _mm256_cmp_epi32_mask(a,b,_MM_CMPINT_LT); }
+  __forceinline const vboolf8 operator >=( const vint8& a, const vint8& b ) { return _mm256_cmp_epi32_mask(a,b,_MM_CMPINT_GE); }
+  __forceinline const vboolf8 operator > ( const vint8& a, const vint8& b ) { return _mm256_cmp_epi32_mask(a,b,_MM_CMPINT_GT); }
+  __forceinline const vboolf8 operator <=( const vint8& a, const vint8& b ) { return _mm256_cmp_epi32_mask(a,b,_MM_CMPINT_LE); }
+
+  __forceinline const vint8 select( const vboolf8& m, const vint8& t, const vint8& f ) {
+    return _mm256_mask_blend_epi32(m, f, t);
+  }
+#else
+  __forceinline const vboolf8 operator ==( const vint8& a, const vint8& b ) { return _mm256_castsi256_ps(_mm256_cmpeq_epi32(a, b)); }
+  __forceinline const vboolf8 operator !=( const vint8& a, const vint8& b ) { return !(a == b); }
+  __forceinline const vboolf8 operator < ( const vint8& a, const vint8& b ) { return _mm256_castsi256_ps(_mm256_cmpgt_epi32(b, a)); }
+  __forceinline const vboolf8 operator >=( const vint8& a, const vint8& b ) { return !(a <  b); }
+  __forceinline const vboolf8 operator > ( const vint8& a, const vint8& b ) { return _mm256_castsi256_ps(_mm256_cmpgt_epi32(a, b)); }
+  __forceinline const vboolf8 operator <=( const vint8& a, const vint8& b ) { return !(a >  b); }
+
+  __forceinline const vint8 select( const vboolf8& m, const vint8& t, const vint8& f ) {
+    return _mm256_castps_si256(_mm256_blendv_ps(_mm256_castsi256_ps(f), _mm256_castsi256_ps(t), m));
+  }
+#endif
+
+  template<int mask>
+  __forceinline const vint8 select(const vint8& t, const vint8& f) {
+    return _mm256_blend_epi32(f, t, mask);
+  }
+
   __forceinline const vboolf8 operator ==( const vint8& a, const int    b ) { return a == vint8(b); }
   __forceinline const vboolf8 operator ==( const int    a, const vint8& b ) { return vint8(a) == b; }
-  
-  __forceinline const vboolf8 operator !=( const vint8& a, const vint8& b ) { return !(a == b); }
+
   __forceinline const vboolf8 operator !=( const vint8& a, const int    b ) { return a != vint8(b); }
   __forceinline const vboolf8 operator !=( const int    a, const vint8& b ) { return vint8(a) != b; }
-  
-  __forceinline const vboolf8 operator < ( const vint8& a, const vint8& b ) { return _mm256_castsi256_ps(_mm256_cmpgt_epi32 (b.v, a.v)); }
+
   __forceinline const vboolf8 operator < ( const vint8& a, const int    b ) { return a <  vint8(b); }
   __forceinline const vboolf8 operator < ( const int    a, const vint8& b ) { return vint8(a) <  b; }
-  
-  __forceinline const vboolf8 operator >=( const vint8& a, const vint8& b ) { return !(a <  b); }
+
   __forceinline const vboolf8 operator >=( const vint8& a, const int    b ) { return a >= vint8(b); }
   __forceinline const vboolf8 operator >=( const int    a, const vint8& b ) { return vint8(a) >= b; }
 
-  __forceinline const vboolf8 operator > ( const vint8& a, const vint8& b ) { return _mm256_castsi256_ps(_mm256_cmpgt_epi32 (a.v, b.v)); }
   __forceinline const vboolf8 operator > ( const vint8& a, const int    b ) { return a >  vint8(b); }
   __forceinline const vboolf8 operator > ( const int    a, const vint8& b ) { return vint8(a) >  b; }
 
-  __forceinline const vboolf8 operator <=( const vint8& a, const vint8& b ) { return !(a >  b); }
   __forceinline const vboolf8 operator <=( const vint8& a, const int    b ) { return a <= vint8(b); }
   __forceinline const vboolf8 operator <=( const int    a, const vint8& b ) { return vint8(a) <= b; }
 
-  __forceinline const vint8 select( const vboolf8& m, const vint8& t, const vint8& f ) {
-    return _mm256_castps_si256(_mm256_blendv_ps(_mm256_castsi256_ps(f), _mm256_castsi256_ps(t), m)); 
-  }
+  __forceinline vboolf8 eq(const vint8& a, const vint8& b) { return a == b; }
+  __forceinline vboolf8 ne(const vint8& a, const vint8& b) { return a != b; }
+  __forceinline vboolf8 lt(const vint8& a, const vint8& b) { return a <  b; }
+  __forceinline vboolf8 ge(const vint8& a, const vint8& b) { return a >= b; }
+  __forceinline vboolf8 gt(const vint8& a, const vint8& b) { return a >  b; }
+  __forceinline vboolf8 le(const vint8& a, const vint8& b) { return a <= b; }
 
-#if defined(__clang__) && !defined(__INTEL_COMPILER) || defined(_MSC_VER) && !defined(__INTEL_COMPILER)
-  __forceinline const vint8 select(const int m, const vint8& t, const vint8& f) {
-          return select(vboolf8(m), t, f); // workaround for clang and Microsoft compiler bugs
-  }
+#if defined(__AVX512VL__)
+  __forceinline vboolf8 eq(const vboolf8& mask, const vint8& a, const vint8& b) { return _mm256_mask_cmp_epi32_mask(mask, a, b, _MM_CMPINT_EQ); }
+  __forceinline vboolf8 ne(const vboolf8& mask, const vint8& a, const vint8& b) { return _mm256_mask_cmp_epi32_mask(mask, a, b, _MM_CMPINT_NE); }
+  __forceinline vboolf8 lt(const vboolf8& mask, const vint8& a, const vint8& b) { return _mm256_mask_cmp_epi32_mask(mask, a, b, _MM_CMPINT_LT); }
+  __forceinline vboolf8 ge(const vboolf8& mask, const vint8& a, const vint8& b) { return _mm256_mask_cmp_epi32_mask(mask, a, b, _MM_CMPINT_GE); }
+  __forceinline vboolf8 gt(const vboolf8& mask, const vint8& a, const vint8& b) { return _mm256_mask_cmp_epi32_mask(mask, a, b, _MM_CMPINT_GT); }
+  __forceinline vboolf8 le(const vboolf8& mask, const vint8& a, const vint8& b) { return _mm256_mask_cmp_epi32_mask(mask, a, b, _MM_CMPINT_LE); }
 #else
-  __forceinline const vint8 select(const int m, const vint8& t, const vint8& f) {
-	  return _mm256_blend_epi32(f, t, m);
-  }
+  __forceinline vboolf8 eq(const vboolf8& mask, const vint8& a, const vint8& b) { return mask & (a == b); }
+  __forceinline vboolf8 ne(const vboolf8& mask, const vint8& a, const vint8& b) { return mask & (a != b); }
+  __forceinline vboolf8 lt(const vboolf8& mask, const vint8& a, const vint8& b) { return mask & (a <  b); }
+  __forceinline vboolf8 ge(const vboolf8& mask, const vint8& a, const vint8& b) { return mask & (a >= b); }
+  __forceinline vboolf8 gt(const vboolf8& mask, const vint8& a, const vint8& b) { return mask & (a >  b); }
+  __forceinline vboolf8 le(const vboolf8& mask, const vint8& a, const vint8& b) { return mask & (a <= b); }
 #endif
 
   ////////////////////////////////////////////////////////////////////////////////
@@ -269,6 +321,7 @@ namespace embree
   template<> __forceinline const vint8 shuffle<0, 1, 0, 1>( const vint8& b ) { return _mm256_castps_si256(_mm256_castpd_ps(_mm256_movedup_pd(_mm256_castps_pd(_mm256_castsi256_ps(b))))); }
 
   __forceinline const vint8 broadcast(const int* ptr) { return _mm256_castps_si256(_mm256_broadcast_ss((const float*)ptr)); }
+
   template<size_t i> __forceinline const vint8 insert4(const vint8& a, const vint4& b) { return _mm256_insertf128_si256(a, b, i); }
   template<size_t i> __forceinline const vint4 extract4   (const vint8& a) { return _mm256_extractf128_si256(a, i); }
   template<>         __forceinline const vint4 extract4<0>(const vint8& a) { return _mm256_castsi256_si128(a);      }
@@ -328,15 +381,15 @@ namespace embree
     const vint8 b0 = shuffle<1,0,3,2>(a0);
     const vint8 c0 = umin(a0,b0);
     const vint8 d0 = umax(a0,b0);
-    const vint8 a1 = select(0x55 /* 0b01010101 */,c0,d0);
+    const vint8 a1 = select<0x55 /* 0b01010101 */>(c0,d0);
     const vint8 b1 = shuffle<2,3,0,1>(a1);
     const vint8 c1 = umin(a1,b1);
     const vint8 d1 = umax(a1,b1);
-    const vint8 a2 = select(0x33 /* 0b00110011 */,c1,d1);
+    const vint8 a2 = select<0x33 /* 0b00110011 */>(c1,d1);
     const vint8 b2 = shuffle<0,2,1,3>(a2);
     const vint8 c2 = umin(a2,b2);
     const vint8 d2 = umax(a2,b2);
-    const vint8 a3 = select(0x22 /* 0b00100010 */,c2,d2);
+    const vint8 a3 = select<0x22 /* 0b00100010 */>(c2,d2);
     return a3;
   }
 
@@ -346,27 +399,27 @@ namespace embree
     const vint8 b0 = shuffle<1,0,3,2>(a0);
     const vint8 c0 = umin(a0,b0);
     const vint8 d0 = umax(a0,b0);
-    const vint8 a1 = select(0x99 /* 0b10011001 */,c0,d0);
+    const vint8 a1 = select<0x99 /* 0b10011001 */>(c0,d0);
     const vint8 b1 = shuffle<2,3,0,1>(a1);
     const vint8 c1 = umin(a1,b1);
     const vint8 d1 = umax(a1,b1);
-    const vint8 a2 = select(0xc3 /* 0b11000011 */,c1,d1);
+    const vint8 a2 = select<0xc3 /* 0b11000011 */>(c1,d1);
     const vint8 b2 = shuffle<1,0,3,2>(a2);
     const vint8 c2 = umin(a2,b2);
     const vint8 d2 = umax(a2,b2);
-    const vint8 a3 = select(0xa5 /* 0b10100101 */,c2,d2);
+    const vint8 a3 = select<0xa5 /* 0b10100101 */>(c2,d2);
     const vint8 b3 = shuffle4<1,0>(a3);
     const vint8 c3 = umin(a3,b3);
     const vint8 d3 = umax(a3,b3);
-    const vint8 a4 = select(0xf /* 0b00001111 */,c3,d3);
+    const vint8 a4 = select<0xf /* 0b00001111 */>(c3,d3);
     const vint8 b4 = shuffle<2,3,0,1>(a4);
     const vint8 c4 = umin(a4,b4);
     const vint8 d4 = umax(a4,b4);
-    const vint8 a5 = select(0x33 /* 0b00110011 */,c4,d4);
+    const vint8 a5 = select<0x33 /* 0b00110011 */>(c4,d4);
     const vint8 b5 = shuffle<1,0,3,2>(a5);
     const vint8 c5 = umin(a5,b5);
     const vint8 d5 = umax(a5,b5);
-    const vint8 a6 = select(0x55 /* 0b01010101 */,c5,d5);
+    const vint8 a6 = select<0x55 /* 0b01010101 */>(c5,d5);
     return a6;
   }
 

@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2017 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -19,8 +19,8 @@
 
 namespace embree
 {
-  UserGeometry::UserGeometry (Scene* parent, size_t items, size_t numTimeSteps) 
-    : AccelSet(parent,items,numTimeSteps) {}
+  UserGeometry::UserGeometry (Scene* parent, RTCGeometryFlags gflags, size_t items, size_t numTimeSteps) 
+    : AccelSet(parent,gflags,items,numTimeSteps) {}
   
   void UserGeometry::setUserData (void* ptr) {
     intersectors.ptr = ptr;
@@ -50,11 +50,23 @@ namespace embree
       throw_RTCError(RTC_INVALID_OPERATION,"static scenes cannot get modified");
 
     this->boundsFunc2 = bounds;
-    this->boundsFunc2UserPtr = userPtr;
+    this->boundsFuncUserPtr = userPtr;
+  }
+
+  void UserGeometry::setBoundsFunction3 (RTCBoundsFunc3 bounds, void* userPtr) 
+  {
+    if (parent->isStatic() && parent->isBuild())
+      throw_RTCError(RTC_INVALID_OPERATION,"static scenes cannot get modified");
+
+    this->boundsFunc3 = bounds;
+    this->boundsFuncUserPtr = userPtr;
   }
 
   void UserGeometry::setIntersectFunction (RTCIntersectFunc intersect1, bool ispc) 
   {
+    if (parent->isStreamMode())
+      throw_RTCError(RTC_INVALID_OPERATION,"you have to use rtcSetIntersectFunctionN (and optionally rtcSetIntersectFunction1Mp) in stream mode");
+
     if (parent->isStatic() && parent->isBuild())
       throw_RTCError(RTC_INVALID_OPERATION,"static scenes cannot get modified");
 
@@ -63,6 +75,9 @@ namespace embree
 
   void UserGeometry::setIntersectFunction4 (RTCIntersectFunc4 intersect4, bool ispc) 
   {
+     if (parent->isStreamMode())
+      throw_RTCError(RTC_INVALID_OPERATION,"you have to use rtcSetIntersectFunctionN (and optionally rtcSetIntersectFunction1Mp) in stream mode");
+
     if (parent->isStatic() && parent->isBuild())
       throw_RTCError(RTC_INVALID_OPERATION,"static scenes cannot get modified");
 
@@ -72,6 +87,9 @@ namespace embree
 
   void UserGeometry::setIntersectFunction8 (RTCIntersectFunc8 intersect8, bool ispc) 
   {
+    if (parent->isStreamMode())
+      throw_RTCError(RTC_INVALID_OPERATION,"you have to use rtcSetIntersectFunctionN (and optionally rtcSetIntersectFunction1Mp) in stream mode");
+
     if (parent->isStatic() && parent->isBuild())
       throw_RTCError(RTC_INVALID_OPERATION,"static scenes cannot get modified");
 
@@ -81,6 +99,9 @@ namespace embree
 
   void UserGeometry::setIntersectFunction16 (RTCIntersectFunc16 intersect16, bool ispc) 
   {
+    if (parent->isStreamMode())
+      throw_RTCError(RTC_INVALID_OPERATION,"you have to use rtcSetIntersectFunctionN (and optionally rtcSetIntersectFunction1Mp) in stream mode");
+
     if (parent->isStatic() && parent->isBuild())
       throw_RTCError(RTC_INVALID_OPERATION,"static scenes cannot get modified");
 
@@ -88,8 +109,33 @@ namespace embree
     intersectors.intersector16.ispc = ispc;
   }
 
+  void UserGeometry::setIntersectFunction1Mp (RTCIntersectFunc1Mp intersect) 
+  {
+    if (!parent->isStreamMode())
+      throw_RTCError(RTC_INVALID_OPERATION,"you can use rtcSetIntersectFunction1Mp only in stream mode");
+
+    if (parent->isStatic() && parent->isBuild())
+      throw_RTCError(RTC_INVALID_OPERATION,"static scenes cannot get modified");
+
+    intersectors.intersector1M.intersect = intersect;
+  }
+
+  void UserGeometry::setIntersectFunctionN (RTCIntersectFuncN intersect) 
+  {
+    if (!parent->isStreamMode())
+      throw_RTCError(RTC_INVALID_OPERATION,"you can use rtcSetIntersectFunctionN only in stream mode");
+
+    if (parent->isStatic() && parent->isBuild())
+      throw_RTCError(RTC_INVALID_OPERATION,"static scenes cannot get modified");
+
+    intersectors.intersectorN.intersect = intersect;
+  }
+
   void UserGeometry::setOccludedFunction (RTCOccludedFunc occluded1, bool ispc) 
   {
+    if (parent->isStreamMode())
+      throw_RTCError(RTC_INVALID_OPERATION,"you have to use rtcSetOccludedFunctionN (and optionally rtcSetOccludedFunction1Mp) in stream mode");
+
     if (parent->isStatic() && parent->isBuild())
       throw_RTCError(RTC_INVALID_OPERATION,"static scenes cannot get modified");
 
@@ -98,6 +144,9 @@ namespace embree
 
   void UserGeometry::setOccludedFunction4 (RTCOccludedFunc4 occluded4, bool ispc) 
   {
+    if (parent->isStreamMode())
+      throw_RTCError(RTC_INVALID_OPERATION,"you have to use rtcSetOccludedFunctionN (and optionally rtcSetOccludedFunction1Mp) in stream mode");
+
     if (parent->isStatic() && parent->isBuild())
       throw_RTCError(RTC_INVALID_OPERATION,"static scenes cannot get modified");
 
@@ -107,6 +156,9 @@ namespace embree
 
   void UserGeometry::setOccludedFunction8 (RTCOccludedFunc8 occluded8, bool ispc) 
   {
+    if (parent->isStreamMode())
+      throw_RTCError(RTC_INVALID_OPERATION,"you have to use rtcSetOccludedFunctionN (and optionally rtcSetOccludedFunction1Mp) in stream mode");
+
     if (parent->isStatic() && parent->isBuild())
       throw_RTCError(RTC_INVALID_OPERATION,"static scenes cannot get modified");
 
@@ -116,10 +168,35 @@ namespace embree
 
   void UserGeometry::setOccludedFunction16 (RTCOccludedFunc16 occluded16, bool ispc) 
   {
+    if (parent->isStreamMode())
+      throw_RTCError(RTC_INVALID_OPERATION,"you have to use rtcSetOccludedFunctionN (and optionally rtcSetOccludedFunction1Mp) in stream mode");
+
     if (parent->isStatic() && parent->isBuild())
       throw_RTCError(RTC_INVALID_OPERATION,"static scenes cannot get modified");
 
     intersectors.intersector16.occluded = (void*)occluded16;
     intersectors.intersector16.ispc = ispc;
+  }
+
+  void UserGeometry::setOccludedFunction1Mp (RTCOccludedFunc1Mp occluded) 
+  {
+    if (!parent->isStreamMode())
+      throw_RTCError(RTC_INVALID_OPERATION,"you can use rtcSetOccludedFunction1Mp only in stream mode");
+
+    if (parent->isStatic() && parent->isBuild())
+      throw_RTCError(RTC_INVALID_OPERATION,"static scenes cannot get modified");
+    
+    intersectors.intersector1M.occluded = occluded;
+  }
+
+  void UserGeometry::setOccludedFunctionN (RTCOccludedFuncN occluded) 
+  {
+    if (!parent->isStreamMode())
+      throw_RTCError(RTC_INVALID_OPERATION,"you can use rtcSetOccludedFunctionN only in stream mode");
+
+    if (parent->isStatic() && parent->isBuild())
+      throw_RTCError(RTC_INVALID_OPERATION,"static scenes cannot get modified");
+
+    intersectors.intersectorN.occluded = occluded;
   }
 }

@@ -1,5 +1,5 @@
 ## ======================================================================== ##
-## Copyright 2009-2015 Intel Corporation                                    ##
+## Copyright 2009-2017 Intel Corporation                                    ##
 ##                                                                          ##
 ## Licensed under the Apache License, Version 2.0 (the "License");          ##
 ## you may not use this file except in compliance with the License.         ##
@@ -14,11 +14,6 @@
 ## limitations under the License.                                           ##
 ## ======================================================================== ##
 
-IF (__XEON__)
-  ADD_LIBRARY(simd STATIC sse.cpp)
-  SET_PROPERTY(TARGET simd PROPERTY FOLDER common)
-ELSE ()
-  INCLUDE(icc_xeonphi)
-  ADD_LIBRARY(simd_xeonphi STATIC vboolf16_avx512.cpp)
-ENDIF ()
+ADD_LIBRARY(simd STATIC sse.cpp)
+SET_PROPERTY(TARGET simd PROPERTY FOLDER common)
 

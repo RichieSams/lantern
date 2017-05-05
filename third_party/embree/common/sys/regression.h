@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2017 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -23,13 +23,16 @@
 namespace embree
 {
   /*! virtual interface for all regression tests */
-  struct RegressionTest { 
-    virtual bool operator()() = 0;
+  struct RegressionTest 
+  { 
+    RegressionTest (std::string name) : name(name) {}
+    virtual bool run() = 0;
+    std::string name;
   };
  
   /*! registers a regression test */
   void registerRegressionTest(RegressionTest* test);
 
   /*! run all regression tests */
-  void runRegressionTests();
+  RegressionTest* getRegressionTest(size_t index);
 }

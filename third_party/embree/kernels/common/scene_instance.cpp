@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2017 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -19,40 +19,40 @@
 
 namespace embree
 {
-  DECLARE_SYMBOL2(RTCBoundsFunc2,InstanceBoundsFunc);
+  DECLARE_SYMBOL2(RTCBoundsFunc3,InstanceBoundsFunc);
   DECLARE_SYMBOL2(AccelSet::Intersector1,InstanceIntersector1);
   DECLARE_SYMBOL2(AccelSet::Intersector4,InstanceIntersector4);
   DECLARE_SYMBOL2(AccelSet::Intersector8,InstanceIntersector8);
   DECLARE_SYMBOL2(AccelSet::Intersector16,InstanceIntersector16);
+  DECLARE_SYMBOL2(AccelSet::Intersector1M,InstanceIntersector1M);
 
   InstanceFactory::InstanceFactory(int features)
   {
-#if defined(__MIC__)
-    SELECT_SYMBOL_KNC(features,InstanceBoundsFunc);
-    SELECT_SYMBOL_KNC(features,InstanceIntersector1);
-    SELECT_SYMBOL_KNC(features,InstanceIntersector16);
-#else
     SELECT_SYMBOL_DEFAULT_AVX_AVX2(features,InstanceBoundsFunc);
-    SELECT_SYMBOL_DEFAULT_AVX_AVX2(features,InstanceIntersector1);
-#if defined (RTCORE_RAY_PACKETS)
-    SELECT_SYMBOL_DEFAULT_AVX_AVX2(features,InstanceIntersector4);
-    SELECT_SYMBOL_INIT_AVX_AVX2(features,InstanceIntersector8);
-    SELECT_SYMBOL_INIT_AVX512KNL(features,InstanceIntersector16);
-#endif
+    SELECT_SYMBOL_DEFAULT_AVX_AVX2_AVX512KNL_AVX512SKX(features,InstanceIntersector1);
+#if defined (EMBREE_RAY_PACKETS)
+    SELECT_SYMBOL_DEFAULT_AVX_AVX2_AVX512KNL_AVX512SKX(features,InstanceIntersector4);
+    SELECT_SYMBOL_INIT_AVX_AVX2_AVX512KNL_AVX512SKX(features,InstanceIntersector8);
+    SELECT_SYMBOL_INIT_AVX512KNL_AVX512SKX(features,InstanceIntersector16);
+    SELECT_SYMBOL_DEFAULT_AVX_AVX2_AVX512KNL_AVX512SKX(features,InstanceIntersector1M);
 #endif
   }
 
-  Instance::Instance (Scene* parent, Accel* object, size_t numTimeSteps) 
-    : AccelSet(parent,1,numTimeSteps), object(object)
+  Instance::Instance (Scene* parent, Scene* object, size_t numTimeSteps) 
+    : AccelSet(parent,RTC_GEOMETRY_STATIC,1,numTimeSteps), object(object)
   {
-    local2world[0] = local2world[1] = one;
-    world2local[0] = world2local[1] = one;
+    world2local0 = one;
+    for (size_t i=0; i<numTimeSteps; i++) local2world[i] = one;
     intersectors.ptr = this;
-    boundsFunc2 = parent->device->instance_factory->InstanceBoundsFunc;
-    intersectors.intersector1 = parent->device->instance_factory->InstanceIntersector1;
-    intersectors.intersector4 = parent->device->instance_factory->InstanceIntersector4; 
-    intersectors.intersector8 = parent->device->instance_factory->InstanceIntersector8; 
-    intersectors.intersector16 = parent->device->instance_factory->InstanceIntersector16;
+    boundsFunc3 = parent->device->instance_factory->InstanceBoundsFunc();
+    boundsFuncUserPtr = nullptr;
+    intersectors.intersector1 = parent->device->instance_factory->InstanceIntersector1();
+#if defined (EMBREE_RAY_PACKETS)
+    intersectors.intersector4 = parent->device->instance_factory->InstanceIntersector4(); 
+    intersectors.intersector8 = parent->device->instance_factory->InstanceIntersector8(); 
+    intersectors.intersector16 = parent->device->instance_factory->InstanceIntersector16();
+    intersectors.intersector1M = parent->device->instance_factory->InstanceIntersector1M();
+#endif
   }
   
   void Instance::setTransform(const AffineSpace3fa& xfm, size_t timeStep)
@@ -64,7 +64,7 @@ namespace embree
       throw_RTCError(RTC_INVALID_OPERATION,"invalid timestep");
 
     local2world[timeStep] = xfm;
-    world2local[timeStep] = rcp(xfm);
+    if (timeStep == 0) world2local0 = rcp(xfm);
   }
 
   void Instance::setMask (unsigned mask) 
@@ -75,6 +75,4 @@ namespace embree
     this->mask = mask; 
     Geometry::update();
   }
-
-  
 }

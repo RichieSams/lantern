@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2017 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -17,6 +17,13 @@
 #pragma once
 
 #include "alloc.h"
+
+/*! instantiate vector using default allocator */
+#define vector_t vector
+#define allocator_t std::allocator<T>
+#include "vector_t.h"
+#undef vector_t
+#undef allocator_t
 
 /*! instantiate vector using aligned malloc */
 #define vector_t avector

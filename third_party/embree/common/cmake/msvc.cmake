@@ -1,5 +1,5 @@
 ## ======================================================================== ##
-## Copyright 2009-2015 Intel Corporation                                    ##
+## Copyright 2009-2017 Intel Corporation                                    ##
 ##                                                                          ##
 ## Licensed under the Apache License, Version 2.0 (the "License");          ##
 ## you may not use this file except in compliance with the License.         ##
@@ -25,29 +25,36 @@ SET(FLAGS_AVX   "/arch:AVX /DCONFIG_AVX")
 # Intel Compiler 15, Update 1 unfortunately cannot handle /arch:AVX2
 IF (${CMAKE_CXX_COMPILER_ID} STREQUAL "Intel")
   SET(FLAGS_AVX2  "/DCONFIG_AVX2 /QxCORE-AVX2")
+  SET(FLAGS_AVX512KNL "/DCONFIG_AVX512KNL /QxMIC-AVX512")
+  SET(FLAGS_AVX512SKX "/DCONFIG_AVX512SKX /QxCORE-AVX512")
 ELSE()
   SET(FLAGS_AVX2  "/arch:AVX2 /DCONFIG_AVX2 /QxCORE-AVX2")
+  SET(FLAGS_AVX512KNL "")
+  SET(FLAGS_AVX512SKX "")
 ENDIF()
-SET(FLAGS_AVX512KNL "")
 
-SET(COMMON_CXX_FLAGS "/EHsc /MP /GR")
-SET(COMMON_CXX_FLAGS "${COMMON_CXX_FLAGS} /Qdiag-disable:11074 ")  # remark #11074: Inlining inhibited by limit max-size
-SET(COMMON_CXX_FLAGS "${COMMON_CXX_FLAGS} /Qdiag-disable:11075 ")  # remark #11075: To get full report use -Qopt-report:4 -Qopt-report-phase ipo
+SET(COMMON_CXX_FLAGS "/EHsc /MP /GR /GS-")
+IF (${CMAKE_CXX_COMPILER_ID} STREQUAL "Intel")
+  SET(COMMON_CXX_FLAGS "${COMMON_CXX_FLAGS} /Qdiag-disable:11074 ")  # remark #11074: Inlining inhibited by limit max-size
+  SET(COMMON_CXX_FLAGS "${COMMON_CXX_FLAGS} /Qdiag-disable:11075 ")  # remark #11075: To get full report use -Qopt-report:4 -Qopt-report-phase ipo
+ENDIF()
 
 SET(CMAKE_CXX_FLAGS_DEBUG          "${CMAKE_CXX_FLAGS_DEBUG} ${COMMON_CXX_FLAGS}")
-SET(CMAKE_CXX_FLAGS_RELEASE        "${CMAKE_CXX_FLAGS_RELEASE}        ${COMMON_CXX_FLAGS} /Ox /fp:fast /Oi /Gy /Qinline-max-total-size- /Qinline-factor=200 ")
-SET(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} ${COMMON_CXX_FLAGS} /Ox /fp:fast /Oi /Gy /Qinline-max-total-size- /Qinline-factor=200 ")
+SET(CMAKE_CXX_FLAGS_RELEASE        "${CMAKE_CXX_FLAGS_RELEASE}        ${COMMON_CXX_FLAGS} /Ox /Oi /Gy /Qinline-max-total-size- /Qinline-factor=200 ")
+SET(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} ${COMMON_CXX_FLAGS} /Ox /Oi /Gy /Qinline-max-total-size- /Qinline-factor=200 ")
 
 SET(CMAKE_EXE_LINKER_FLAGS_DEBUG "${CMAKE_EXE_LINKER_FLAGS_DEBUG} /DEBUG")
 
-SET(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /Qdiag-disable:11082 ")  # warning #11082: locally defined symbol XXX imported
+IF (${CMAKE_CXX_COMPILER_ID} STREQUAL "Intel")
+  SET(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /Qdiag-disable:11082 ")  # warning #11082: locally defined symbol XXX imported
+ENDIF()
 SET(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /IGNORE:4217")  # locally defined symbol XXX imported in function YYY (happens as the ISPC API layer uses exported library functions)
-SET(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /IGNORE:4044")  # warning LNK4044: unrecognized option '/Qdiag-disable:11082'; ignored
+SET(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /IGNORE:4049")  # warning LNK4049: locally defined symbol _rtcOccluded1M imported
 SET(CMAKE_SHARED_LINKER_FLAGS_DEBUG "${CMAKE_SHARED_LINKER_FLAGS_DEBUG} /DEBUG")
 
 # optionally use static runtime library
-OPTION(USE_STATIC_RUNTIME "Use the static version of the C/C++ runtime library." ON)
-IF (USE_STATIC_RUNTIME)
+OPTION(EMBREE_STATIC_RUNTIME "Use the static version of the C/C++ runtime library." ON)
+IF (EMBREE_STATIC_RUNTIME)
   STRING(REPLACE "/MDd" "/MTd" CMAKE_CXX_FLAGS_DEBUG ${CMAKE_CXX_FLAGS_DEBUG})
   STRING(REPLACE "/MD" "/MT" CMAKE_CXX_FLAGS_RELWITHDEBINFO ${CMAKE_CXX_FLAGS_RELWITHDEBINFO})
   STRING(REPLACE "/MD" "/MT" CMAKE_CXX_FLAGS_RELEASE ${CMAKE_CXX_FLAGS_RELEASE})

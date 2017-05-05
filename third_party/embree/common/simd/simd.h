@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2017 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -25,22 +25,20 @@
 
 /* include AVX wrapper classes */
 #if defined(__AVX__)
-#include "avx.h"
+#  include "avx.h"
 #endif
 
 /* include AVX512 wrapper classes */
-#if defined (__MIC__)
+#if defined (__AVX512F__)
 #  include "avx512.h"
 #endif
 
-#if defined (__AVX__)
 #if defined(__AVX512F__)
-#define AVX_ZERO_UPPER() // FIXME: shouldn't this be enabled if AVX512VL not supported?
+#  define AVX_ZERO_UPPER()
+#elif defined (__AVX__)
+#  define AVX_ZERO_UPPER() _mm256_zeroupper()
 #else
-#define AVX_ZERO_UPPER() _mm256_zeroupper()
-#endif
-#else
-#define AVX_ZERO_UPPER()
+#  define AVX_ZERO_UPPER()
 #endif
 
 namespace embree
@@ -51,7 +49,7 @@ namespace embree
   {
     vbool valid1 = valid0;
     while (any(valid1)) {
-      const int j = __bsf(movemask(valid1));
+      const int j = int(__bsf(movemask(valid1)));
       const int i = vi[j];
       const vbool valid2 = valid1 & (i == vi);
       valid1 = valid1 & !valid2;
@@ -65,7 +63,7 @@ namespace embree
   {
     vbool valid1 = valid0;
     while (any(valid1)) {
-      const int j = __bsf(movemask(valid1));
+      const int j = (int) __bsf(movemask(valid1));
       const int i = vi[j];
       const vbool valid2 = valid1 & (i == vi);
       valid1 = valid1 & !valid2;

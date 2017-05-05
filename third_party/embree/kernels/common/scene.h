@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2017 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and      //
 // limitations under the License.                                           //
 // ======================================================================== //
-
+ 
 #pragma once
 
 #include "default.h"
@@ -27,31 +27,20 @@
 #include "scene_line_segments.h"
 #include "scene_subdiv_mesh.h"
 
-#include "subdiv/tessellation_cache.h"
+#include "../subdiv/tessellation_cache.h"
 
 #include "acceln.h"
 #include "geometry.h"
 
 namespace embree
 {
-  /*! decoding of geometry flags */
-  __forceinline bool isStatic    (RTCSceneFlags flags) { return (flags & 1) == RTC_SCENE_STATIC; }
-  __forceinline bool isDynamic   (RTCSceneFlags flags) { return (flags & 1) == RTC_SCENE_DYNAMIC; }
-
-  __forceinline bool isCompact   (RTCSceneFlags flags) { return flags & RTC_SCENE_COMPACT; }
-  __forceinline bool isRobust    (RTCSceneFlags flags) { return flags & RTC_SCENE_ROBUST; }
-  __forceinline bool isCoherent  (RTCSceneFlags flags) { return flags & RTC_SCENE_COHERENT; }
-  __forceinline bool isIncoherent(RTCSceneFlags flags) { return flags & RTC_SCENE_INCOHERENT; }
-  __forceinline bool isHighQuality(RTCSceneFlags flags) { return flags & RTC_SCENE_HIGH_QUALITY; }
-  __forceinline bool isInterpolatable(RTCAlgorithmFlags flags) { return flags & RTC_INTERPOLATE; }
-
   /*! Base class all scenes are derived from */
   class Scene : public Accel
   {
     ALIGNED_CLASS;
 
   public:
-    template<typename Ty, size_t timeSteps = 1>
+    template<typename Ty, bool mblur = false>
       class Iterator
       {
       public:
@@ -66,7 +55,7 @@ namespace embree
         if (geom == nullptr) return nullptr;
         if (!all && !geom->isEnabled()) return nullptr;
         if (geom->getType() != Ty::geom_type) return nullptr;
-        if (geom->numTimeSteps != timeSteps) return nullptr;
+        if ((geom->numTimeSteps != 1) != mblur) return nullptr;
         return (Ty*) geom;
       }
 
@@ -79,7 +68,7 @@ namespace embree
       }
       
       __forceinline size_t numPrimitives() const {
-        return scene->getNumPrimitives<Ty,timeSteps>();
+        return scene->getNumPrimitives<Ty,mblur>();
       }
 
       __forceinline size_t maxPrimitivesPerGeometry() 
@@ -89,6 +78,17 @@ namespace embree
           Ty* mesh = at(i);
           if (mesh == nullptr) continue;
           ret = max(ret,mesh->size());
+        }
+        return ret;
+      }
+
+      __forceinline unsigned maxTimeStepsPerGeometry()
+      {
+        unsigned ret = 0;
+        for (size_t i=0; i<scene->size(); i++) {
+          Ty* mesh = at(i);
+          if (mesh == nullptr) continue;
+          ret = max(ret,mesh->numTimeSteps);
         }
         return ret;
       }
@@ -103,6 +103,12 @@ namespace embree
     /*! Scene construction */
     Scene (Device* device, RTCSceneFlags flags, RTCAlgorithmFlags aflags);
 
+  private:
+    /*! class is non-copyable */
+    Scene (const Scene& other) DELETED; // do not implement
+    Scene& operator= (const Scene& other) DELETED; // do not implement
+
+  public:
     void createTriangleAccel();
     void createQuadAccel();
     void createTriangleMBAccel();
@@ -112,6 +118,9 @@ namespace embree
     void createLineAccel();
     void createLineMBAccel();
     void createSubdivAccel();
+    void createSubdivMBAccel();
+    void createUserGeometryAccel();
+    void createUserGeometryMBAccel();
 
     /*! Scene destruction */
     ~Scene ();
@@ -120,7 +129,7 @@ namespace embree
     void clear();
 
     /*! Creates new user geometry. */
-    unsigned int newUserGeometry (size_t items, size_t numTimeSteps);
+    unsigned int newUserGeometry (RTCGeometryFlags gflags, size_t items, size_t numTimeSteps);
 
     /*! Creates a new scene instance. */
     unsigned int newInstance (Scene* scene, size_t numTimeSteps);
@@ -135,7 +144,7 @@ namespace embree
     unsigned int newQuadMesh (RTCGeometryFlags flags, size_t maxQuads, size_t maxVertices, size_t numTimeSteps);
 
     /*! Creates a new collection of quadratic bezier curves. */
-    unsigned int newBezierCurves (RTCGeometryFlags flags, size_t maxCurves, size_t maxVertices, size_t numTimeSteps);
+    unsigned int newCurves (NativeCurves::SubType subtype, NativeCurves::Basis basis, RTCGeometryFlags flags, size_t maxCurves, size_t maxVertices, size_t numTimeSteps);
 
     /*! Creates a new collection of line segments. */
     unsigned int newLineSegments (RTCGeometryFlags flags, size_t maxSegments, size_t maxVertices, size_t numTimeSteps);
@@ -147,19 +156,11 @@ namespace embree
     void deleteGeometry(size_t geomID);
 
     /*! Builds acceleration structure for the scene. */
-    void build (size_t threadIndex, size_t threadCount);
-    void build_task ();
-
-    /*! stores scene into binary file */
-    void write(std::ofstream& file);
+    void commit (size_t threadIndex, size_t threadCount, bool useThreadPool);
+    void commit_task ();
+    void build () {}
 
     void updateInterface();
-
-    /*! build task */
-#if defined(TASKING_LOCKSTEP)
-    TASK_RUN_FUNCTION(Scene,task_build_parallel);
-    TaskScheduler::Task task;
-#endif
 
     /* return number of geometries */
     __forceinline size_t size() const { return geometries.size(); }
@@ -183,6 +184,19 @@ namespace embree
     __forceinline const Geometry* get(size_t i) const { assert(i < geometries.size()); return geometries[i]; }
 
     template<typename Mesh>
+      __forceinline       Mesh* get(size_t i)       { 
+      assert(i < geometries.size()); 
+      assert(geometries[i]->getType() == Mesh::geom_type);
+      return (Mesh*)geometries[i]; 
+    }
+    template<typename Mesh>
+      __forceinline const Mesh* get(size_t i) const { 
+      assert(i < geometries.size()); 
+      assert(geometries[i]->getType() == Mesh::geom_type);
+      return (Mesh*)geometries[i]; 
+    }
+
+    template<typename Mesh>
     __forceinline Mesh* getSafe(size_t i) {
       assert(i < geometries.size());
       if (geometries[i] == nullptr) return nullptr;
@@ -191,86 +205,10 @@ namespace embree
     }
 
     __forceinline Geometry* get_locked(size_t i)  {
-      Lock<AtomicMutex> lock(geometriesMutex);
+      Lock<SpinLock> lock(geometriesMutex);
       Geometry *g = geometries[i]; 
       assert(i < geometries.size()); 
       return g; 
-    }
-
-    /* get triangle mesh by ID */
-    __forceinline TriangleMesh* getTriangleMesh(size_t i) { 
-      assert(i < geometries.size()); 
-      assert(geometries[i]);
-      assert(geometries[i]->getType() == Geometry::TRIANGLE_MESH);
-      return (TriangleMesh*) geometries[i]; 
-    }
-    __forceinline const TriangleMesh* getTriangleMesh(size_t i) const { 
-      assert(i < geometries.size()); 
-      assert(geometries[i]);
-      assert(geometries[i]->getType() == Geometry::TRIANGLE_MESH);
-      return (TriangleMesh*) geometries[i]; 
-    }
-    __forceinline TriangleMesh* getTriangleMeshSafe(size_t i) { 
-      assert(i < geometries.size()); 
-      if (geometries[i] == nullptr) return nullptr;
-      if (geometries[i]->getType() != Geometry::TRIANGLE_MESH) return nullptr;
-      else return (TriangleMesh*) geometries[i]; 
-    }
-
-    /* get quad mesh by ID */
-    __forceinline QuadMesh* getQuadMesh(size_t i) { 
-      assert(i < geometries.size()); 
-      assert(geometries[i]);
-      assert(geometries[i]->getType() == Geometry::QUAD_MESH);
-      return (QuadMesh*) geometries[i]; 
-    }
-    __forceinline const QuadMesh* getQuadMesh(size_t i) const { 
-      assert(i < geometries.size()); 
-      assert(geometries[i]);
-      assert(geometries[i]->getType() == Geometry::QUAD_MESH);
-      return (QuadMesh*) geometries[i]; 
-    }
-
-    /* get subdiv mesh by ID */
-    __forceinline SubdivMesh* getSubdivMesh(size_t i) { 
-      assert(i < geometries.size()); 
-      assert(geometries[i]);
-      assert(geometries[i]->getType() == Geometry::SUBDIV_MESH);
-      return (SubdivMesh*) geometries[i]; 
-    }
-    __forceinline const SubdivMesh* getSubdivMesh(size_t i) const { 
-      assert(i < geometries.size()); 
-      assert(geometries[i]);
-      assert(geometries[i]->getType() == Geometry::SUBDIV_MESH);
-      return (SubdivMesh*) geometries[i]; 
-    }
-
-    /* get user geometry by ID */
-    __forceinline AccelSet* getUserGeometrySafe(size_t i) { 
-      assert(i < geometries.size()); 
-      if (geometries[i] == nullptr) return nullptr;
-      if (geometries[i]->getType() != Geometry::USER_GEOMETRY) return nullptr;
-      else return (AccelSet*) geometries[i]; 
-    }
-
-    __forceinline BezierCurves* getBezierCurves(size_t i) { 
-      assert(i < geometries.size()); 
-      assert(geometries[i]);
-      assert(geometries[i]->getType() == Geometry::BEZIER_CURVES);
-      return (BezierCurves*) geometries[i]; 
-    }
-
-    __forceinline LineSegments* getLineSegments(size_t i) {
-      assert(i < geometries.size());
-      assert(geometries[i]);
-      assert(geometries[i]->getType() == Geometry::LINE_SEGMENTS);
-      return (LineSegments*) geometries[i];
-    }
-    __forceinline const LineSegments* getLineSegments(size_t i) const {
-      assert(i < geometries.size());
-      assert(geometries[i]);
-      assert(geometries[i]->getType() == Geometry::LINE_SEGMENTS);
-      return (LineSegments*) geometries[i];
     }
 
     /* test if this is a static scene */
@@ -284,22 +222,28 @@ namespace embree
     __forceinline bool isRobust() const { return embree::isRobust(flags); }
     __forceinline bool isHighQuality() const { return embree::isHighQuality(flags); }
     __forceinline bool isInterpolatable() const { return embree::isInterpolatable(aflags); }
+    __forceinline bool isStreamMode() const { return embree::isStreamMode(aflags); }
+
+    __forceinline bool isExclusiveIntersect1Mode() const { 
+      if (!embree::isIntersect1Mode(aflags)) return false;
+      if (embree::isIntersect4Mode(aflags))  return false;
+      if (embree::isIntersect8Mode(aflags))  return false;
+      if (embree::isIntersect16Mode(aflags)) return false;
+      return true;
+    }
 
     /* test if scene got already build */
     __forceinline bool isBuild() const { return is_build; }
 
   public:
-    std::vector<int> usedIDs; // FIXME: encapsulate this functionality into own class
+    IDPool<unsigned> id_pool;
     std::vector<Geometry*> geometries; //!< list of all user geometries
-
-    static AtomicCounter numScenes;
     
   public:
     Device* device;
     AccelN accels;
-    unsigned int commitCounter;
-    atomic_t commitCounterSubdiv;
-    atomic_t numMappedBuffers;         //!< number of mapped buffers
+    std::atomic<size_t> commitCounterSubdiv;
+    std::atomic<size_t> numMappedBuffers;         //!< number of mapped buffers
     RTCSceneFlags flags;
     RTCAlgorithmFlags aflags;
     bool needTriangleIndices; 
@@ -312,19 +256,20 @@ namespace embree
     bool needLineVertices;
     bool needSubdivIndices;
     bool needSubdivVertices;
-    bool is_build;
     MutexSys buildMutex;
-    AtomicMutex geometriesMutex;
+    SpinLock geometriesMutex;
+    bool is_build;
     bool modified;                   //!< true if scene got modified
     
     /*! global lock step task scheduler */
-#if defined(TASKING_LOCKSTEP)
-    __aligned(64) LockStepTaskScheduler lockstep_scheduler;
-#elif defined(TASKING_TBB_INTERNAL)
+#if defined(TASKING_INTERNAL) 
     MutexSys schedulerMutex;
-    Ref<TaskSchedulerTBB> scheduler;
-#else
+    Ref<TaskScheduler> scheduler;
+#elif defined(TASKING_TBB)
     tbb::task_group* group;
+    BarrierActiveAutoReset group_barrier;
+#elif defined(TASKING_PPL)
+    concurrency::task_group* group;
     BarrierActiveAutoReset group_barrier;
 #endif
     
@@ -332,14 +277,14 @@ namespace embree
     struct BuildProgressMonitorInterface : public BuildProgressMonitor {
       BuildProgressMonitorInterface(Scene* scene) 
       : scene(scene) {}
-      void operator() (size_t dn) { scene->progressMonitor(dn); }
+      void operator() (size_t dn) const { scene->progressMonitor(double(dn)); }
     private:
       Scene* scene;
     };
     BuildProgressMonitorInterface progressInterface;
     RTCProgressMonitorFunc progress_monitor_function;
     void* progress_monitor_ptr;
-    atomic_t progress_monitor_counter;
+    std::atomic<size_t> progress_monitor_counter;
     void progressMonitor(double nprims);
     void setProgressMonitorFunction(RTCProgressMonitorFunc func, void* ptr);
 
@@ -353,43 +298,54 @@ namespace embree
         return numTriangles + numQuads + numBezierCurves + numLineSegments + numSubdivPatches + numUserGeometries;
       }
 
-      atomic_t numTriangles;             //!< number of enabled triangles
-      atomic_t numQuads;                 //!< number of enabled quads
-      atomic_t numBezierCurves;          //!< number of enabled curves
-      atomic_t numLineSegments;          //!< number of enabled line segments
-      atomic_t numSubdivPatches;         //!< number of enabled subdivision patches
-      atomic_t numUserGeometries;        //!< number of enabled user geometries
+      std::atomic<size_t> numTriangles;             //!< number of enabled triangles
+      std::atomic<size_t> numQuads;                 //!< number of enabled quads
+      std::atomic<size_t> numBezierCurves;          //!< number of enabled curves
+      std::atomic<size_t> numLineSegments;          //!< number of enabled line segments
+      std::atomic<size_t> numSubdivPatches;         //!< number of enabled subdivision patches
+      std::atomic<size_t> numUserGeometries;        //!< number of enabled user geometries
     };
     
-    GeometryCounts world1;               //!< counts for non-motion blurred geometry
-    GeometryCounts world2;               //!< counts for motion blurred geometry
-    GeometryCounts instanced1;           //!< instance counts for non-motion blurred geometry
-    GeometryCounts instanced2;           //!< instance counts for motion blurred geometry
+    GeometryCounts world;               //!< counts for non-motion blurred geometry
+    GeometryCounts worldMB;             //!< counts for motion blurred geometry
+    GeometryCounts instanced;           //!< instance counts for non-motion blurred geometry
+    GeometryCounts instancedMB;         //!< instance counts for motion blurred geometry
 
-    atomic_t numSubdivEnableDisableEvents; //!< number of enable/disable calls for any subdiv geometry
+    std::atomic<size_t> numSubdivEnableDisableEvents; //!< number of enable/disable calls for any subdiv geometry
 
     __forceinline size_t numPrimitives() const {
-      return world1.size() + world2.size();
+      return world.size() + worldMB.size();
     }
 
-    template<typename Mesh, int timeSteps> __forceinline size_t getNumPrimitives() const;
+    template<typename Mesh, bool mblur> __forceinline size_t getNumPrimitives() const;
+
+    template<typename Mesh, bool mblur>
+    __forceinline unsigned getNumTimeSteps()
+    {
+      if (!mblur)
+        return 1;
+
+      Scene::Iterator<Mesh,mblur> iter(this);
+      return iter.maxTimeStepsPerGeometry();
+    }
    
-    atomic_t numIntersectionFilters4;   //!< number of enabled intersection/occlusion filters for 4-wide ray packets
-    atomic_t numIntersectionFilters8;   //!< number of enabled intersection/occlusion filters for 8-wide ray packets
-    atomic_t numIntersectionFilters16;  //!< number of enabled intersection/occlusion filters for 16-wide ray packets
-    atomic_t numIntersectionFiltersN;  //!< number of enabled intersection/occlusion filters for N-wide ray streams    
+    std::atomic<size_t> numIntersectionFilters1;   //!< number of enabled intersection/occlusion filters for single rays
+    std::atomic<size_t> numIntersectionFilters4;   //!< number of enabled intersection/occlusion filters for 4-wide ray packets
+    std::atomic<size_t> numIntersectionFilters8;   //!< number of enabled intersection/occlusion filters for 8-wide ray packets
+    std::atomic<size_t> numIntersectionFilters16;  //!< number of enabled intersection/occlusion filters for 16-wide ray packets
+    std::atomic<size_t> numIntersectionFiltersN;   //!< number of enabled intersection/occlusion filters for N-wide ray packets
   };
 
-  template<> __forceinline size_t Scene::getNumPrimitives<TriangleMesh,1>() const { return world1.numTriangles; } 
-  template<> __forceinline size_t Scene::getNumPrimitives<TriangleMesh,2>() const { return world2.numTriangles; } 
-  template<> __forceinline size_t Scene::getNumPrimitives<QuadMesh,1>() const { return world1.numQuads; } 
-  template<> __forceinline size_t Scene::getNumPrimitives<QuadMesh,2>() const { return world2.numQuads; } 
-  template<> __forceinline size_t Scene::getNumPrimitives<BezierCurves,1>() const { return world1.numBezierCurves; } 
-  template<> __forceinline size_t Scene::getNumPrimitives<BezierCurves,2>() const { return world2.numBezierCurves; } 
-  template<> __forceinline size_t Scene::getNumPrimitives<LineSegments,1>() const { return world1.numLineSegments; }
-  template<> __forceinline size_t Scene::getNumPrimitives<LineSegments,2>() const { return world2.numLineSegments; }
-  template<> __forceinline size_t Scene::getNumPrimitives<SubdivMesh,1>() const { return world1.numSubdivPatches; } 
-  template<> __forceinline size_t Scene::getNumPrimitives<SubdivMesh,2>() const { return world2.numSubdivPatches; } 
-  template<> __forceinline size_t Scene::getNumPrimitives<AccelSet,1>() const { return world1.numUserGeometries; } 
-  template<> __forceinline size_t Scene::getNumPrimitives<AccelSet,2>() const { return world2.numUserGeometries; } 
+  template<> __forceinline size_t Scene::getNumPrimitives<TriangleMesh,false>() const { return world.numTriangles; }
+  template<> __forceinline size_t Scene::getNumPrimitives<TriangleMesh,true>() const { return worldMB.numTriangles; }
+  template<> __forceinline size_t Scene::getNumPrimitives<QuadMesh,false>() const { return world.numQuads; }
+  template<> __forceinline size_t Scene::getNumPrimitives<QuadMesh,true>() const { return worldMB.numQuads; }
+  template<> __forceinline size_t Scene::getNumPrimitives<NativeCurves,false>() const { return world.numBezierCurves; }
+  template<> __forceinline size_t Scene::getNumPrimitives<NativeCurves,true>() const { return worldMB.numBezierCurves; }
+  template<> __forceinline size_t Scene::getNumPrimitives<LineSegments,false>() const { return world.numLineSegments; }
+  template<> __forceinline size_t Scene::getNumPrimitives<LineSegments,true>() const { return worldMB.numLineSegments; }
+  template<> __forceinline size_t Scene::getNumPrimitives<SubdivMesh,false>() const { return world.numSubdivPatches; }
+  template<> __forceinline size_t Scene::getNumPrimitives<SubdivMesh,true>() const { return worldMB.numSubdivPatches; }
+  template<> __forceinline size_t Scene::getNumPrimitives<AccelSet,false>() const { return world.numUserGeometries; }
+  template<> __forceinline size_t Scene::getNumPrimitives<AccelSet,true>() const { return worldMB.numUserGeometries; }
 }

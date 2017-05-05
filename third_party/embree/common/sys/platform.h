@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2015 Intel Corporation                                    //
+// Copyright 2009-2017 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -18,6 +18,8 @@
 
 #define _CRT_SECURE_NO_WARNINGS
 
+//__asm__(".symver memcpy,memcpy@GLIBC_2.2.5");
+
 #include <cstddef>
 #include <cassert>
 #include <cstdlib>
@@ -30,6 +32,7 @@
 #include <string>
 #include <cstring>
 #include <stdint.h>
+#include <functional>
 
 ////////////////////////////////////////////////////////////////////////////////
 /// detect platform
@@ -60,7 +63,7 @@
 #  endif
 #endif
 
-/* detect Windows 95/98/NT/2000/XP/Vista/7 platform */
+/* detect Windows 95/98/NT/2000/XP/Vista/7/8/10 platform */
 #if (defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)) && !defined(__CYGWIN__)
 #  if !defined(__WIN32__)
 #     define __WIN32__
@@ -168,21 +171,33 @@
 #define debugbreak()           __debugbreak()
 
 #else
-#undef __noinline
-#undef __forceinline
+#if !defined(__noinline)
 #define __noinline             __attribute__((noinline))
+#endif
+#if !defined(__forceinline)
 #define __forceinline          inline __attribute__((always_inline))
+#endif
 //#define __restrict             __restrict
 //#define __thread               __thread
+#if !defined(__aligned)
 #define __aligned(...)           __attribute__((aligned(__VA_ARGS__)))
+#endif
+#if !defined(__FUNCTION__)
 #define __FUNCTION__           __PRETTY_FUNCTION__
+#endif
 #define debugbreak()           asm ("int $3")
 #endif
 
-#ifdef __GNUC__
-  #define MAYBE_UNUSED __attribute__((used))
+#if defined(__clang__) || defined(__GNUC__)
+  #define MAYBE_UNUSED __attribute__((unused))
 #else
   #define MAYBE_UNUSED
+#endif
+
+#if defined(_MSC_VER) && (_MSC_VER < 1900) // before VS2015 deleted functions are not supported properly
+  #define DELETED
+#else
+  #define DELETED  = delete
 #endif
 
 #if defined(_MSC_VER) && !defined(__INTEL_COMPILER)
@@ -214,13 +229,8 @@
     throw std::runtime_error(str);
 #endif
 
-#if defined(__MIC__)
-  #define FATAL(x)   { std::cerr << "Error: "   << x << std::endl << std::flush; exit(1); }
-  #define WARNING(x) { std::cerr << "Warning: " << x << std::endl << std::flush; }
-#else
-  #define FATAL(x)   THROW_RUNTIME_ERROR(x)
-  #define WARNING(x) { std::cerr << "Warning: " << x << std::endl << std::flush; }
-#endif
+#define FATAL(x)   THROW_RUNTIME_ERROR(x)
+#define WARNING(x) { std::cerr << "Warning: " << x << std::endl << std::flush; }
 
 #define NOT_IMPLEMENTED FATAL(std::string(__FUNCTION__) + " not implemented")
 
@@ -253,45 +263,69 @@ __forceinline std::string toString(long long value) {
 ////////////////////////////////////////////////////////////////////////////////
 
 #if defined(__INTEL_COMPILER)
-#pragma warning(disable:265 ) // floating-point operation result is out of range
-#pragma warning(disable:383 ) // value copied to temporary, reference to temporary used
-#pragma warning(disable:869 ) // parameter was never referenced
-#pragma warning(disable:981 ) // operands are evaluated in unspecified order
-#pragma warning(disable:1418) // external function definition with no prior declaration
-#pragma warning(disable:1419) // external declaration in primary source file
-#pragma warning(disable:1572) // floating-point equality and inequality comparisons are unreliable
-#pragma warning(disable:94  ) // the size of an array must be greater than zero
-#pragma warning(disable:1599) // declaration hides parameter
-#pragma warning(disable:424 ) // extra ";" ignored
+//#pragma warning(disable:265 ) // floating-point operation result is out of range
+//#pragma warning(disable:383 ) // value copied to temporary, reference to temporary used
+//#pragma warning(disable:869 ) // parameter was never referenced
+//#pragma warning(disable:981 ) // operands are evaluated in unspecified order
+//#pragma warning(disable:1418) // external function definition with no prior declaration
+//#pragma warning(disable:1419) // external declaration in primary source file
+//#pragma warning(disable:1572) // floating-point equality and inequality comparisons are unreliable
+//#pragma warning(disable:94  ) // the size of an array must be greater than zero
+//#pragma warning(disable:1599) // declaration hides parameter
+//#pragma warning(disable:424 ) // extra ";" ignored
 #pragma warning(disable:2196) // routine is both "inline" and "noinline"
-#pragma warning(disable:177 ) // label was declared but never referenced
-#pragma warning(disable:114 ) // function was referenced but not defined
-#pragma warning(disable:819 ) // template nesting depth does not match the previous declaration of function
+//#pragma warning(disable:177 ) // label was declared but never referenced
+//#pragma warning(disable:114 ) // function was referenced but not defined
+//#pragma warning(disable:819 ) // template nesting depth does not match the previous declaration of function
 #endif
 
 #if defined(_MSC_VER)
-#pragma warning(disable:4200) // nonstandard extension used : zero-sized array in struct/union
+//#pragma warning(disable:4200) // nonstandard extension used : zero-sized array in struct/union
 #pragma warning(disable:4800) // forcing value to bool 'true' or 'false' (performance warning)
-#pragma warning(disable:4267) // '=' : conversion from 'size_t' to 'unsigned long', possible loss of data
-#pragma warning(disable:4244) // 'argument' : conversion from 'ssize_t' to 'unsigned int', possible loss of data
-#pragma warning(disable:4355) // 'this' : used in base member initializer list
-#pragma warning(disable:391 ) // '<=' : signed / unsigned mismatch
-#pragma warning(disable:4018) // '<' : signed / unsigned mismatch
-#pragma warning(disable:4305) // 'initializing' : truncation from 'double' to 'float'
-#pragma warning(disable:4068) // unknown pragma
-#pragma warning(disable:4146) // unary minus operator applied to unsigned type, result still unsigned
-#pragma warning(disable:4838) // conversion from 'unsigned int' to 'const int' requires a narrowing conversion)
-#pragma warning(disable:4227) // anachronism used : qualifiers on reference are ignored
+//#pragma warning(disable:4267) // '=' : conversion from 'size_t' to 'unsigned long', possible loss of data
+//#pragma warning(disable:4244) // 'argument' : conversion from 'ssize_t' to 'unsigned int', possible loss of data
+//#pragma warning(disable:4355) // 'this' : used in base member initializer list
+//#pragma warning(disable:391 ) // '<=' : signed / unsigned mismatch
+//#pragma warning(disable:4018) // '<' : signed / unsigned mismatch
+//#pragma warning(disable:4305) // 'initializing' : truncation from 'double' to 'float'
+//#pragma warning(disable:4068) // unknown pragma
+//#pragma warning(disable:4146) // unary minus operator applied to unsigned type, result still unsigned
+//#pragma warning(disable:4838) // conversion from 'unsigned int' to 'const int' requires a narrowing conversion)
+//#pragma warning(disable:4227) // anachronism used : qualifiers on reference are ignored
+#pragma warning(disable:4503) // decorated name length exceeded, name was truncated
+#pragma warning(disable:4180) // qualifier applied to function type has no meaning; ignored
+#pragma warning(disable:4258) // definition from the for loop is ignored; the definition from the enclosing scope is used
 #endif
 
 #if defined(__clang__) && !defined(__INTEL_COMPILER)
-#pragma clang diagnostic ignored "-Wunknown-pragmas"
-#pragma clang diagnostic ignored "-Wunused-variable"
-#pragma clang diagnostic ignored "-Wreorder"
-#pragma clang diagnostic ignored "-Wmicrosoft"
-#pragma clang diagnostic ignored "-Wunused-private-field"
-#pragma clang diagnostic ignored "-Wunused-local-typedef"
+//#pragma clang diagnostic ignored "-Wunknown-pragmas"
+//#pragma clang diagnostic ignored "-Wunused-variable"
+//#pragma clang diagnostic ignored "-Wreorder"
+//#pragma clang diagnostic ignored "-Wmicrosoft"
+//#pragma clang diagnostic ignored "-Wunused-private-field"
+//#pragma clang diagnostic ignored "-Wunused-local-typedef"
+//#pragma clang diagnostic ignored "-Wunused-function"
+//#pragma clang diagnostic ignored "-Wnarrowing"
+//#pragma clang diagnostic ignored "-Wc++11-narrowing"
+//#pragma clang diagnostic ignored "-Wdeprecated-register"
+//#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+#endif
+
+#if defined(__GNUC__) && !defined(__INTEL_COMPILER) && !defined(__clang__)
+//#pragma GCC diagnostic ignored "-Wnarrowing"
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+//#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+//#pragma GCC diagnostic ignored "-Warray-bounds"
+#pragma GCC diagnostic ignored "-Wattributes"
+#endif
+
+#if defined(__clang__) && defined(__WIN32__)
+#pragma clang diagnostic ignored "-Wunused-parameter"
+#pragma clang diagnostic ignored "-Wmicrosoft-cast"
+#pragma clang diagnostic ignored "-Wmicrosoft-enum-value"
+#pragma clang diagnostic ignored "-Wmicrosoft-include"
 #pragma clang diagnostic ignored "-Wunused-function"
+#pragma clang diagnostic ignored "-Wunknown-pragmas"
 #endif
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -325,3 +359,31 @@ __asm__ __volatile__ (									\
 					IACA_SSC_MARK(111)}
 #define IACA_END {IACA_SSC_MARK(222) \
 					IACA_UD_BYTES}
+
+namespace embree
+{
+  template<typename Closure>
+    struct OnScopeExitHelper
+  {
+    OnScopeExitHelper (const Closure f) : active(true), f(f) {}
+    ~OnScopeExitHelper() { if (active) f(); }
+    void deactivate() { active = false; }
+    bool active;
+    const Closure f;
+  };
+  
+  template <typename Closure>
+    OnScopeExitHelper<Closure> OnScopeExit(const Closure f) {
+    return OnScopeExitHelper<Closure>(f);
+  };
+
+#define STRING_JOIN2(arg1, arg2) DO_STRING_JOIN2(arg1, arg2)
+#define DO_STRING_JOIN2(arg1, arg2) arg1 ## arg2
+#define ON_SCOPE_EXIT(code)                                             \
+  auto STRING_JOIN2(on_scope_exit_, __LINE__) = OnScopeExit([&](){code;})
+
+  template<typename Ty>
+    std::unique_ptr<Ty> make_unique(Ty* ptr) {
+    return std::unique_ptr<Ty>(ptr);
+  }
+}
