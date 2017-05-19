@@ -26,7 +26,7 @@ find_package(OpenGL REQUIRED)
 set( GLFW_BUILD_EXAMPLES OFF CACHE BOOL  "GLFW lib only" )
 set( GLFW_BUILD_TESTS OFF CACHE BOOL  "GLFW lib only" )
 set( GLFW_BUILD_DOCS OFF CACHE BOOL  "GLFW lib only" )
-set( GLFW_BUILD_INSTALL OFF CACHE BOOL  "GLFW lib only" )
+set( GLFW_INSTALL OFF CACHE BOOL  "GLFW lib only" )
 add_subdirectory(third_party/glfw)
 include_directories(third_party/glfw/include)
 
