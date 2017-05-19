@@ -23,6 +23,7 @@
 
 #include <json.h>
 
+#define EMBREE_STATIC_LIB
 #include <embree2/rtcore.h>
 
 

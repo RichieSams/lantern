@@ -36,7 +36,7 @@ namespace embree
       typedef std::ptrdiff_t difference_type;
       
       __forceinline aligned_monitored_allocator(MemoryMonitorInterface* device) 
-        : device(device) {}
+        : device(device), hugepages(false) {}
 
       __forceinline pointer allocate( size_type n ) 
       {
@@ -44,14 +44,12 @@ namespace embree
           assert(device);
           device->memoryMonitor(n*sizeof(T),false);
         }
-#if defined(__LINUX__) && defined(__AVX512ER__) // KNL
         if (n*sizeof(value_type) >= 14 * PAGE_SIZE_2M)
         {
-          pointer p =  (pointer) os_malloc(n*sizeof(value_type));
+          pointer p =  (pointer) os_malloc(n*sizeof(value_type),hugepages);
           assert(p);
           return p;
         }
-#endif
         return (pointer) alignedMalloc(n*sizeof(value_type),alignment);
       }
 
@@ -59,14 +57,10 @@ namespace embree
       {
         if (p)
         {
-#if defined(__LINUX__) && defined(__AVX512ER__) // KNL
           if (n*sizeof(value_type) >= 14 * PAGE_SIZE_2M)
-            os_free(p,n*sizeof(value_type)); 
+            os_free(p,n*sizeof(value_type),hugepages); 
           else
             alignedFree(p);
-#else
-          alignedFree(p);
-#endif
         }
         else assert(n == 0);
 
@@ -86,21 +80,10 @@ namespace embree
 
     private:
       MemoryMonitorInterface* device;
+      bool hugepages;
     };
-}
 
-/*! instantiate vector using monitored aligned allocations */
-#define VECTOR_INIT_ALLOCATOR
-#define vector_t mvector
-#define allocator_t aligned_monitored_allocator<T,std::alignment_of<T>::value>
-#include "../common/sys/vector_t.h"
-#undef vector_t
-#undef allocator_t
-#undef VECTOR_INIT_ALLOCATOR
-
-namespace embree
-{
   /*! monitored vector */
-  //template<typename T> // FIXME: unfortunately not supported in VS2012
-  //using mvector = vector_t<T,aligned_monitored_allocator<T,std::alignment_of<T>::value> >;
+  template<typename T>
+    using mvector = vector_t<T,aligned_monitored_allocator<T,std::alignment_of<T>::value> >;
 }

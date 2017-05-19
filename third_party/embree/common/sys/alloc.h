@@ -18,6 +18,7 @@
 
 #include "platform.h"
 #include <vector>
+#include <set>
 
 namespace embree
 {
@@ -77,11 +78,11 @@ namespace embree
     };
 
   /*! allocates pages directly from OS */
-  void* os_malloc (size_t bytes);
-  void* os_reserve(size_t bytes);
-  void  os_commit (void* ptr, size_t bytes);
-  size_t os_shrink (void* ptr, size_t bytesNew, size_t bytesOld);
-  void  os_free   (void* ptr, size_t bytes);
+  bool win_enable_selockmemoryprivilege(bool verbose);
+  bool os_init(bool hugepages, bool verbose);
+  void* os_malloc (size_t bytes, bool& hugepages);
+  size_t os_shrink (void* ptr, size_t bytesNew, size_t bytesOld, bool hugepages);
+  void  os_free   (void* ptr, size_t bytes, bool hugepages);
   void  os_advise (void* ptr, size_t bytes);
 
   /*! allocator that performs OS allocations */
@@ -96,12 +97,15 @@ namespace embree
       typedef std::size_t size_type;
       typedef std::ptrdiff_t difference_type;
 
+      __forceinline os_allocator () 
+        : hugepages(false) {}
+
       __forceinline pointer allocate( size_type n ) {
-        return (pointer) os_malloc(n*sizeof(value_type));
+        return (pointer) os_malloc(n*sizeof(value_type),hugepages);
       }
 
       __forceinline void deallocate( pointer p, size_type n ) {
-        return os_free(p,n*sizeof(value_type));
+        return os_free(p,n*sizeof(value_type),hugepages);
       }
 
       __forceinline void construct( pointer p, const_reference val ) {
@@ -111,6 +115,8 @@ namespace embree
       __forceinline void destroy( pointer p ) {
         p->~T();
       }
+
+      bool hugepages;
     };
 
   /*! allocator for IDs */
@@ -122,13 +128,13 @@ namespace embree
       IDPool ()
       : nextID(0) {}
 
-      __forceinline T allocate() 
+      T allocate() 
       {
         /* return ID from list */
-        if (IDs.size()) 
+        if (!IDs.empty()) 
         {
-          T id = IDs.back();
-          IDs.pop_back();
+          T id = *IDs.begin();
+          IDs.erase(IDs.begin());
           return id;
         } 
 
@@ -138,19 +144,38 @@ namespace embree
         }
       }
 
-      __forceinline void deallocate( T id ) 
+      /* adds an ID provided by the user */
+      bool add(T id)
       {
-        assert(id < nextID);
-        IDs.push_back(id);
+        /* check if ID should be in IDs set */
+        if (id < nextID) {
+          auto p = IDs.find(id);
+          if (p == IDs.end()) return false;
+          IDs.erase(p);
+          return true;
+        }
+
+        /* otherwise increase ID set */
+        else
+        {
+          for (T i=nextID; i<id; i++) {
+            IDs.insert(i);
+          }
+          nextID = id+1;
+          return true;
+        }
       }
 
-      __forceinline size_t size() const {
-        return nextID;
+      void deallocate( T id ) 
+      {
+        assert(id < nextID);
+        MAYBE_UNUSED auto done = IDs.insert(id).second;
+        assert(done);
       }
 
     private:
-      std::vector<T> IDs;   //!< stores deallocated IDs to be reused
-      size_t nextID;        //!< next ID to use when IDs vector is empty
+      std::set<T> IDs;   //!< stores deallocated IDs to be reused
+      T nextID;          //!< next ID to use when IDs vector is empty
     };
 }
 

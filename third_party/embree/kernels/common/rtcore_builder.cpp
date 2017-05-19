@@ -36,7 +36,7 @@ namespace embree
     struct BVH
     {
       BVH (Device* device)
-        : device(device), isStatic(false), allocator(device,true), morton_src(device), morton_tmp(device) {}
+        : device(device), isStatic(false), allocator(device,true), morton_src(device,0), morton_tmp(device,0) {}
 
     public:
       Device* device;
@@ -96,13 +96,13 @@ namespace embree
       std::pair<void*,BBox3fa> root = BVHBuilderMorton::build<std::pair<void*,BBox3fa>>(
         
         /* thread local allocator for fast allocations */
-        [&] () -> FastAllocator::ThreadLocal* { 
-          return bvh->allocator.threadLocal();
+        [&] () -> FastAllocator::CachedAllocator { 
+          return bvh->allocator.getCachedAllocator();
         },
         
         /* lambda function that allocates BVH nodes */
-        [&] ( FastAllocator::ThreadLocal* alloc, size_t N ) -> void* {
-          return createNode((RTCThreadLocalAllocator)alloc,N,userPtr);
+        [&] ( const FastAllocator::CachedAllocator& alloc, size_t N ) -> void* {
+          return createNode((RTCThreadLocalAllocator)&alloc,N,userPtr);
         },
         
         /* lambda function that sets bounds */
@@ -122,11 +122,11 @@ namespace embree
         },
         
         /* lambda function that creates BVH leaves */
-        [&]( const range<unsigned>& current, FastAllocator::ThreadLocal* alloc) -> std::pair<void*,BBox3fa>
+        [&]( const range<unsigned>& current, const FastAllocator::CachedAllocator& alloc) -> std::pair<void*,BBox3fa>
         {
           const size_t id = morton_src[current.begin()].index;
           const BBox3fa bounds = prims[id].bounds(); 
-          void* node = createLeaf((RTCThreadLocalAllocator)alloc,prims_i+current.begin(),current.size(),userPtr);
+          void* node = createLeaf((RTCThreadLocalAllocator)&alloc,prims_i+current.begin(),current.size(),userPtr);
           return std::make_pair(node,bounds);
         },
         
@@ -175,14 +175,14 @@ namespace embree
       void* root = BVHBuilderBinnedSAH::build<void*>(
         
         /* thread local allocator for fast allocations */
-        [&] () -> FastAllocator::ThreadLocal* { 
-          return bvh->allocator.threadLocal();
+        [&] () -> FastAllocator::CachedAllocator { 
+          return bvh->allocator.getCachedAllocator();
         },
 
         /* lambda function that creates BVH nodes */
-        [&](BVHBuilderBinnedSAH::BuildRecord* children, const size_t N, FastAllocator::ThreadLocal* alloc) -> void*
+        [&](BVHBuilderBinnedSAH::BuildRecord* children, const size_t N, const FastAllocator::CachedAllocator& alloc) -> void*
         {
-          void* node = createNode((RTCThreadLocalAllocator)alloc,N,userPtr);
+          void* node = createNode((RTCThreadLocalAllocator)&alloc,N,userPtr);
           const RTCBounds* cbounds[GeneralBVHBuilder::MAX_BRANCHING_FACTOR];
           for (size_t i=0; i<N; i++) cbounds[i] = (const RTCBounds*) &children[i].prims.geomBounds;
           setNodeBounds(node,cbounds,N,userPtr);
@@ -196,8 +196,8 @@ namespace embree
         },
         
         /* lambda function that creates BVH leaves */
-        [&](const BVHBuilderBinnedSAH::BuildRecord& current, FastAllocator::ThreadLocal* alloc) -> void* {
-          return createLeaf((RTCThreadLocalAllocator)alloc,prims+current.prims.begin(),current.prims.size(),userPtr);
+        [&](const range<size_t>& range, const FastAllocator::CachedAllocator& alloc) -> void* {
+          return createLeaf((RTCThreadLocalAllocator)&alloc,prims+range.begin(),range.size(),userPtr);
         },
         
         /* progress monitor function */
@@ -244,16 +244,16 @@ namespace embree
         
         __forceinline void operator() (PrimRef& prim, const size_t dim, const float pos, PrimRef& left_o, PrimRef& right_o) const 
         {
-          prim.geomID() &= BVHBuilderBinnedFastSpatialSAH::GEOMID_MASK;
-          splitPrimitive((RTCBuildPrimitive&)prim,dim,pos,(RTCBounds&)left_o,(RTCBounds&)right_o,userPtr);
-          left_o.geomID()  = geomID; left_o.primID()  = primID;
-          right_o.geomID() = geomID; right_o.primID() = primID;
+          prim.geomIDref() &= BVHBuilderBinnedFastSpatialSAH::GEOMID_MASK;
+          splitPrimitive((RTCBuildPrimitive&)prim,(unsigned)dim,pos,(RTCBounds&)left_o,(RTCBounds&)right_o,userPtr);
+          left_o.geomIDref()  = geomID; left_o.primIDref()  = primID;
+          right_o.geomIDref() = geomID; right_o.primIDref() = primID;
         }
 
         __forceinline void operator() (const BBox3fa& box, const size_t dim, const float pos, BBox3fa& left_o, BBox3fa& right_o) const 
         {
           PrimRef prim(box,geomID & BVHBuilderBinnedFastSpatialSAH::GEOMID_MASK,primID);
-          splitPrimitive((RTCBuildPrimitive&)prim,dim,pos,(RTCBounds&)left_o,(RTCBounds&)right_o,userPtr);
+          splitPrimitive((RTCBuildPrimitive&)prim,(unsigned)dim,pos,(RTCBounds&)left_o,(RTCBounds&)right_o,userPtr);
         }
    
         RTCSplitPrimitiveFunc splitPrimitive;
@@ -266,14 +266,14 @@ namespace embree
       void* root = BVHBuilderBinnedFastSpatialSAH::build<void*>(
         
         /* thread local allocator for fast allocations */
-        [&] () -> FastAllocator::ThreadLocal* { 
-          return bvh->allocator.threadLocal();
+        [&] () -> FastAllocator::CachedAllocator { 
+          return bvh->allocator.getCachedAllocator();
         },
 
         /* lambda function that creates BVH nodes */
-        [&] (BVHBuilderBinnedFastSpatialSAH::BuildRecord* children, const size_t N, FastAllocator::ThreadLocal* alloc) -> void*
+        [&] (BVHBuilderBinnedFastSpatialSAH::BuildRecord* children, const size_t N, const FastAllocator::CachedAllocator& alloc) -> void*
         {
-          void* node = createNode((RTCThreadLocalAllocator)alloc,N,userPtr);
+          void* node = createNode((RTCThreadLocalAllocator)&alloc,N,userPtr);
           const RTCBounds* cbounds[GeneralBVHBuilder::MAX_BRANCHING_FACTOR];
           for (size_t i=0; i<N; i++) cbounds[i] = (const RTCBounds*) &children[i].prims.geomBounds;
           setNodeBounds(node,cbounds,N,userPtr);
@@ -287,8 +287,8 @@ namespace embree
         },
         
         /* lambda function that creates BVH leaves */
-        [&] (const BVHBuilderBinnedFastSpatialSAH::BuildRecord& current, FastAllocator::ThreadLocal* alloc) -> void* {
-          return createLeaf((RTCThreadLocalAllocator)alloc,prims+current.prims.begin(),current.prims.size(),userPtr);
+        [&] (const range<size_t>& range, const FastAllocator::CachedAllocator& alloc) -> void* {
+          return createLeaf((RTCThreadLocalAllocator)&alloc,prims+range.begin(),range.size(),userPtr);
         },
         
         /* returns the splitter */
@@ -358,11 +358,11 @@ namespace embree
 
     RTCORE_API void* rtcThreadLocalAlloc(RTCThreadLocalAllocator localAllocator, size_t bytes, size_t align)
     {
+      FastAllocator::CachedAllocator* alloc = (FastAllocator::CachedAllocator*) localAllocator;
       RTCORE_CATCH_BEGIN;
       RTCORE_TRACE(rtcThreadLocalAlloc);
-      FastAllocator::ThreadLocal* alloc = (FastAllocator::ThreadLocal*) localAllocator;
-      return alloc->malloc(bytes,align);
-      RTCORE_CATCH_END(((FastAllocator::ThreadLocal*) localAllocator)->alloc->getDevice());
+      return alloc->malloc0(bytes,align);
+      RTCORE_CATCH_END(alloc->alloc->getDevice());
       return nullptr;
     }
 
@@ -372,7 +372,6 @@ namespace embree
       RTCORE_CATCH_BEGIN;
       RTCORE_TRACE(rtcStaticBVH);
       RTCORE_VERIFY_HANDLE(hbvh);
-      bvh->allocator.shrink();
       bvh->morton_src.clear();
       bvh->morton_tmp.clear();
       bvh->isStatic = true;

@@ -96,17 +96,17 @@ namespace embree
         }
 
         /*! slow path for more than two hits */
-        const size_t hits = __popcnt(movemask(vmask));
-        const vint<Nx> dist_i = select(vmask, (asInt(tNear) & 0xfffffff8) | vint<Nx>(step), 0x7fffffff);
+        size_t hits = movemask(vmask);
+        const vint<Nx> dist_i = select(vmask, (asInt(tNear) & 0xfffffff8) | vint<Nx>(step), 0);
 #if defined(__AVX512F__) && !defined(__AVX512VL__) // KNL
         const vint<N> tmp = extractN<N,0>(dist_i);
-        const vint<Nx> dist_i_sorted = sortNetwork(tmp);
+        const vint<Nx> dist_i_sorted = usort_descending(tmp);
 #else
-        const vint<Nx> dist_i_sorted = sortNetwork(dist_i);
+        const vint<Nx> dist_i_sorted = usort_descending(dist_i);
 #endif
         const vint<Nx> sorted_index = dist_i_sorted & 7;
 
-        size_t i = hits-1;
+        size_t i = 0;
         for (;;)
         {
           const unsigned int index = sorted_index[i];
@@ -115,8 +115,9 @@ namespace embree
           m_trav_active = tMask[index];
           assert(m_trav_active);
           cur.prefetch(types);
-          if (unlikely(i==0)) break;
-          i--;
+          __bscf(hits);
+          if (unlikely(hits==0)) break;
+          i++;
           assert(cur != BVH::emptyNode);
           stackPtr->ptr = cur; 
           stackPtr->mask = m_trav_active;
@@ -178,7 +179,7 @@ namespace embree
 
       __forceinline RayContext(Ray* ray)
       {
-#if defined(__AVX512F__) && !defined(__AVX512VL__)
+#if defined(__AVX512F__) && !defined(__AVX512VL__) // KNL
         vfloat16 org(vfloat4(ray->org));
         vfloat16 dir(vfloat4(ray->dir));
         vfloat16 rdir     = select(0x7777,rcp_safe(dir),max(vfloat16(ray->tnear),vfloat16(zero)));
@@ -351,7 +352,7 @@ namespace embree
       size_t parent;
       size_t child;
       unsigned int childID;
-      unsigned int dist;
+      //unsigned int dist;
     };
 
     template<int N, int Nx, int types>
@@ -404,7 +405,7 @@ namespace embree
             stackPtr->parent  = parent;
             stackPtr->child   = c1;
             stackPtr->childID = (unsigned int)r1;
-            stackPtr->dist    = d1;
+            //stackPtr->dist    = d1;
             stackPtr++; 
             cur = c0; 
             m_trav_active = tMask[r0]; 
@@ -416,7 +417,7 @@ namespace embree
             stackPtr->parent  = parent;
             stackPtr->child   = c0;
             stackPtr->childID = (unsigned int)r0;
-            stackPtr->dist    = d0;
+            //stackPtr->dist    = d0;
             stackPtr++; 
             cur = c1; 
             m_trav_active = tMask[r1]; 
@@ -425,17 +426,17 @@ namespace embree
         }
 
         /*! slow path for more than two hits */
-        const size_t hits = __popcnt(movemask(vmask));
-        const vint<Nx> dist_i = select(vmask, (asInt(tNear) & 0xfffffff8) | vint<Nx>(step), 0x7fffffff);
+        size_t hits = movemask(vmask);
+        const vint<Nx> dist_i = select(vmask, (asInt(tNear) & 0xfffffff8) | vint<Nx>(step), 0);
 #if defined(__AVX512F__) && !defined(__AVX512VL__) // KNL
         const vint<N> tmp = extractN<N,0>(dist_i);
-        const vint<Nx> dist_i_sorted = sortNetwork(tmp);
+        const vint<Nx> dist_i_sorted = usort_descending(tmp);
 #else
-        const vint<Nx> dist_i_sorted = sortNetwork(dist_i);
+        const vint<Nx> dist_i_sorted = usort_descending(dist_i);
 #endif
         const vint<Nx> sorted_index = dist_i_sorted & 7;
 
-        size_t i = hits-1;
+        size_t i = 0;
         for (;;)
         {
           const unsigned int index = sorted_index[i];
@@ -444,15 +445,16 @@ namespace embree
           m_trav_active = tMask[index];
           assert(m_trav_active);
           cur.prefetch(types);
-          if (unlikely(i==0)) break;
-          i--;
+          __bscf(hits);
+          if (unlikely(hits==0)) break;
+          i++;
           assert(cur != BVH::emptyNode);
           assert(tNear[index] >= 0.0f);
           stackPtr->mask    = m_trav_active;
           stackPtr->parent  = parent;
           stackPtr->child   = cur;
           stackPtr->childID = index;
-          stackPtr->dist = tNear_i[index];
+          //stackPtr->dist = tNear_i[index];
           stackPtr++;
         }
       }
@@ -522,8 +524,6 @@ namespace embree
       typedef typename BVH::BaseNode BaseNode;
       typedef typename BVH::AlignedNode AlignedNode;
       typedef typename BVH::AlignedNodeMB AlignedNodeMB;
-      typedef Vec3<vfloat<K>> Vec3vfK;
-      typedef Vec3<vint<K>> Vec3viK;
 
       // =============================================================================================
       // =============================================================================================
@@ -531,8 +531,8 @@ namespace embree
 
       struct Packet
       {
-        Vec3vfK rdir;
-        Vec3vfK org_rdir;
+        Vec3vf<K> rdir;
+        Vec3vf<K> org_rdir;
         vfloat<K> min_dist;
         vfloat<K> max_dist;
       };
@@ -579,10 +579,10 @@ namespace embree
       {
         const size_t numPackets = (numOctantRays+K-1)/K;
 
-        Vec3vfK   tmp_min_rdir(pos_inf); 
-        Vec3vfK   tmp_max_rdir(neg_inf);
-        Vec3vfK   tmp_min_org(pos_inf); 
-        Vec3vfK   tmp_max_org(neg_inf);
+        Vec3vf<K>   tmp_min_rdir(pos_inf);
+        Vec3vf<K>   tmp_max_rdir(neg_inf);
+        Vec3vf<K>   tmp_min_org(pos_inf);
+        Vec3vf<K>   tmp_max_org(neg_inf);
         vfloat<K> tmp_min_dist(pos_inf);
         vfloat<K> tmp_max_dist(neg_inf);
 
@@ -600,18 +600,18 @@ namespace embree
           tmp_min_dist = min(tmp_min_dist, packet[i].min_dist);
           tmp_max_dist = max(tmp_max_dist, packet[i].max_dist);
 
-          const Vec3vfK& org     = inputPackets[i]->org;
-          const Vec3vfK& dir     = inputPackets[i]->dir;
-          const Vec3vfK rdir     = rcp_safe(dir);
-          const Vec3vfK org_rdir = org * rdir;
+          const Vec3vf<K>& org     = inputPackets[i]->org;
+          const Vec3vf<K>& dir     = inputPackets[i]->dir;
+          const Vec3vf<K> rdir     = rcp_safe(dir);
+          const Vec3vf<K> org_rdir = org * rdir;
         
           packet[i].rdir     = rdir;
           packet[i].org_rdir = org_rdir;
 
-          tmp_min_rdir = min(tmp_min_rdir, select(m_valid,rdir, Vec3vfK(pos_inf)));
-          tmp_max_rdir = max(tmp_max_rdir, select(m_valid,rdir, Vec3vfK(neg_inf)));
-          tmp_min_org  = min(tmp_min_org , select(m_valid,org , Vec3vfK(pos_inf)));
-          tmp_max_org  = max(tmp_max_org , select(m_valid,org , Vec3vfK(neg_inf)));
+          tmp_min_rdir = min(tmp_min_rdir, select(m_valid,rdir, Vec3vf<K>(pos_inf)));
+          tmp_max_rdir = max(tmp_max_rdir, select(m_valid,rdir, Vec3vf<K>(neg_inf)));
+          tmp_min_org  = min(tmp_min_org , select(m_valid,org , Vec3vf<K>(pos_inf)));
+          tmp_max_org  = max(tmp_max_org , select(m_valid,org , Vec3vf<K>(neg_inf)));
         }
 
         m_active &= (numOctantRays == (8 * sizeof(size_t))) ? (size_t)-1 : (((size_t)1 << numOctantRays)-1);
@@ -784,13 +784,13 @@ namespace embree
 #else
           maskK = select(vmask, maskK | bitmask, maskK);
 #endif
-        } while(bits);    
+        } while(bits);
         //const vbool<Nx> vmask = dist < inf;
         const vbool<Nx> vmask = maskK != vint<Nx>(zero);
         return vmask;
       }
 
-#if defined(__AVX512F__) 
+#if defined(__AVX512F__)
       template<bool dist_update>
         __forceinline static vbool<Nx> traversalLoop(const size_t &m_trav_active,
                                                      const AlignedNode* __restrict__ const node,
@@ -854,8 +854,10 @@ namespace embree
       static const size_t stackSizeSingle = 1+(N-1)*BVH::maxDepth;
 
       static void intersectCoherentSOA(BVH* bvh, RayK<K>** inputRays, size_t numValidStreams, IntersectContext* context);
-
       static void occludedCoherentSOA(BVH* bvh, RayK<K>** inputRays, size_t numValidStreams, IntersectContext* context);
+
+      static void intersectCoherent(BVH* bvh, Ray** ray, size_t numRays, IntersectContext* context);
+      static void occludedCoherent (BVH* bvh, Ray** ray, size_t numRays, IntersectContext* context);
       
     public:
       static void intersect(BVH* bvh, Ray** ray, size_t numRays, IntersectContext* context);

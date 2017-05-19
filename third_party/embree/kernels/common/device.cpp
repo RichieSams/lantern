@@ -15,7 +15,7 @@
 // ======================================================================== //
 
 #include "device.h"
-#include "version.h"
+#include "hash.h"
 #include "scene_triangle_mesh.h"
 #include "scene_user_geometry.h"
 #include "scene_instance.h"
@@ -33,6 +33,7 @@
 #include "../bvh/bvh8_factory.h"
 
 #include "../common/tasking/taskscheduler.h"
+#include "../../common/sys/alloc.h"
 
 namespace embree
 {
@@ -51,16 +52,27 @@ namespace embree
   Device::Device (const char* cfg, bool singledevice)
     : State(singledevice)
   {
+    /* check CPU */
+    if (!hasISA(ISA)) 
+      throw_RTCError(RTC_UNSUPPORTED_CPU,"CPU does not support " ISA_STR);
+
     /* initialize global state */
     State::parseString(cfg);
     if (!ignore_config_files && FileName::executableFolder() != FileName(""))
-      State::parseFile(FileName::executableFolder()+FileName(".embree" TOSTRING(__EMBREE_VERSION_MAJOR__)));
+      State::parseFile(FileName::executableFolder()+FileName(".embree" TOSTRING(RTCORE_VERSION_MAJOR)));
     if (!ignore_config_files && FileName::homeFolder() != FileName(""))
-      State::parseFile(FileName::homeFolder()+FileName(".embree" TOSTRING(__EMBREE_VERSION_MAJOR__)));
+      State::parseFile(FileName::homeFolder()+FileName(".embree" TOSTRING(RTCORE_VERSION_MAJOR)));
     State::verify();
 
     /*! do some internal tests */
     assert(isa::Cylinder::verify());
+
+    /*! enable huge page support if desired */
+#if defined(__WIN32__)
+    if (State::enable_selockmemoryprivilege)
+      State::hugepages_success &= win_enable_selockmemoryprivilege(State::verbosity(3));
+#endif
+    State::hugepages_success &= os_init(State::hugepages,State::verbosity(3));
     
     /*! set tessellation cache size */
     setCacheSize( State::tessellation_cache_size );
@@ -89,7 +101,7 @@ namespace embree
 
     bvh4_factory = make_unique(new BVH4Factory(enabled_builder_cpu_features, enabled_cpu_features));
 
-#if defined(__TARGET_AVX__)
+#if defined(EMBREE_TARGET_AVX)
     bvh8_factory = make_unique(new BVH8Factory(enabled_builder_cpu_features, enabled_cpu_features));
 #endif
 
@@ -112,23 +124,23 @@ namespace embree
 
   std::string getEnabledTargets()
   {
-    std::string v = std::string(ISA_STR) + " ";
-#if defined(__TARGET_SSE41__)
-    v += "SSE4.1 ";
+    std::string v;
+#if defined(EMBREE_TARGET_SSE2)
+    v += "SSE2 ";
 #endif
-#if defined(__TARGET_SSE42__)
+#if defined(EMBREE_TARGET_SSE42)
     v += "SSE4.2 ";
 #endif
-#if defined(__TARGET_AVX__)
+#if defined(EMBREE_TARGET_AVX)
     v += "AVX ";
 #endif
-#if defined(__TARGET_AVX2__)
+#if defined(EMBREE_TARGET_AVX2)
     v += "AVX2 ";
 #endif
-#if defined(__TARGET_AVX512KNL__)
+#if defined(EMBREE_TARGET_AVX512KNL)
     v += "AVX512KNL ";
 #endif
-#if defined(__TARGET_AVX512SKX__)
+#if defined(EMBREE_TARGET_AVX512SKX)
     v += "AVX512SKX ";
 #endif
     return v;
@@ -152,7 +164,7 @@ namespace embree
   void Device::print()
   {
     const int cpu_features = getCPUFeatures();
-    std::cout << "Embree Ray Tracing Kernels " << __EMBREE_VERSION__ << " (" << __EMBREE_HASH__ << ")" << std::endl;
+    std::cout << "Embree Ray Tracing Kernels " << RTCORE_VERSION_STRING << " (" << RTCORE_HASH << ")" << std::endl;
     std::cout << "  Compiler  : " << getCompilerName() << std::endl;
     std::cout << "  Build     : ";
 #if defined(DEBUG)
@@ -399,26 +411,26 @@ namespace embree
     /* documented parameters */
     switch (parm) 
     {
-    case RTC_CONFIG_VERSION_MAJOR: return __EMBREE_VERSION_MAJOR__;
-    case RTC_CONFIG_VERSION_MINOR: return __EMBREE_VERSION_MINOR__;
-    case RTC_CONFIG_VERSION_PATCH: return __EMBREE_VERSION_PATCH__;
-    case RTC_CONFIG_VERSION      : return __EMBREE_VERSION_NUMBER__;
+    case RTC_CONFIG_VERSION_MAJOR: return RTCORE_VERSION_MAJOR;
+    case RTC_CONFIG_VERSION_MINOR: return RTCORE_VERSION_MINOR;
+    case RTC_CONFIG_VERSION_PATCH: return RTCORE_VERSION_PATCH;
+    case RTC_CONFIG_VERSION      : return RTCORE_VERSION;
 
     case RTC_CONFIG_INTERSECT1: return 1;
 
-#if defined(__TARGET_SIMD4__) && defined(EMBREE_RAY_PACKETS)
+#if defined(EMBREE_TARGET_SIMD4) && defined(EMBREE_RAY_PACKETS)
     case RTC_CONFIG_INTERSECT4:  return hasISA(SSE2);
 #else
     case RTC_CONFIG_INTERSECT4:  return 0;
 #endif
 
-#if defined(__TARGET_SIMD8__) && defined(EMBREE_RAY_PACKETS)
+#if defined(EMBREE_TARGET_SIMD8) && defined(EMBREE_RAY_PACKETS)
     case RTC_CONFIG_INTERSECT8:  return hasISA(AVX);
 #else
     case RTC_CONFIG_INTERSECT8:  return 0;
 #endif
 
-#if defined(__TARGET_SIMD16__) && defined(EMBREE_RAY_PACKETS)
+#if defined(EMBREE_TARGET_SIMD16) && defined(EMBREE_RAY_PACKETS)
     case RTC_CONFIG_INTERSECT16: return hasISA(AVX512KNL) | hasISA(AVX512SKX);
 #else
     case RTC_CONFIG_INTERSECT16: return 0;

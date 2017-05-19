@@ -127,7 +127,7 @@ namespace embree
       static __forceinline void scatter(const vboolf8& mask, void* ptr, const vint8& ofs, const vfloat8& v)
     {
 #if defined(__AVX512VL__)
-      _mm256_mask_i32scatter_ps(ptr,mask,ofs,v,scale);
+      _mm256_mask_i32scatter_ps((float*)ptr,mask,ofs,v,scale);
 #else
       if (likely(mask[0])) *(float*)(((char*)ptr)+scale*ofs[0]) = v[0];
       if (likely(mask[1])) *(float*)(((char*)ptr)+scale*ofs[1]) = v[1];
@@ -619,7 +619,7 @@ namespace embree
   /// In Register Sorting
   ////////////////////////////////////////////////////////////////////////////////
 
-  __forceinline vfloat8 sortNetwork(const vfloat8& v)
+  __forceinline vfloat8 sort_ascending(const vfloat8& v)
   {
     const vfloat8 a0 = v;
     const vfloat8 b0 = shuffle<1,0,3,2>(a0);
@@ -645,6 +645,36 @@ namespace embree
     const vfloat8 b5 = shuffle<1,0,3,2>(a5);
     const vfloat8 c5 = min(a5,b5);
     const vfloat8 d5 = max(a5,b5);
+    const vfloat8 a6 = select<0x55 /* 0b01010101 */>(c5,d5);
+    return a6;
+  }
+
+   __forceinline vfloat8 sort_descending(const vfloat8& v)
+  {
+    const vfloat8 a0 = v;
+    const vfloat8 b0 = shuffle<1,0,3,2>(a0);
+    const vfloat8 c0 = max(a0,b0);
+    const vfloat8 d0 = min(a0,b0);
+    const vfloat8 a1 = select<0x99 /* 0b10011001 */>(c0,d0);
+    const vfloat8 b1 = shuffle<2,3,0,1>(a1);
+    const vfloat8 c1 = max(a1,b1);
+    const vfloat8 d1 = min(a1,b1);
+    const vfloat8 a2 = select<0xc3 /* 0b11000011 */>(c1,d1);
+    const vfloat8 b2 = shuffle<1,0,3,2>(a2);
+    const vfloat8 c2 = max(a2,b2);
+    const vfloat8 d2 = min(a2,b2);
+    const vfloat8 a3 = select<0xa5 /* 0b10100101 */>(c2,d2);
+    const vfloat8 b3 = shuffle4<1,0>(a3);
+    const vfloat8 c3 = max(a3,b3);
+    const vfloat8 d3 = min(a3,b3);
+    const vfloat8 a4 = select<0xf /* 0b00001111 */>(c3,d3);
+    const vfloat8 b4 = shuffle<2,3,0,1>(a4);
+    const vfloat8 c4 = max(a4,b4);
+    const vfloat8 d4 = min(a4,b4);
+    const vfloat8 a5 = select<0x33 /* 0b00110011 */>(c4,d4);
+    const vfloat8 b5 = shuffle<1,0,3,2>(a5);
+    const vfloat8 c5 = max(a5,b5);
+    const vfloat8 d5 = min(a5,b5);
     const vfloat8 a6 = select<0x55 /* 0b01010101 */>(c5,d5);
     return a6;
   }

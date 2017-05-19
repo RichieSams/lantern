@@ -118,4 +118,4 @@ set(LANTERN_CORE_SRC
 
 # Create lib
 add_library(lantern_core ${LANTERN_CORE_SRC})
-target_link_libraries(lantern_core embree glfw ${GLFW_LIBRARIES} imgui ${TBB_LIBRARIES})
+target_link_libraries(lantern_core glfw ${GLFW_LIBRARIES} imgui tbb_static tbbmalloc_static embree)

@@ -26,11 +26,11 @@ namespace embree
       {
         typedef BVHN<N> BVH;
         typedef typename BVH::NodeRef NodeRef;
-        typedef FastAllocator::ThreadLocal2 Allocator;
+        typedef FastAllocator::CachedAllocator Allocator;
       
         struct BVHNBuilderV {
           NodeRef build(FastAllocator* allocator, BuildProgressMonitor& progress, PrimRef* prims, const PrimInfo& pinfo, GeneralBVHBuilder::Settings settings);
-          virtual NodeRef createLeaf (const BVHBuilderBinnedSAH::BuildRecord& current, Allocator* alloc) = 0;
+          virtual NodeRef createLeaf (const range<size_t>& set, const Allocator& alloc) = 0;
         };
 
         template<typename CreateLeafFunc>
@@ -39,8 +39,8 @@ namespace embree
           BVHNBuilderT (CreateLeafFunc createLeafFunc)
             : createLeafFunc(createLeafFunc) {}
 
-          NodeRef createLeaf (const BVHBuilderBinnedSAH::BuildRecord& current, Allocator* alloc) {
-            return createLeafFunc(current,alloc);
+          NodeRef createLeaf (const range<size_t>& set, const Allocator& alloc) {
+            return createLeafFunc(set,alloc);
           }
 
         private:
@@ -58,11 +58,11 @@ namespace embree
       {
         typedef BVHN<N> BVH;
         typedef typename BVH::NodeRef NodeRef;
-        typedef FastAllocator::ThreadLocal2 Allocator;
+        typedef FastAllocator::CachedAllocator Allocator;
       
         struct BVHNBuilderV {
           NodeRef build(FastAllocator* allocator, BuildProgressMonitor& progress, PrimRef* prims, const PrimInfo& pinfo, GeneralBVHBuilder::Settings settings);
-          virtual NodeRef createLeaf (const BVHBuilderBinnedSAH::BuildRecord& current, Allocator* alloc) = 0;
+          virtual NodeRef createLeaf (const range<size_t>& set, const Allocator& alloc) = 0;
         };
 
         template<typename CreateLeafFunc>
@@ -71,8 +71,8 @@ namespace embree
           BVHNBuilderT (CreateLeafFunc createLeafFunc)
             : createLeafFunc(createLeafFunc) {}
 
-          NodeRef createLeaf (const BVHBuilderBinnedSAH::BuildRecord& current, Allocator* alloc) {
-            return createLeafFunc(current,alloc);
+          NodeRef createLeaf (const range<size_t>& set, const Allocator& alloc) {
+            return createLeafFunc(set,alloc);
           }
 
         private:
@@ -91,11 +91,12 @@ namespace embree
         typedef BVHN<N> BVH;
         typedef typename BVH::AlignedNodeMB AlignedNodeMB;
         typedef typename BVH::NodeRef NodeRef;
-        typedef FastAllocator::ThreadLocal2 Allocator;
+        typedef typename BVH::NodeRecordMB NodeRecordMB;
+        typedef FastAllocator::CachedAllocator Allocator;
       
         struct BVHNBuilderV {
-          std::tuple<NodeRef,LBBox3fa> build(FastAllocator* allocator, BuildProgressMonitor& progress, PrimRef* prims, const PrimInfo& pinfo, GeneralBVHBuilder::Settings settings);
-          virtual std::pair<NodeRef,LBBox3fa> createLeaf (const BVHBuilderBinnedSAH::BuildRecord& current, Allocator* alloc) = 0;
+          NodeRecordMB build(FastAllocator* allocator, BuildProgressMonitor& progress, PrimRef* prims, const PrimInfo& pinfo, GeneralBVHBuilder::Settings settings, const BBox1f& timeRange);
+          virtual NodeRecordMB createLeaf (const range<size_t>& set, const Allocator& alloc) = 0;
         };
 
         template<typename CreateLeafFunc>
@@ -104,8 +105,8 @@ namespace embree
           BVHNBuilderT (CreateLeafFunc createLeafFunc)
             : createLeafFunc(createLeafFunc) {}
 
-          std::pair<NodeRef,LBBox3fa> createLeaf (const BVHBuilderBinnedSAH::BuildRecord& current, Allocator* alloc) {
-            return createLeafFunc(current,alloc);
+          NodeRecordMB createLeaf (const range<size_t>& set, const Allocator& alloc) {
+            return createLeafFunc(set,alloc);
           }
 
         private:
@@ -113,8 +114,8 @@ namespace embree
         };
 
         template<typename CreateLeafFunc>
-        static std::tuple<NodeRef,LBBox3fa> build(FastAllocator* allocator, CreateLeafFunc createLeaf, BuildProgressMonitor& progress, PrimRef* prims, const PrimInfo& pinfo, GeneralBVHBuilder::Settings settings) {
-          return BVHNBuilderT<CreateLeafFunc>(createLeaf).build(allocator,progress,prims,pinfo,settings);
+        static NodeRecordMB build(FastAllocator* allocator, CreateLeafFunc createLeaf, BuildProgressMonitor& progress, PrimRef* prims, const PrimInfo& pinfo, GeneralBVHBuilder::Settings settings, const BBox1f& timeRange) {
+          return BVHNBuilderT<CreateLeafFunc>(createLeaf).build(allocator,progress,prims,pinfo,settings,timeRange);
         }
       };
   }

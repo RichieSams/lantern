@@ -20,7 +20,7 @@ ENDIF()
 
 IF (TASKING_TBB)
   ADD_LIBRARY(tasking STATIC taskschedulertbb.cpp)
-  TARGET_LINK_LIBRARIES(tasking sys ${TBB_LIBRARIES})
+  TARGET_LINK_LIBRARIES(tasking sys tbb_static tbbmalloc_static)
 ENDIF()
 
 IF (TASKING_PPL)

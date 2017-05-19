@@ -58,7 +58,7 @@ namespace embree
                                                         const Vec3vfx& Ng, const Vec4vfx& dP0du, const Vec4vfx& dP3du,
                                                         const Epilog& epilog)
     {
-      if (tp.lower[i]+dt >= ray.tfar) return false;
+      if (tp.lower[i]+dt > ray.tfar) return false;
       Vec3fa Ng_o = Vec3fa(Ng.x[i],Ng.y[i],Ng.z[i]);
       if (h0.lower[i] == tp.lower[i]) Ng_o = -Vec3fa(dP0du.x[i],dP0du.y[i],dP0du.z[i]);
       if (h1.lower[i] == tp.lower[i]) Ng_o = +Vec3fa(dP3du.x[i],dP3du.y[i],dP3du.z[i]);
@@ -113,7 +113,7 @@ namespace embree
         if (converged_u && converged_t) 
         {
           t+=dt;
-          if (t < ray.tnear || t > ray.tfar) return false;
+          if (t <= ray.tnear || t > ray.tfar) return false;
           if (u < 0.0f || u > 1.0f) return false;
           const Vec3fa R = normalize(Q-P);
           const Vec3fa U = madd(Vec3fa(dPdu.w),R,dPdu);
@@ -144,13 +144,15 @@ namespace embree
       const Vec4vfx P2 = P3 - dP3du;
 
       /* calculate bounding cylinders */
-      const Vec3vfx nP3P0 = normalize(P3-P0);
       const vfloatx rr1 = sqr_point_to_line_distance(Vec3vfx(dP0du),Vec3vfx(P3-P0));
       const vfloatx rr2 = sqr_point_to_line_distance(Vec3vfx(dP3du),Vec3vfx(P3-P0));
       const vfloatx maxr12 = sqrt(max(rr1,rr2));
-      const vfloatx r_outer = max(P0.w,P1.w,P2.w,P3.w)+maxr12;
-      const vfloatx sr = min(abs(dot(nP3P0,normalize(Vec3vfx(dP0du)))),abs(dot(nP3P0,normalize(Vec3vfx(dP3du)))));
-      const vfloatx r_inner = max(0.0f,min(P0.w,P1.w,P2.w,P3.w)-maxr12)*sr;
+      const vfloatx one_plus_ulp  = 1.0f+2.0f*float(ulp);
+      const vfloatx one_minus_ulp = 1.0f-2.0f*float(ulp);
+      vfloatx r_outer = max(P0.w,P1.w,P2.w,P3.w)+maxr12;
+      vfloatx r_inner = min(P0.w,P1.w,P2.w,P3.w)-maxr12;
+      r_outer = one_plus_ulp*r_outer;
+      r_inner = max(0.0f,one_minus_ulp*r_inner);
       const CylinderN<VSIZEX> cylinder_outer(Vec3vfx(P0),Vec3vfx(P3),r_outer);
       const CylinderN<VSIZEX> cylinder_inner(Vec3vfx(P0),Vec3vfx(P3),r_inner);
       vboolx valid = true; clear(valid,VSIZEX-1);
@@ -201,9 +203,9 @@ namespace embree
         if (depth >= termDepth) found = found | intersect_bezier_iterative_jacobian(ray,dt,curve,u_outer0[i],tp0.lower[i],epilog);
         //if (depth >= maxDepth) found = found | intersect_bezier_iterative_debug   (ray,dt,curve,i,u_outer0,tp0,h0,h1,Ng_outer0,dP0du,dP3du,epilog);
         else                   found = found | intersect_bezier_recursive_jacobian(ray,dt,curve,vu0[i+0],vu0[i+1],depth+1,epilog);
-        valid0 &= tp0.lower+dt < ray.tfar;
+        valid0 &= tp0.lower+dt <= ray.tfar;
       }
-      valid1 &= tp1.lower+dt < ray.tfar;
+      valid1 &= tp1.lower+dt <= ray.tfar;
 
       /* iterate over all second hits front to back */
       while (any(valid1))
@@ -213,7 +215,7 @@ namespace embree
         if (depth >= termDepth) found = found | intersect_bezier_iterative_jacobian(ray,dt,curve,u_outer1[i],tp1.upper[i],epilog);
         //if (depth >= maxDepth) found = found | intersect_bezier_iterative_debug   (ray,dt,curve,i,u_outer1,tp1,h0,h1,Ng_outer1,dP0du,dP3du,epilog);
         else                   found = found | intersect_bezier_recursive_jacobian(ray,dt,curve,vu0[i+0],vu0[i+1],depth+1,epilog);
-        valid1 &= tp1.lower+dt < ray.tfar;
+        valid1 &= tp1.lower+dt <= ray.tfar;
       }
       return found;
     }

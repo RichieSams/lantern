@@ -19,6 +19,8 @@
 
 namespace embree
 {
+  MutexSys g_printMutex;
+
   State::ErrorHandler State::g_errorHandler;
 
   State::ErrorHandler::ErrorHandler()
@@ -86,6 +88,8 @@ namespace embree
     object_accel_min_leaf_size = 1;
     object_accel_max_leaf_size = 1;
 
+    object_accel_mb = "default";
+    object_builder_mb = "default";
     object_accel_mb_min_leaf_size = 1;
     object_accel_mb_max_leaf_size = 1;
 
@@ -125,6 +129,18 @@ namespace embree
     if (hasISA(AVX512KNL)) set_affinity = true;
 
     start_threads = false;
+    enable_selockmemoryprivilege = false;
+#if defined(__LINUX__)
+    hugepages = true;
+#else
+    hugepages = false;
+#endif
+    hugepages_success = true;
+
+    alloc_main_block_size = 0;
+    alloc_num_main_slots = 0;
+    alloc_thread_block_size = 0;
+    alloc_single_thread_alloc = -1;
 
     error_function = nullptr;
     error_function2 = nullptr;
@@ -144,10 +160,6 @@ namespace embree
 
   void State::verify()
   {
-    /* CPU has to support at least SSE2 */
-    if (!hasISA(SSE2)) 
-      throw_RTCError(RTC_UNSUPPORTED_CPU,"CPU does not support SSE2");
-
     /* verify that calculations stay in range */
     assert(rcp(min_rcp_input)*FLT_LARGE+FLT_LARGE < 0.01f*FLT_MAX);
 
@@ -155,20 +167,22 @@ namespace embree
      * call that same or lower ISA version of non-inlined class member
      * functions */
 #if defined(DEBUG)
-    assert(isa::getISA() == ISA);
-#if defined(__TARGET_SSE42__)
+#if defined(EMBREE_TARGET_SSE2)
+    assert(sse2::getISA() <= SSE2);
+#endif
+#if defined(EMBREE_TARGET_SSE42)
     assert(sse42::getISA() <= SSE42);
 #endif
-#if defined(__TARGET_AVX__)
+#if defined(EMBREE_TARGET_AVX)
     assert(avx::getISA() <= AVX);
 #endif
-#if defined(__TARGET_AVX2__)
+#if defined(EMBREE_TARGET_AVX2)
     assert(avx2::getISA() <= AVX2);
 #endif
-#if defined (__TARGET_AVX512KNL__)
+#if defined (EMBREE_TARGET_AVX512KNL)
     assert(avx512knl::getISA() <= AVX512KNL);
 #endif
-#if defined (__TARGET_AVX512SKX__)
+#if defined (EMBREE_TARGET_AVX512SKX)
     assert(avx512skx::getISA() <= AVX512SKX);
 #endif
 #endif
@@ -261,6 +275,13 @@ namespace embree
         enabled_builder_cpu_features &= string_to_cpufeatures(isa);
       }
 
+      else if (tok == Token::Id("enable_selockmemoryprivilege") && cin->trySymbol("=")) {
+        enable_selockmemoryprivilege = cin->get().Int();
+      }
+      else if (tok == Token::Id("hugepages") && cin->trySymbol("=")) {
+        hugepages = cin->get().Int();
+      }
+
       else if (tok == Token::Id("ignore_config_files") && cin->trySymbol("="))
         ignore_config_files = cin->get().Int();
       else if (tok == Token::Id("float_exceptions") && cin->trySymbol("=")) 
@@ -331,6 +352,10 @@ namespace embree
       else if (tok == Token::Id("object_accel_max_leaf_size") && cin->trySymbol("="))
         object_accel_max_leaf_size = cin->get().Int();
 
+      else if (tok == Token::Id("object_accel_mb") && cin->trySymbol("="))
+        object_accel_mb = cin->get().Identifier();
+      else if (tok == Token::Id("object_builder_mb") && cin->trySymbol("="))
+        object_builder_mb = cin->get().Identifier();
       else if (tok == Token::Id("object_accel_mb_min_leaf_size") && cin->trySymbol("="))
         object_accel_mb_min_leaf_size = cin->get().Int();
       else if (tok == Token::Id("object_accel_mb_max_leaf_size") && cin->trySymbol("="))
@@ -385,6 +410,15 @@ namespace embree
       else if (tok == Token::Id("cache_size") && cin->trySymbol("="))
         tessellation_cache_size = size_t(cin->get().Float()*1024.0f*1024.0f);
 
+      else if (tok == Token::Id("alloc_main_block_size") && cin->trySymbol("="))
+        alloc_main_block_size = cin->get().Int();
+       else if (tok == Token::Id("alloc_num_main_slots") && cin->trySymbol("="))
+        alloc_num_main_slots = cin->get().Int();
+       else if (tok == Token::Id("alloc_thread_block_size") && cin->trySymbol("="))
+         alloc_thread_block_size = cin->get().Int();
+       else if (tok == Token::Id("alloc_single_thread_alloc") && cin->trySymbol("="))
+         alloc_single_thread_alloc = cin->get().Int();
+
       cin->trySymbol(","); // optional , separator
     }
   }
@@ -399,6 +433,12 @@ namespace embree
     std::cout << "  build threads = " << numThreads   << std::endl;
     std::cout << "  start_threads = " << start_threads << std::endl;
     std::cout << "  affinity      = " << set_affinity << std::endl;
+    
+    std::cout << "  hugepages     = ";
+    if (!hugepages) std::cout << "disabled" << std::endl;
+    else if (hugepages_success) std::cout << "enabled" << std::endl;
+    else std::cout << "failed" << std::endl;
+
     std::cout << "  verbosity     = " << verbose << std::endl;
     std::cout << "  cache_size    = " << float(tessellation_cache_size)*1E-6 << " MB" << std::endl;
     std::cout << "  max_spatial_split_replications = " << max_spatial_split_replications << std::endl;

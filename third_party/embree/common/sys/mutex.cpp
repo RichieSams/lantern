@@ -47,9 +47,9 @@ namespace embree
   
   MutexSys::~MutexSys( void ) 
   { 
-    bool failed = pthread_mutex_destroy((pthread_mutex_t*)mutex) != 0;
+    MAYBE_UNUSED bool ok = pthread_mutex_destroy((pthread_mutex_t*)mutex) == 0;
+    assert(ok);
     delete (pthread_mutex_t*)mutex; 
-    if (failed) THROW_RUNTIME_ERROR("pthread_mutex_destroy failed");
   }
   
   void MutexSys::lock( void ) 
@@ -70,6 +70,7 @@ namespace embree
 };
 #endif
 
+#if 0
 namespace embree
 {
   template<typename Mutex>
@@ -102,3 +103,4 @@ namespace embree
   mutex_regression_test<MutexSys> mutex_sys_regression("sys_mutex_regression_test");
   mutex_regression_test<SpinLock> mutex_atomic_regression("atomic_mutex_regression_test");
 }
+#endif

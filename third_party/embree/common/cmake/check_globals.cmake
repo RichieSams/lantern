@@ -19,7 +19,6 @@ IF (WIN32 OR APPLE)
 ENDIF()
 
 execute_process(COMMAND objdump -C -t ${file} OUTPUT_VARIABLE output)
-
 string(REPLACE "\n" ";" output ${output})
 
 foreach (line ${output})
