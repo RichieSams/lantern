@@ -13,16 +13,16 @@ class Medium;
 
 struct Material {
 	Material()
-		: BSDF(nullptr), 
-		  Medium(nullptr) {
+		: bsdf(nullptr),
+		  medium(nullptr) {
 	}
 	explicit Material(BSDF *bsdf, Medium *medium = nullptr)
-		: BSDF(bsdf),
-		  Medium(medium) {
+		: bsdf(bsdf),
+		  medium(medium) {
 	}
 
-	BSDF *BSDF;
-	Medium *Medium;
+	BSDF *bsdf;
+	Medium *medium;
 };
 
 } // End of namespace Lantern

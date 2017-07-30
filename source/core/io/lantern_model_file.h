@@ -6,8 +6,10 @@
 
 #pragma once
 
-#include <math/int_types.h>
+#include "math/int_types.h"
+
 #include <vector>
+#include <cstdio>
 
 
 namespace Lantern {
