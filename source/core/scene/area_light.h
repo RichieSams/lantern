@@ -14,7 +14,7 @@ namespace Lantern {
 class AreaLight : public Light {
 public:
 	AreaLight(float3 color, float radiantPower, float area, uint geomId, float4 boundingSphere)
-		: Light(color * radiantPower * M_1_PI / area),
+		: Light(color * radiantPower * (float)M_1_PI / area),
 		  m_area(area),
 		  m_geomId(geomId),
 		  m_boundingSphere(boundingSphere) {

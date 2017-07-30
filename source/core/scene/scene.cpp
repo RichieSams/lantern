@@ -26,6 +26,8 @@
 #define EMBREE_STATIC_LIB
 #include <embree2/rtcore.h>
 
+#include <stdlib.h>
+
 
 namespace Lantern {
 
@@ -42,14 +44,14 @@ Scene::~Scene() {
 	rtcDeleteDevice(m_device);
 }
 
-float4 CalculateBoundingSphere(float3a *positions, uint len) {
+float4 CalculateBoundingSphere(float3a *positions, std::size_t len) {
 	float3a center = positions[0];
 	float radius = 0.0001f;
 	float3a pos, diff;
 	float length, alpha, alphaSq;
 
-	for (int i = 0; i < 2; i++) {
-		for (uint j = 0; j < len; ++j) {
+	for (std::size_t i = 0; i < 2; i++) {
+		for (std::size_t j = 0; j < len; ++j) {
 			pos = positions[j];
 			diff = pos - center;
 			length = embree::length(diff);
@@ -62,7 +64,7 @@ float4 CalculateBoundingSphere(float3a *positions, uint len) {
 		}
 	}
 
-	for (uint j = 0; j < len; ++j) {
+	for (std::size_t j = 0; j < len; ++j) {
 		pos = positions[j];
 		diff = pos - center;
 		length = embree::length(diff);
@@ -99,7 +101,8 @@ bool Scene::ReloadSceneFromJSON() {
 }
 
 Light *Scene::RandomOneLight(UniformSampler *sampler) {
-	uint numLights = m_lights.size();
+	// FIXME: Update to a full size_t if we ever get lots and lots of lights
+	uint numLights = (uint)m_lights.size();
 	if (numLights == 0) {
 		return nullptr;
 	}
@@ -147,14 +150,14 @@ bool Scene::ParseJSON() {
 	// Get the camera values
 	nlohmann::json camera = j["camera"];
 
-	float phi = M_PI_4;
+	float phi = (float)M_PI_4;
 	float theta = 0.0f;
 	float cameraRadius = 10.0f;
-	float fov = M_PI_4;
+	float fov = (float)M_PI_4;
 	float3 target(0.0f);
 
-	float clientWidth = camera["client_width"].get<float>();
-	float clientHeight = camera["client_height"].get<float>();
+	uint clientWidth = camera["client_width"].get<uint>();
+	uint clientHeight = camera["client_height"].get<uint>();
 	if (camera.count("phi") == 1) {
 		phi = camera["phi"].get<float>();
 	}
@@ -377,8 +380,8 @@ uint Scene::AddMesh(Mesh *mesh, float4x4 &transform, float *out_surfaceArea, flo
 
 uint Scene::AddLMF(LanternModelFile *lmf, float4x4 &transform, float *out_surfaceArea, float4 *out_boundingSphere) {
 	uint meshId;
-	uint numPrimitives;
-	uint numVertices = lmf->Positions.size() / 3;
+	std::size_t numPrimitives;
+	std::size_t numVertices = lmf->Positions.size() / 3;
 	if (lmf->VerticesPerPrimative == 3) {
 		numPrimitives = lmf->Indices.size() / 3;
 

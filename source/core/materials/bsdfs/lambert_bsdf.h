@@ -33,7 +33,7 @@ public:
 	}
 
 	float Pdf(SurfaceInteraction &interaction) const override {
-		return dot(interaction.InputDirection, interaction.Normal) * M_1_PI;
+		return dot(interaction.InputDirection, interaction.Normal) * (float)M_1_PI;
 	}
 };
 

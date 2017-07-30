@@ -8,6 +8,8 @@
 
 #include "math/vector_types.h"
 
+#include <cmath>
+
 
 namespace Lantern {
 
@@ -45,7 +47,7 @@ inline float Fresnel(float IORi, float IORo, float VdotN, float sinSquaredThetaT
 		return 1.0f;
 	}
 
-	float cosThetaT = std::sqrtf(1.0f - sinSquaredThetaT);
+	float cosThetaT = sqrtf(1.0f - sinSquaredThetaT);
 	float R_perpendicular = (IORi * VdotN - IORo * cosThetaT) / (IORi * VdotN + IORo * cosThetaT);
 	float R_parallel = (IORo * VdotN - IORi * cosThetaT) / (IORo * VdotN + IORi * cosThetaT);
 
@@ -53,11 +55,15 @@ inline float Fresnel(float IORi, float IORo, float VdotN, float sinSquaredThetaT
 }
 
 inline bool AnyNan(float3 &a) {
-	return isnan(a.x) || isnan(a.y) || isnan(a.z);
+	return std::isnan(a.x) || std::isnan(a.y) || std::isnan(a.z);
 }
 
 inline bool AnyNan(float3a &a) {
-	return isnan(a.x) || isnan(a.y) || isnan(a.z);
+	return std::isnan(a.x) || std::isnan(a.y) || std::isnan(a.z);
+}
+
+inline bool AnyNan(float2 &a) {
+	return std::isnan(a.x) || std::isnan(a.y);
 }
 
 } // End of namespace Lantern

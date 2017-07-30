@@ -30,10 +30,10 @@ void Renderer::RenderFrame() {
 	uint width = m_scene->Camera->FrameBuffer.Width;
 	uint height = m_scene->Camera->FrameBuffer.Height;
 
-	const int numTilesX = (width + kTileSize - 1) / kTileSize;
-	const int numTilesY = (height + kTileSize - 1) / kTileSize;
+	const uint numTilesX = (width + kTileSize - 1) / kTileSize;
+	const uint numTilesY = (height + kTileSize - 1) / kTileSize;
 
-	tbb::parallel_for(size_t(0), size_t(numTilesX * numTilesY), [=](size_t i) {
+	tbb::parallel_for(uint(0), uint(numTilesX * numTilesY), [=](uint i) {
 		RenderTile(i, width, height, numTilesX, numTilesY);
 	});
 

@@ -31,10 +31,15 @@ public:
 		uint64 oldState = m_state;
 		
 		m_state = oldState * 6364136223846793005ULL + (m_sequence | 1);
-		uint32 xorShifted = ((oldState >> 18u) ^ oldState) >> 27u;
+		uint32 xorShifted = (uint32)(((oldState >> 18u) ^ oldState) >> 27u);
 		uint32 rot = oldState >> 59u;
 
+		// Stop complaining about unary minus on an unsigned
+		// It's intended
+		#pragma warning ( push)
+		#pragma warning ( disable : 4146)
 		return (xorShifted >> rot) | (xorShifted << ((-rot) & 31));
+		#pragma warning ( pop)
 	}
 
 	float NextFloat() {
@@ -48,7 +53,7 @@ public:
 	}
 
 	uint NextDiscrete(uint range) {
-		return range * NextFloat();
+		return (uint)(range * NextFloat());
 	}
 
 private:

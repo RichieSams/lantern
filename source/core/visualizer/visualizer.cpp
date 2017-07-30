@@ -66,15 +66,15 @@ void Visualizer::Run() {
 		m_renderer->RenderFrame();
 
 		auto currentTime = std::chrono::high_resolution_clock::now();
-		int delta = std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - lastRender).count();
+		int delta = (int)std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - lastRender).count();
 
 		ImGui::SetNextWindowPos(ImVec2(0, 0));
 		ImGui::Begin("Frame Stats", nullptr, ImVec2(0, 0), -1.0f, ImGuiWindowFlags_AlwaysAutoResize);
 		ImGui::Text("%d ms/frame (%.1f FPS)", delta, 1.0f / delta * 1000.0f);
 		
 		auto runTime = currentTime - startTime;
-		int minutes = std::chrono::duration_cast<std::chrono::minutes>(runTime).count();
-		int seconds = std::chrono::duration_cast<std::chrono::seconds>(runTime).count() - minutes * 60;
+		int minutes = (int)std::chrono::duration_cast<std::chrono::minutes>(runTime).count();
+		int seconds = (int)std::chrono::duration_cast<std::chrono::seconds>(runTime).count() - minutes * 60;
 		ImGui::Text("Run time - %d:%d (min:sec)", minutes, seconds);
 		ImGui::End();
 
@@ -130,7 +130,7 @@ void Visualizer::CursorPosCallback(GLFWwindow *window, double xpos, double ypos)
 		glfwGetCursorPos(window, &g_visualizer->m_lastMousePosX, &g_visualizer->m_lastMousePosY);
 
 		g_visualizer->m_scene->Camera->Rotate((float)(oldY - g_visualizer->m_lastMousePosY) / 300,
-		                                     (float)(oldX - g_visualizer->m_lastMousePosX) / 300);
+		                                      (float)(oldX - g_visualizer->m_lastMousePosX) / 300);
 
 		g_visualizer->m_scene->Camera->FrameBuffer.Reset();
 	} else if (g_visualizer->m_middleMouseCaptured) {
@@ -138,16 +138,16 @@ void Visualizer::CursorPosCallback(GLFWwindow *window, double xpos, double ypos)
 		double oldY = g_visualizer->m_lastMousePosY;
 		glfwGetCursorPos(window, &g_visualizer->m_lastMousePosX, &g_visualizer->m_lastMousePosY);
 
-		g_visualizer->m_scene->Camera->Pan((float)(oldX - g_visualizer->m_lastMousePosX) * 0.01,
-		                                  (float)(g_visualizer->m_lastMousePosY - oldY) * 0.01);
+		g_visualizer->m_scene->Camera->Pan((float)(oldX - g_visualizer->m_lastMousePosX) * 0.01f,
+		                                   (float)(g_visualizer->m_lastMousePosY - oldY) * 0.01f);
 
 		g_visualizer->m_scene->Camera->FrameBuffer.Reset();
 	}
 }
 
 void Visualizer::ScrollCallback(GLFWwindow *window, double xoffset, double yoffset) {
-	g_visualizer->m_scene->Camera->Zoom(yoffset);
 	g_visualizer->m_scene->Camera->FrameBuffer.Reset();
+	g_visualizer->m_scene->Camera->Zoom((float)yoffset);
 
 	g_visualizer->m_imGuiImpl.ScrollCallback(window, xoffset, yoffset);
 }

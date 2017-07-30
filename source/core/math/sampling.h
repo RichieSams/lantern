@@ -30,11 +30,11 @@ inline float PowerHeuristic(uint numf, float fPdf, uint numg, float gPdf, uint n
 
 inline void UniformSampleDisc(UniformSampler *sampler, float radius, float *x, float *y) {
 	float rand = sampler->NextFloat();
-	float r = std::sqrtf(rand) * radius;
-	float theta = sampler->NextFloat() * 2.0f * M_PI;
+	float r = sqrtf(rand) * radius;
+	float theta = sampler->NextFloat() * 2.0f * (float)M_PI;
 
-	*x = r * std::cosf(theta);
-	*y = r * std::sinf(theta);
+	*x = r * cosf(theta);
+	*y = r * sinf(theta);
 }
 
 /**
@@ -54,19 +54,19 @@ inline float3a CosineSampleHemisphere(float3a &normal, UniformSampler *sampler) 
 	UniformSampleDisc(sampler, 1.0f, &x, &y);
 
 	// Project z up to the unit hemisphere
-	float z = std::sqrtf(1.0f - x * x - y * y);
+	float z = sqrtf(1.0f - x * x - y * y);
 
 	return normalize(RotateToWorld(x, y, z, normal));
 }
 
 inline float3a UniformSampleHemisphere(float3a &normal, UniformSampler *sampler) {
 	float cosPhi = sampler->NextFloat();
-	float sinPhi = std::sqrt(1.0f - cosPhi * cosPhi);
-	float theta = 2 * M_PI * sampler->NextFloat();
+	float sinPhi = sqrt(1.0f - cosPhi * cosPhi);
+	float theta = 2 * (float)M_PI * sampler->NextFloat();
 
-	float x = sinPhi * std::sinf(theta);
+	float x = sinPhi * sinf(theta);
 	float y = cosPhi;
-	float z = sinPhi * std::cosf(theta);
+	float z = sinPhi * cosf(theta);
 
 	return normalize(RotateToWorld(x, y, z, normal));
 }
@@ -74,11 +74,11 @@ inline float3a UniformSampleHemisphere(float3a &normal, UniformSampler *sampler)
 inline float3a UniformSampleSphere(UniformSampler *sampler) {
 	float cosPhi = 2.0f * sampler->NextFloat() - 1.0f;
 	float sinPhi = std::sqrt(1.0f - cosPhi * cosPhi);
-	float theta = 2 * M_PI * sampler->NextFloat();
+	float theta = 2 * (float)M_PI * sampler->NextFloat();
 
-	float x = sinPhi * std::sinf(theta);
+	float x = sinPhi * sinf(theta);
 	float y = cosPhi;
-	float z = sinPhi * std::cosf(theta);
+	float z = sinPhi * cosf(theta);
 
 	return float3a(x, y, z);
 }

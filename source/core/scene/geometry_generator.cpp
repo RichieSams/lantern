@@ -144,17 +144,17 @@ void CreateSphere(float radius, uint sliceCount, uint stackCount, Mesh *mesh) {
 			float theta = j * thetaStep;
 
 			// Spherical to cartesian
-			float x = radius * std::sinf(phi) * std::sinf(theta);
-			float y = radius * std::cosf(phi);
-			float z = radius * std::sinf(phi) * std::cosf(theta);
+			float x = radius * sinf(phi) * sinf(theta);
+			float y = radius * cosf(phi);
+			float z = radius * sinf(phi) * cosf(theta);
 
 			mesh->Positions.emplace_back(x, y, z);
 			mesh->Normals.push_back(normalize(float3(x, y, z)));
 
 			// Partial derivative of P with respect to theta
-			float dx = radius * std::sinf(phi) * std::cosf(theta);
-			float dy = radius * std::cosf(phi);
-			float dz = radius * std::sinf(phi) * -std::sinf(theta);
+			float dx = radius * sinf(phi) * cosf(theta);
+			float dy = radius * cosf(phi);
+			float dz = radius * sinf(phi) * -sinf(theta);
 
 			mesh->Tangents.push_back(normalize(float3(dx, dy, dz)));
 
@@ -288,7 +288,7 @@ inline float QuadrantAwareArcTan(float y, float x) {
 
 		// If x = 0, then atanf(y/x) = +pi/2 if y > 0
 		//                atanf(y/x) = -pi/2 if y < 0
-		result = std::atanf(y / x); // in [-pi/2, +pi/2]
+		result = atanf(y / x); // in [-pi/2, +pi/2]
 
 		if (result < 0.0f) {
 			result += 2.0f * M_PI; // in [0, 2*pi).
@@ -296,7 +296,7 @@ inline float QuadrantAwareArcTan(float y, float x) {
 	} else {
 		// Quadrant II or III
 
-		result = std::atanf(y / x) + M_PI; // in [0, 2*pi).
+		result = atanf(y / x) + M_PI; // in [0, 2*pi).
 	}
 
 	return result;
@@ -317,7 +317,7 @@ void CreateGeosphere(float radius, uint numSubdivisions, Mesh *mesh) {
 		float3a(Z, -X, 0.0f),  float3a(-Z, -X, 0.0f)
 	};
 
-	DWORD k[60] = {
+	int k[60] = {
 		1,4,0,  4,9,0,  4,5,9,  8,5,4,  1,8,4,
 		1,10,8, 10,3,8, 8,3,5,  3,2,5,  3,7,2,
 		3,10,7, 10,6,7, 6,11,7, 6,0,11, 6,1,0,
@@ -355,15 +355,15 @@ void CreateGeosphere(float radius, uint numSubdivisions, Mesh *mesh) {
 
 		// Derive texture coordinates from spherical coordinates.
 		float theta = QuadrantAwareArcTan(p.x, p.z);
-		float phi = std::acosf(p.y / radius);
+		float phi = acosf(p.y / radius);
 
 		mesh->TexCoords[i].x = theta / (2.0f * M_PI);
 		mesh->TexCoords[i].y = phi / M_PI;
 
 		// Partial derivative of P with respect to theta
-		float dx = radius * std::sinf(phi) * std::cosf(theta);
-		float dy = radius * std::cosf(phi);
-		float dz = radius * std::sinf(phi) * -std::sinf(theta);
+		float dx = radius * sinf(phi) * cosf(theta);
+		float dy = radius * cosf(phi);
+		float dz = radius * sinf(phi) * -sinf(theta);
 
 		mesh->Tangents[i] = normalize(float3(dx, dy, dz));
 	}
