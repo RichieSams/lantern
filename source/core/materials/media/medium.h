@@ -21,8 +21,7 @@ public:
 		// This method for calculating the absorption coefficient is borrowed from Burley's 2015 Siggraph Course Notes "Extending the Disney BRDF to a BSDF with Integrated Subsurface Scattering"
 		// It's much more intutive to specify a color and a distance, then back-calculate the coefficient
 	}
-	virtual ~Medium() {
-	}
+	virtual ~Medium() = default;
 
 protected:
 	const float3a m_absorptionCoefficient;

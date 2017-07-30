@@ -19,7 +19,7 @@ public:
 	Light(float3 radiance) 
 		: m_radiance(radiance) {
 	}
-	virtual ~Light() {}
+	virtual ~Light() = default;
 
 public:
 	float3 m_radiance;
