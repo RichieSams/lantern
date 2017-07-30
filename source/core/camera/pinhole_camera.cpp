@@ -23,7 +23,7 @@ PinholeCamera::PinholeCamera()
 		  m_filter(ReconstructionFilter::Type::Tent) {
 	UpdateOrigin();
 	UpdateCartesianCoordSystem();
-	FrameBuffer.Reset();
+	FrameBufferData.Reset();
 }
 
 PinholeCamera::PinholeCamera(float phi, float theta, float radius, uint clientWidth, uint clientHeight, float3 target, float fov, ReconstructionFilter::Type filterType)
@@ -38,7 +38,7 @@ PinholeCamera::PinholeCamera(float phi, float theta, float radius, uint clientWi
 		  m_filter(filterType) {
 	UpdateOrigin();
 	UpdateCartesianCoordSystem();
-	FrameBuffer.Reset();
+	FrameBufferData.Reset();
 }
 
 void PinholeCamera::Rotate(float dPhi, float dTheta) {
@@ -102,8 +102,8 @@ Ray PinholeCamera::CalculateRayFromPixel(uint x, uint y, UniformSampler *sampler
 	float u = m_filter.Sample(sampler->NextFloat());
 	float v = m_filter.Sample(sampler->NextFloat());
 	
-	float3a viewVector((((x + 0.5f + u) / FrameBuffer.Width) * 2.0f - 1.0f) * m_tanFovXDiv2,
-	                   -(((y + 0.5f + v) / FrameBuffer.Height) * 2.0f - 1.0f) * m_tanFovYDiv2,
+	float3a viewVector((((x + 0.5f + u) / FrameBufferData.Width) * 2.0f - 1.0f) * m_tanFovXDiv2,
+	                   -(((y + 0.5f + v) / FrameBufferData.Height) * 2.0f - 1.0f) * m_tanFovYDiv2,
 	                   -1.0f);
 
 	// Matrix multiply

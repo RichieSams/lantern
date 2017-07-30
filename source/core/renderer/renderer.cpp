@@ -27,8 +27,8 @@
 namespace Lantern {
 
 void Renderer::RenderFrame() {
-	uint width = m_scene->Camera->FrameBuffer.Width;
-	uint height = m_scene->Camera->FrameBuffer.Height;
+	uint width = m_scene->Camera->FrameBufferData.Width;
+	uint height = m_scene->Camera->FrameBufferData.Height;
 
 	const uint numTilesX = (width + kTileSize - 1) / kTileSize;
 	const uint numTilesY = (height + kTileSize - 1) / kTileSize;
@@ -216,7 +216,7 @@ void Renderer::RenderPixel(uint x, uint y, UniformSampler *sampler) const {
 		printf("Over max bounces");
 	}
 
-	m_scene->Camera->FrameBuffer.SplatPixel(x, y, color);
+	m_scene->Camera->FrameBufferData.SplatPixel(x, y, color);
 }
 
 float3 Renderer::SampleOneLight(UniformSampler *sampler, SurfaceInteraction interaction, BSDF *bsdf, Light *hitLight) const {
@@ -237,7 +237,7 @@ float3 Renderer::SampleOneLight(UniformSampler *sampler, SurfaceInteraction inte
 		light = m_scene->RandomOneLight(sampler);
 	} while (light == hitLight);
 
-	return numLights * EstimateDirect(light, sampler, interaction, bsdf);
+	return (float)numLights * EstimateDirect(light, sampler, interaction, bsdf);
 }
 
 float3 Renderer::EstimateDirect(Light *light, UniformSampler *sampler, SurfaceInteraction &interaction, BSDF *bsdf) const {

@@ -25,7 +25,7 @@ public:
 	
 public:
 	// Frame Data
-	FrameBuffer FrameBuffer;
+	FrameBuffer FrameBufferData;
 
 private:
 	ReconstructionFilter m_filter;
