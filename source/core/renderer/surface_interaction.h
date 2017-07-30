@@ -22,6 +22,7 @@ struct SurfaceInteraction {
 
 	float3a Position;
 	float3a Normal;
+	float2 TexCoord;
 	float3a InputDirection;
 	float3a OutputDirection;
 	BSDFLobe::Type SampledLobe;

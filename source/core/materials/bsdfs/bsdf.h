@@ -15,21 +15,21 @@ namespace Lantern {
 
 struct SurfaceInteraction;
 class UniformSampler;
+class Texture;
 
 class BSDF {
 public:
-	BSDF(BSDFLobe::Type supportedLobes, float3 albedo)
+	BSDF(BSDFLobe::Type supportedLobes, Texture *albedoTexture)
 		: SupportedLobes(supportedLobes),
-		  m_albedo(albedo) {
+		  m_albedoTexture(albedoTexture) {
 	}
-	virtual ~BSDF() {
-	}
+	virtual ~BSDF() = default;
 
 public:
 	BSDFLobe::Type SupportedLobes;
 
 protected:
-	float3 m_albedo;
+	Texture *m_albedoTexture;
 
 public:
 	virtual float3 Eval(SurfaceInteraction &interaction) const = 0;

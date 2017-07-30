@@ -7,6 +7,7 @@
 #pragma once
 
 #include "materials/bsdfs/bsdf.h"
+#include "materials/textures/texture.h"
 
 #include "renderer/surface_interaction.h"
 
@@ -18,13 +19,13 @@ namespace Lantern {
 
 class MirrorBSDF : public BSDF {
 public:
-	MirrorBSDF(float3 albedo)
-		: BSDF(BSDFLobe::SpecularReflection, albedo) {
+	MirrorBSDF(Texture *albedoTexture)
+		: BSDF(BSDFLobe::SpecularReflection, albedoTexture) {
 	}
 
 public:
 	float3 Eval(SurfaceInteraction &interaction) const override {
-		return m_albedo;
+		return m_albedoTexture->Sample(interaction.TexCoord);
 	}
 
 	void Sample(SurfaceInteraction &interaction, UniformSampler *sampler) const override {

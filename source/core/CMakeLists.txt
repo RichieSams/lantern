@@ -59,6 +59,12 @@ SetSourceGroup(NAME Materials/BSDFs
 	             materials/bsdfs/ideal_specular_dielectric.h
 )
 
+SetSourceGroup(NAME Materials/Textures
+	PREFIX LANTERN_CORE
+	SOURCE_FILES materials/textures/texture.h
+	             materials/textures/constant_texture.h
+)
+
 SetSourceGroup(NAME "Materials/Media"
 	PREFIX LANTERN_CORE
 	SOURCE_FILES materials/media/medium.h
@@ -108,6 +114,7 @@ set(LANTERN_CORE_SRC
 	${LANTERN_CORE_MATERIALS}
 	${LANTERN_CORE_MATERIALS_BSDFS}
 	${LANTERN_CORE_MATERIALS_MEDIA}
+	${LANTERN_CORE_MATERIALS_TEXTURES}
 	${LANTERN_CORE_RENDERER}
 	${LANTERN_CORE_VISUALIZER}
 	${LANTERN_CORE_THIRD_PARTY_TINY_OBJ_LOADER}
@@ -117,4 +124,4 @@ set(LANTERN_CORE_SRC
 
 # Create lib
 add_library(lantern_core ${LANTERN_CORE_SRC})
-target_link_libraries(lantern_core glfw ${GLFW_LIBRARIES} imgui tbb_static tbbmalloc_static embree)
+target_link_libraries(lantern_core glfw ${GLFW_LIBRARIES} ${OPENGL_gl_LIBRARY} imgui tbb_static tbbmalloc_static embree)

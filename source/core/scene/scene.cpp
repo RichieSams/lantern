@@ -18,6 +18,7 @@
 #include "materials/bsdfs/mirror_bsdf.h"
 #include "materials/media/non_scattering_medium.h"
 #include "materials/media/isotropic_scattering_medium.h"
+#include "materials/textures/constant_texture.h"
 
 #include "io/lantern_model_file.h"
 
@@ -126,6 +127,17 @@ float3 Scene::InterpolateNormal(uint meshId, uint primId, float u, float v) cons
 	return normal;
 }
 
+float2 Scene::InterpolateTexCoord(uint meshId, uint primId, float u, float v) const {
+	float2 texCoord;
+	rtcInterpolate(m_scene, meshId, primId, u, v, RTC_USER_VERTEX_BUFFER1, &texCoord.x, nullptr, nullptr, 2);
+
+	if (AnyNan(texCoord)) {
+		printf("nan");
+	}
+
+	return texCoord;
+}
+
 bool Scene::ParseJSON() {
 	m_scene = rtcDeviceNewScene(m_device, RTC_SCENE_STATIC, RTC_INTERSECT1 | RTC_INTERPOLATE);
 
@@ -187,23 +199,29 @@ bool Scene::ParseJSON() {
 			std::string name = bsdf["name"].get<std::string>();
 			std::string type = bsdf["type"].get<std::string>();
 			if (type == "ideal_specular_dielectric") {
-				BSDF *newBSDF = new IdealSpecularDielectric(float3(bsdf["albedo"][0].get<float>(),
-				                                                   bsdf["albedo"][1].get<float>(),
-				                                                   bsdf["albedo"][2].get<float>()),
-				                                                   bsdf["ior"].get<float>());
+				ConstantTexture *newTexture = new ConstantTexture(float3(bsdf["albedo"][0].get<float>(),
+				                                                         bsdf["albedo"][1].get<float>(),
+				                                                         bsdf["albedo"][2].get<float>()));
+				BSDF *newBSDF = new IdealSpecularDielectric(newTexture,
+				                                            bsdf["ior"].get<float>());
 				m_bsdfs.push_back(newBSDF);
+				m_textures.push_back(newTexture);
 				bsdfMap[name] = newBSDF;
 			} else if (type == "lambert") {
-				BSDF *newBSDF = new LambertBSDF(float3(bsdf["albedo"][0].get<float>(),
-				                                       bsdf["albedo"][1].get<float>(),
-				                                       bsdf["albedo"][2].get<float>()));
+				ConstantTexture *newTexture = new ConstantTexture(float3(bsdf["albedo"][0].get<float>(),
+				                                                         bsdf["albedo"][1].get<float>(),
+				                                                         bsdf["albedo"][2].get<float>()));
+				BSDF *newBSDF = new LambertBSDF(newTexture);
 				m_bsdfs.push_back(newBSDF);
+				m_textures.push_back(newTexture);
 				bsdfMap[name] = newBSDF;
 			} else if (type == "mirror") {
-				BSDF *newBSDF = new MirrorBSDF(float3(bsdf["albedo"][0].get<float>(),
-				                                      bsdf["albedo"][1].get<float>(),
-				                                      bsdf["albedo"][2].get<float>()));
+				ConstantTexture *newTexture = new ConstantTexture(float3(bsdf["albedo"][0].get<float>(),
+				                                                         bsdf["albedo"][1].get<float>(),
+				                                                         bsdf["albedo"][2].get<float>()));
+				BSDF *newBSDF = new MirrorBSDF(newTexture);
 				m_bsdfs.push_back(newBSDF);
+				m_textures.push_back(newTexture);
 				bsdfMap[name] = newBSDF;
 			}
 		}
@@ -276,6 +294,8 @@ bool Scene::ParseJSON() {
 			uint meshId;
 			float surfaceArea;
 			float4 boundingSphere;
+			bool hasNormals;
+			bool hasTexCoords;
 			if (type == "lmf") {
 				std::string lmfFilePathString = primitive["file_path"].get<std::string>();
 				fs::path lmfFilePath(lmfFilePathString);
@@ -296,7 +316,7 @@ bool Scene::ParseJSON() {
 				}
 				fclose(file);
 
-				meshId = AddLMF(&lmf, transform, &surfaceArea, &boundingSphere);
+				meshId = AddLMF(&lmf, transform, &surfaceArea, &boundingSphere, &hasNormals, &hasTexCoords);
 				primitiveMap[name] = meshId;
 			} else if (type == "grid") {
 				float width = primitive["width"].get<float>();
@@ -306,7 +326,7 @@ bool Scene::ParseJSON() {
 
 				Mesh mesh;
 				CreateGrid(width, depth, m, n, &mesh);
-				meshId = AddMesh(&mesh, transform, &surfaceArea, &boundingSphere);
+				meshId = AddMesh(&mesh, transform, &surfaceArea, &boundingSphere, &hasNormals, &hasTexCoords);
 				primitiveMap[name] = meshId;
 			} else if (type == "geosphere") {
 				float radius = primitive["radius"].get<float>();
@@ -314,7 +334,7 @@ bool Scene::ParseJSON() {
 
 				Mesh mesh;
 				CreateGeosphere(radius, n, &mesh);
-				meshId = AddMesh(&mesh, transform, &surfaceArea, &boundingSphere);
+				meshId = AddMesh(&mesh, transform, &surfaceArea, &boundingSphere, &hasNormals, &hasTexCoords);
 				primitiveMap[name] = meshId;
 			} else {
 				printf("Unknown primitive type: [%s]\n", type.c_str());
@@ -322,7 +342,9 @@ bool Scene::ParseJSON() {
 			}
 
 			std::string material = primitive["material"].get<std::string>();
-			m_models[meshId].Material = materialMap[material];
+			m_models[meshId].material = materialMap[material];
+			m_models[meshId].hasNormals = hasNormals;
+			m_models[meshId].hasTexCoords = hasTexCoords;
 
 			if (primitive.count("emission") == 1) {
 				float3 color(primitive["emission"]["color"][0].get<float>(), primitive["emission"]["color"][1].get<float>(), primitive["emission"]["color"][2].get<float>());
@@ -330,7 +352,7 @@ bool Scene::ParseJSON() {
 
 				AreaLight *light = new AreaLight(color, radiantPower, surfaceArea, meshId, boundingSphere);
 				m_lights.push_back(light);
-				m_models[meshId].Light = light;
+				m_models[meshId].light = light;
 			}
 		}
 	}
@@ -338,7 +360,7 @@ bool Scene::ParseJSON() {
 	return true;
 }
 
-uint Scene::AddMesh(Mesh *mesh, float4x4 &transform, float *out_surfaceArea, float4 *out_boundingSphere) {
+uint Scene::AddMesh(Mesh *mesh, float4x4 &transform, float *out_surfaceArea, float4 *out_boundingSphere, bool *out_hasNormals, bool *out_hasTexCoords) {
 	uint meshId = rtcNewTriangleMesh(m_scene, RTC_GEOMETRY_STATIC, mesh->Indices.size() / 3, mesh->Positions.size());
 
 	float3a *vertices = (float3a *)rtcMapBuffer(m_scene, meshId, RTC_VERTEX_BUFFER);
@@ -378,7 +400,7 @@ uint Scene::AddMesh(Mesh *mesh, float4x4 &transform, float *out_surfaceArea, flo
 	return meshId;
 }
 
-uint Scene::AddLMF(LanternModelFile *lmf, float4x4 &transform, float *out_surfaceArea, float4 *out_boundingSphere) {
+uint Scene::AddLMF(LanternModelFile *lmf, float4x4 &transform, float *out_surfaceArea, float4 *out_boundingSphere, bool *out_hasNormals, bool *out_hasTexCoords) {
 	uint meshId;
 	std::size_t numPrimitives;
 	std::size_t numVertices = lmf->Positions.size() / 3;
@@ -424,10 +446,27 @@ uint Scene::AddLMF(LanternModelFile *lmf, float4x4 &transform, float *out_surfac
 	memcpy(indices, &lmf->Indices[0], lmf->Indices.size() * sizeof(uint));
 	rtcUnmapBuffer(m_scene, meshId, RTC_INDEX_BUFFER);
 
-	float *normals = (float *)_aligned_malloc(sizeof(float) * lmf->Normals.size(), 16);
-	memcpy(normals, &lmf->Normals[0], sizeof(float) * lmf->Normals.size());
-	rtcSetBuffer(m_scene, meshId, RTC_USER_VERTEX_BUFFER0, normals, 0u, sizeof(float) * 3);
-	m_meshNormals.push_back(normals);
+	if (lmf->Normals.size() > 0) {
+		float *normals = (float *)_aligned_malloc(sizeof(float) * lmf->Normals.size(), 16);
+		memcpy(normals, &lmf->Normals[0], sizeof(float) * lmf->Normals.size());
+		rtcSetBuffer(m_scene, meshId, RTC_USER_VERTEX_BUFFER0, normals, 0u, sizeof(float) * 3);
+		m_meshNormals.push_back(normals);
+
+		*out_hasNormals = true;
+	} else {
+		*out_hasNormals = false;
+	}
+
+	if (lmf->TexCoords.size() > 0) {
+		float *texCoords = (float *)_aligned_malloc(sizeof(float) * lmf->TexCoords.size(), 16);
+		memcpy(texCoords, &lmf->TexCoords[0], sizeof(float) * lmf->TexCoords.size());
+		rtcSetBuffer(m_scene, meshId, RTC_USER_VERTEX_BUFFER1, texCoords, 0u, sizeof(float) * 2);
+		m_meshTexCoords.push_back(texCoords);
+
+		*out_hasTexCoords = true;
+	} else {
+		*out_hasTexCoords = false;
+	}
 
 	return meshId;
 }

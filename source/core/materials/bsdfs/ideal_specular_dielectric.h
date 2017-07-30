@@ -7,6 +7,7 @@
 #pragma once
 
 #include "materials/bsdfs/bsdf.h"
+#include "materials/textures/texture.h"
 
 #include "renderer/surface_interaction.h"
 
@@ -18,8 +19,8 @@ namespace Lantern {
 
 class IdealSpecularDielectric : public BSDF {
 public:
-	IdealSpecularDielectric(float3 albedo, float ior)
-		: BSDF(BSDFLobe::Specular, albedo), 
+	IdealSpecularDielectric(Texture *albedoTexture, float ior)
+		: BSDF(BSDFLobe::Specular, albedoTexture), 
 		  m_ior(ior) {
 	}
 
@@ -28,7 +29,7 @@ private:
 
 public:
 	float3 Eval(SurfaceInteraction &interaction) const override {
-		return m_albedo;
+		return m_albedoTexture->Sample(interaction.TexCoord);
 	}
 
 	void Sample(SurfaceInteraction &interaction, UniformSampler *sampler) const override {

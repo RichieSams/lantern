@@ -160,27 +160,36 @@ void Renderer::RenderPixel(uint x, uint y, UniformSampler *sampler) const {
 			}
 
 			interaction.Position = ray.Origin + ray.Direction * ray.TFar;
-			interaction.Normal = normalize(m_scene->InterpolateNormal(ray.GeomID, ray.PrimID, ray.U, ray.V));
+			if (m_scene->HasNormals(ray.GeomID)) {
+				interaction.Normal = normalize(m_scene->InterpolateNormal(ray.GeomID, ray.PrimID, ray.U, ray.V));
+			} else {
+				interaction.Normal = ray.GeomNormal;
+			}
+			if (m_scene->HasTexCoords(ray.GeomID)) {
+				interaction.TexCoord = m_scene->InterpolateTexCoord(ray.GeomID, ray.PrimID, ray.U, ray.V);
+			} else {
+				interaction.TexCoord = float2(0.0f, 0.0f);
+			}
 			interaction.OutputDirection = normalize(-ray.Direction);
 			interaction.IORo = 0.0f;
 
 
 			// Calculate the direct lighting
-			color += throughput * SampleOneLight(sampler, interaction, material->BSDF, light);
+			color += throughput * SampleOneLight(sampler, interaction, material->bsdf, light);
 
 
 			// Get the new ray direction
 			// Choose the direction based on the bsdf		
-			material->BSDF->Sample(interaction, sampler);
-			float pdf = material->BSDF->Pdf(interaction);
+			material->bsdf->Sample(interaction, sampler);
+			float pdf = material->bsdf->Pdf(interaction);
 
 			// Accumulate the weight
-			throughput = throughput * material->BSDF->Eval(interaction) / pdf;
+			throughput = throughput * material->bsdf->Eval(interaction) / pdf;
 
 			// Update the current IOR and medium if we refracted
 			if (interaction.SampledLobe == BSDFLobe::SpecularTransmission) {
 				interaction.IORi = interaction.IORo;
-				medium = material->Medium;
+				medium = material->medium;
 			}
 
 			// Shoot a new ray
@@ -213,7 +222,7 @@ void Renderer::RenderPixel(uint x, uint y, UniformSampler *sampler) const {
 	}
 
 	if (bounces == maxBounces) {
-		printf("Over max bounces");
+		//printf("Over max bounces");
 	}
 
 	m_scene->Camera->FrameBufferData.SplatPixel(x, y, color);
