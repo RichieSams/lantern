@@ -65,6 +65,7 @@ SetSourceGroup(NAME Materials/Textures
 	PREFIX LANTERN_CORE
 	SOURCE_FILES materials/textures/texture.h
 	             materials/textures/constant_texture.h
+	             materials/textures/image_texture.h
 )
 
 SetSourceGroup(NAME "Materials/Media"
