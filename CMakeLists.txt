@@ -41,6 +41,7 @@ include_directories(third_party/embree/common)
 include_directories(third_party/tiny_obj_loader/include)
 include_directories(third_party/json)
 include_directories(third_party/ez_option_parser)
+include_directories(third_party/stb/include)
 
 
 # Add the main source

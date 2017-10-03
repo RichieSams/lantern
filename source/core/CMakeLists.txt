@@ -104,6 +104,14 @@ SetSourceGroup(NAME "Third Party/EZ Option Parser"
 	SOURCE_FILES ../../third_party/ez_option_parser/ez_option_parser.h
 )
 
+SetSourceGroup(NAME "Third Party/STB"
+	PREFIX LANTERN_CORE
+	SOURCE_FILES ../../third_party/stb/include/stb/stb_image.h
+	             ../../third_party/stb/stb.cpp
+)
+
+
+
 
 # Link all the sources into one
 set(LANTERN_CORE_SRC
@@ -120,6 +128,7 @@ set(LANTERN_CORE_SRC
 	${LANTERN_CORE_THIRD_PARTY_TINY_OBJ_LOADER}
 	${LANTERN_CORE_THIRD_PARTY_JSON}
 	${LANTERN_CORE_THIRD_PARTY_EZ_OPTION_PARSER}
+	${LANTERN_CORE_THIRD_PARTY_STB}
 )
 
 # Create lib
