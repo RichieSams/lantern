@@ -36,6 +36,8 @@ SetSourceGroup(NAME Scene
 	             scene/area_light.cpp
 	             scene/geometry_generator.h
 	             scene/geometry_generator.cpp
+	             scene/image_cache.h
+	             scene/image_cache.cpp
 	             scene/light.h
 	             scene/mesh_elements.h
 	             scene/ray.h
