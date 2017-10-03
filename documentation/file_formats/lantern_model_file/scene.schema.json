@@ -127,7 +127,7 @@
 			"maxItems" : 16,
 			"additionalItems" : false
 		},
-		
+
 		"ideal_specular_dielectric_bsdf" : {
 			"type" : "object",
 			"required" : ["name", "type", "albedo", "ior"],
@@ -141,10 +141,13 @@
 					"type" : "string",
 					"enum" : ["ideal_specular_dielectric"] 
 				},
-				"albedo" : {
-					"description" : "",
-					"$ref" : "#/definitions/float3"
-				},
+					"albedo": {
+						"description": "",
+						"oneOf": [
+							{ "$ref": "#/definitions/float3" },
+							{ "type": "string" }
+						]
+					},
 				"ior" : {
 					"description" : "",
 					"type" : "number"
@@ -166,7 +169,10 @@
 				},
 				"albedo" : {
 					"description" : "",
-					"$ref" : "#/definitions/float3"
+					"oneOf": [
+						{ "$ref": "#/definitions/float3" },
+						{ "type": "string" }
+					]
 				}
 			}
 		},
@@ -185,7 +191,10 @@
 				},
 				"albedo" : {
 					"description" : "",
-					"$ref" : "#/definitions/float3"
+					"oneOf": [
+						{ "$ref": "#/definitions/float3" },
+						{ "type": "string" }
+					]
 				}
 			}
 		},

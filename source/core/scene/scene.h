@@ -12,6 +12,7 @@
 
 #include "scene/light.h"
 #include "scene/ray.h"
+#include "scene/image_cache.h"
 
 #include <unordered_map>
 #include <experimental/filesystem>
@@ -51,6 +52,8 @@ private:
 	std::vector<float *> m_meshNormals;
 	std::vector<float *> m_meshTexCoords;
 	std::vector<Light *> m_lights;
+
+	ImageCache m_imageCache;
 
 	struct Model {
 		Model() : material(nullptr), light(nullptr) { }

@@ -19,6 +19,7 @@
 #include "materials/media/non_scattering_medium.h"
 #include "materials/media/isotropic_scattering_medium.h"
 #include "materials/textures/constant_texture.h"
+#include "materials/textures/image_texture.h"
 
 #include "io/lantern_model_file.h"
 
@@ -199,26 +200,44 @@ bool Scene::ParseJSON() {
 			std::string name = bsdf["name"].get<std::string>();
 			std::string type = bsdf["type"].get<std::string>();
 			if (type == "ideal_specular_dielectric") {
-				ConstantTexture *newTexture = new ConstantTexture(float3(bsdf["albedo"][0].get<float>(),
-				                                                         bsdf["albedo"][1].get<float>(),
-				                                                         bsdf["albedo"][2].get<float>()));
+				Texture *newTexture;
+				if (bsdf["albedo"].is_array()) {
+					newTexture = new ConstantTexture(float3(bsdf["albedo"][0].get<float>(),
+				                                            bsdf["albedo"][1].get<float>(),
+				                                            bsdf["albedo"][2].get<float>()));
+				} else {
+					uint imageId = m_imageCache.AddImage(bsdf["albedo"].get<std::string>().c_str());
+					newTexture = new ImageTexture(&m_imageCache, imageId);
+				}
 				BSDF *newBSDF = new IdealSpecularDielectric(newTexture,
 				                                            bsdf["ior"].get<float>());
 				m_bsdfs.push_back(newBSDF);
 				m_textures.push_back(newTexture);
 				bsdfMap[name] = newBSDF;
 			} else if (type == "lambert") {
-				ConstantTexture *newTexture = new ConstantTexture(float3(bsdf["albedo"][0].get<float>(),
-				                                                         bsdf["albedo"][1].get<float>(),
-				                                                         bsdf["albedo"][2].get<float>()));
+				Texture *newTexture;
+				if (bsdf["albedo"].is_array()) {
+					newTexture = new ConstantTexture(float3(bsdf["albedo"][0].get<float>(),
+				                                            bsdf["albedo"][1].get<float>(),
+				                                            bsdf["albedo"][2].get<float>()));
+				} else {
+					uint imageId = m_imageCache.AddImage(bsdf["albedo"].get<std::string>().c_str());
+					newTexture = new ImageTexture(&m_imageCache, imageId);
+				}
 				BSDF *newBSDF = new LambertBSDF(newTexture);
 				m_bsdfs.push_back(newBSDF);
 				m_textures.push_back(newTexture);
 				bsdfMap[name] = newBSDF;
 			} else if (type == "mirror") {
-				ConstantTexture *newTexture = new ConstantTexture(float3(bsdf["albedo"][0].get<float>(),
-				                                                         bsdf["albedo"][1].get<float>(),
-				                                                         bsdf["albedo"][2].get<float>()));
+				Texture *newTexture;
+				if (bsdf["albedo"].is_array()) {
+					newTexture = new ConstantTexture(float3(bsdf["albedo"][0].get<float>(),
+				                                            bsdf["albedo"][1].get<float>(),
+				                                            bsdf["albedo"][2].get<float>()));
+				} else {
+					uint imageId = m_imageCache.AddImage(bsdf["albedo"].get<std::string>().c_str());
+					newTexture = new ImageTexture(&m_imageCache, imageId);
+				}
 				BSDF *newBSDF = new MirrorBSDF(newTexture);
 				m_bsdfs.push_back(newBSDF);
 				m_textures.push_back(newTexture);
@@ -396,6 +415,18 @@ uint Scene::AddMesh(Mesh *mesh, float4x4 &transform, float *out_surfaceArea, flo
 	memcpy(normals, &mesh->Normals[0], sizeof(float3) * mesh->Normals.size());
 	rtcSetBuffer(m_scene, meshId, RTC_USER_VERTEX_BUFFER0, normals, 0u, sizeof(float3));
 	m_meshNormals.push_back(normals);
+	*out_hasNormals = true;
+
+	if (mesh->TexCoords.size() > 0) {
+		float *texCoords = (float *)_aligned_malloc(sizeof(float2) * mesh->TexCoords.size(), 16);
+		memcpy(texCoords, &mesh->TexCoords[0], sizeof(float2) * mesh->TexCoords.size());
+		rtcSetBuffer(m_scene, meshId, RTC_USER_VERTEX_BUFFER1, texCoords, 0u, sizeof(float2));
+		m_meshTexCoords.push_back(texCoords);
+
+		*out_hasTexCoords = true;
+	} else {
+		*out_hasTexCoords = false;
+	}
 
 	return meshId;
 }
@@ -493,6 +524,8 @@ void Scene::CleanupScene() {
 
 	m_materials.clear();
 	m_models.clear();
+
+	m_imageCache.Clear();
 
 	rtcDeleteScene(m_scene);
 }
