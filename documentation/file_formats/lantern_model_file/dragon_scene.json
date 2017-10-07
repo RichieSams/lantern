@@ -1,43 +1,46 @@
 {
-	"background_color" : [0.846, 0.933, 0.949],
-	"camera" : {
-		"phi" : 1.25,
-		"theta" : -1.570796,
-		"radius" : 2.0,
-		"client_width" : 1280,
-		"client_height" : 720,
-		"fov" : 0.7853981
+	"background_color": [ 0.846, 0.933, 0.949 ],
+	"camera": {
+		"phi": 1.25,
+		"theta": -1.570796,
+		"radius": 2.0,
+		"client_width": 1280,
+		"client_height": 720,
+		"fov": 0.7853981
 	},
-	"bsdfs" : [
+	"bsdfs": [
 		{
-			"name" : "glass",
-			"type" : "ideal_specular_dielectric",
-			"albedo" : [1.0, 1.0, 1.0],
-			"ior" : 1.35
+			"name": "glass",
+			"type": "ideal_specular_dielectric",
+			"albedo": {
+				"type": "constant",
+				"value": [ 1.0, 1.0, 1.0 ]
+			},
+			"ior": 1.35
 		}
 	],
-	"media" : [
+	"media": [
 		{
-			"name" : "red_scattering",
-			"type" : "isotropic_scattering",
-			"absorption_color" : [0.9801986733, 0.00609674656, 0.00334596545],
-			"absorption_at_distance" : 1.0,
-			"scattering_distance" : 0.01
+			"name": "red_scattering",
+			"type": "isotropic_scattering",
+			"absorption_color": [ 0.9801986733, 0.00609674656, 0.00334596545 ],
+			"absorption_at_distance": 1.0,
+			"scattering_distance": 0.01
 		}
 	],
-	"materials" : [
+	"materials": [
 		{
-			"name" : "dragon_material",
-			"bsdf" : "glass",
-			"medium" : "red_scattering"
+			"name": "dragon_material",
+			"bsdf": "glass",
+			"medium": "red_scattering"
 		}
 	],
-	"primitives" : [
+	"primitives": [
 		{
-			"name" : "dragon",
-			"type" : "lmf",
-			"file_path" : "dragon.lmf",
-			"material" : "dragon_material"
+			"name": "dragon",
+			"type": "lmf",
+			"file_path": "dragon.lmf",
+			"material": "dragon_material"
 		}
 	]
 }
