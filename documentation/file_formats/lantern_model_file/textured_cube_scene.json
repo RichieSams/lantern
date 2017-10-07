@@ -1,0 +1,160 @@
+{
+	"background_color": [ 0.846, 0.933, 0.949 ],
+	"camera": {
+		"phi": 1.0471975512,
+		"theta": 0.62831853071,
+		"radius": 10.0,
+		"client_width": 1280,
+		"client_height": 720,
+		"fov": 0.7853981
+	},
+	"bsdfs": [
+		{
+			"name": "gray",
+			"type": "lambert",
+			"albedo": {
+				"type": "constant",
+				"value": [ 0.9, 0.9, 0.9 ]
+			}
+		},
+		{
+			"name": "left",
+			"type": "lambert",
+			"albedo": {
+				"type": "image",
+				"file_path": "left.png"
+			}
+		},
+		{
+			"name": "right",
+			"type": "lambert",
+			"albedo": {
+				"type": "image",
+				"file_path": "right.png"
+			}
+		},
+		{
+			"name": "top",
+			"type": "lambert",
+			"albedo": {
+				"type": "image",
+				"file_path": "top.png"
+			}
+		},
+		{
+			"name": "bottom",
+			"type": "lambert",
+			"albedo": {
+				"type": "image",
+				"file_path": "bottom.png"
+			}
+		},
+		{
+			"name": "front",
+			"type": "lambert",
+			"albedo": {
+				"type": "image",
+				"file_path": "front.png"
+			}
+		},
+		{
+			"name": "back",
+			"type": "lambert",
+			"albedo": {
+				"type": "image",
+				"file_path": "back.png"
+			}
+		},
+		{
+			"name": "checkerboard",
+			"type": "lambert",
+			"albedo": {
+				"type": "image",
+				"file_path": "checkerboard.png"
+			}
+		},
+		{
+			"name": "uv",
+			"type": "lambert",
+			"albedo": {
+				"type": "uv"
+			}
+		}
+	],
+	"materials": [
+		{
+			"name": "gray",
+			"bsdf": "gray"
+		},
+		{
+			"name": "left",
+			"bsdf": "left"
+		},
+		{
+			"name": "right",
+			"bsdf": "right"
+		},
+		{
+			"name": "top",
+			"bsdf": "top"
+		},
+		{
+			"name": "bottom",
+			"bsdf": "bottom"
+		},
+		{
+			"name": "front",
+			"bsdf": "front"
+		},
+		{
+			"name": "back",
+			"bsdf": "back"
+		},
+		{
+			"name": "checkerboard",
+			"bsdf": "checkerboard"
+		},
+		{
+			"name": "uv",
+			"bsdf": "uv" 
+		}
+	],
+	"primitives": [
+		{
+			"name": "left",
+			"type": "lmf",
+			"file_path": "left.lmf",
+			"material": "left"
+		},
+		{
+			"name": "right",
+			"type": "lmf",
+			"file_path": "right.lmf",
+			"material": "right"
+		},
+		{
+			"name": "top",
+			"type": "lmf",
+			"file_path": "top.lmf",
+			"material": "top"
+		},
+		{
+			"name": "bottom",
+			"type": "lmf",
+			"file_path": "bottom.lmf",
+			"material": "bottom"
+		},
+		{
+			"name": "front",
+			"type": "lmf",
+			"file_path": "front.lmf",
+			"material": "front"
+		},
+		{
+			"name": "back",
+			"type": "lmf",
+			"file_path": "back.lmf",
+			"material": "back"
+		}
+	]
+}
