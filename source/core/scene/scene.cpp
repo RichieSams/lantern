@@ -201,12 +201,12 @@ bool Scene::ParseJSON() {
 			std::string type = bsdf["type"].get<std::string>();
 			if (type == "ideal_specular_dielectric") {
 				Texture *newTexture;
-				if (bsdf["albedo"].is_array()) {
-					newTexture = new ConstantTexture(float3(bsdf["albedo"][0].get<float>(),
-				                                            bsdf["albedo"][1].get<float>(),
-				                                            bsdf["albedo"][2].get<float>()));
-				} else {
-					uint imageId = m_imageCache.AddImage(bsdf["albedo"].get<std::string>().c_str());
+				if (bsdf["albedo"]["type"] == "constant") {
+					newTexture = new ConstantTexture(float3(bsdf["albedo"]["value"][0].get<float>(),
+				                                            bsdf["albedo"]["value"][1].get<float>(),
+				                                            bsdf["albedo"]["value"][2].get<float>()));
+				} else if (bsdf["albedo"]["type"] == "image") {
+					uint imageId = m_imageCache.AddImage(bsdf["albedo"]["file_path"].get<std::string>().c_str());
 					newTexture = new ImageTexture(&m_imageCache, imageId);
 				}
 				BSDF *newBSDF = new IdealSpecularDielectric(newTexture,
@@ -216,12 +216,12 @@ bool Scene::ParseJSON() {
 				bsdfMap[name] = newBSDF;
 			} else if (type == "lambert") {
 				Texture *newTexture;
-				if (bsdf["albedo"].is_array()) {
-					newTexture = new ConstantTexture(float3(bsdf["albedo"][0].get<float>(),
-				                                            bsdf["albedo"][1].get<float>(),
-				                                            bsdf["albedo"][2].get<float>()));
-				} else {
-					uint imageId = m_imageCache.AddImage(bsdf["albedo"].get<std::string>().c_str());
+				if (bsdf["albedo"]["type"] == "constant") {
+					newTexture = new ConstantTexture(float3(bsdf["albedo"]["value"][0].get<float>(),
+					                                        bsdf["albedo"]["value"][1].get<float>(),
+					                                        bsdf["albedo"]["value"][2].get<float>()));
+				} else if (bsdf["albedo"]["type"] == "image") {
+					uint imageId = m_imageCache.AddImage(bsdf["albedo"]["file_path"].get<std::string>().c_str());
 					newTexture = new ImageTexture(&m_imageCache, imageId);
 				}
 				BSDF *newBSDF = new LambertBSDF(newTexture);
@@ -230,12 +230,12 @@ bool Scene::ParseJSON() {
 				bsdfMap[name] = newBSDF;
 			} else if (type == "mirror") {
 				Texture *newTexture;
-				if (bsdf["albedo"].is_array()) {
-					newTexture = new ConstantTexture(float3(bsdf["albedo"][0].get<float>(),
-				                                            bsdf["albedo"][1].get<float>(),
-				                                            bsdf["albedo"][2].get<float>()));
-				} else {
-					uint imageId = m_imageCache.AddImage(bsdf["albedo"].get<std::string>().c_str());
+				if (bsdf["albedo"]["type"] == "constant") {
+					newTexture = new ConstantTexture(float3(bsdf["albedo"]["value"][0].get<float>(),
+					                                        bsdf["albedo"]["value"][1].get<float>(),
+					                                        bsdf["albedo"]["value"][2].get<float>()));
+				} else if (bsdf["albedo"]["type"] == "image") {
+					uint imageId = m_imageCache.AddImage(bsdf["albedo"]["file_path"].get<std::string>().c_str());
 					newTexture = new ImageTexture(&m_imageCache, imageId);
 				}
 				BSDF *newBSDF = new MirrorBSDF(newTexture);

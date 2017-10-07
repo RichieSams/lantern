@@ -170,6 +170,7 @@ void Renderer::RenderPixel(uint x, uint y, UniformSampler *sampler) const {
 			} else {
 				interaction.TexCoord = float2(0.0f, 0.0f);
 			}
+			//interaction.TexCoord = float2(ray.U, ray.V);
 			interaction.OutputDirection = normalize(-ray.Direction);
 			interaction.IORo = 0.0f;
 
