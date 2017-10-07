@@ -10,7 +10,6 @@
 
 #include "math/int_types.h"
 
-
 #include "scene/image_cache.h"
 
 
@@ -31,6 +30,11 @@ namespace Lantern {
 
 	public:
 		float3 Sample(float2 texCoord) override {
+			// UV assume texCoords start in the bottom left
+			// Textures assume texCoords start in the top left
+			// So we have to invert texCoord.y to fix this discrepancy
+			texCoord.y = 1.0f - texCoord.y;
+
 			return m_imageCache->SampleImage(m_imageId, texCoord);
 		}
 	};
