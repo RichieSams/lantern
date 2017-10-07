@@ -20,6 +20,7 @@
 #include "materials/media/isotropic_scattering_medium.h"
 #include "materials/textures/constant_texture.h"
 #include "materials/textures/image_texture.h"
+#include "materials/textures/uv_texture.h"
 
 #include "io/lantern_model_file.h"
 
@@ -208,6 +209,8 @@ bool Scene::ParseJSON() {
 				} else if (bsdf["albedo"]["type"] == "image") {
 					uint imageId = m_imageCache.AddImage(bsdf["albedo"]["file_path"].get<std::string>().c_str());
 					newTexture = new ImageTexture(&m_imageCache, imageId);
+				} else if (bsdf["albedo"]["type"] == "uv") {
+					newTexture = new UVTexture();
 				}
 				BSDF *newBSDF = new IdealSpecularDielectric(newTexture,
 				                                            bsdf["ior"].get<float>());
@@ -223,6 +226,8 @@ bool Scene::ParseJSON() {
 				} else if (bsdf["albedo"]["type"] == "image") {
 					uint imageId = m_imageCache.AddImage(bsdf["albedo"]["file_path"].get<std::string>().c_str());
 					newTexture = new ImageTexture(&m_imageCache, imageId);
+				} else if (bsdf["albedo"]["type"] == "uv") {
+					newTexture = new UVTexture();
 				}
 				BSDF *newBSDF = new LambertBSDF(newTexture);
 				m_bsdfs.push_back(newBSDF);
@@ -237,6 +242,8 @@ bool Scene::ParseJSON() {
 				} else if (bsdf["albedo"]["type"] == "image") {
 					uint imageId = m_imageCache.AddImage(bsdf["albedo"]["file_path"].get<std::string>().c_str());
 					newTexture = new ImageTexture(&m_imageCache, imageId);
+				} else if (bsdf["albedo"]["type"] == "uv") {
+					newTexture = new UVTexture();
 				}
 				BSDF *newBSDF = new MirrorBSDF(newTexture);
 				m_bsdfs.push_back(newBSDF);

@@ -66,6 +66,7 @@ SetSourceGroup(NAME Materials/Textures
 	SOURCE_FILES materials/textures/texture.h
 	             materials/textures/constant_texture.h
 	             materials/textures/image_texture.h
+	             materials/textures/uv_texture.h
 )
 
 SetSourceGroup(NAME "Materials/Media"
