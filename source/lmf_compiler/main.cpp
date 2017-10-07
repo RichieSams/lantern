@@ -140,7 +140,7 @@ void ConvertObjToLMF(CMDLineArgs *args) {
 		byte verticesPerPrimative = shape.mesh.num_vertices[0];
 		for (std::size_t i = 1; i < shape.mesh.num_vertices.size(); ++i) {
 			if (shape.mesh.num_vertices[i] != verticesPerPrimative) {
-				printf("The number of vertices per primative is not consistent across [%s]\nThe first face has %u vertices. Found %u vertices for face #%llu\n", shape.name.c_str(), verticesPerPrimative, shape.mesh.num_vertices[i], i / verticesPerPrimative);
+				printf("The number of vertices per primitive is not consistent across [%s]\nThe first face has %u vertices. Found %u vertices for face #%llu\n", shape.name.c_str(), verticesPerPrimative, shape.mesh.num_vertices[i], i / verticesPerPrimative);
 				return;
 			}
 		}
@@ -149,7 +149,7 @@ void ConvertObjToLMF(CMDLineArgs *args) {
 		lmf.Positions = std::move(shape.mesh.positions);
 		lmf.Indices = std::move(shape.mesh.indices);
 		lmf.Normals = std::move(shape.mesh.normals);
-		lmf.TexCoords = std::move(shape.mesh.normals);
+		lmf.TexCoords = std::move(shape.mesh.texcoords);
 
 		// Write the file
 		if (!Lantern::WriteLFM(file, &lmf)) {
