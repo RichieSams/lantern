@@ -163,7 +163,7 @@ void Renderer::RenderPixel(uint x, uint y, UniformSampler *sampler) const {
 			if (m_scene->HasNormals(ray.GeomID)) {
 				interaction.Normal = normalize(m_scene->InterpolateNormal(ray.GeomID, ray.PrimID, ray.U, ray.V));
 			} else {
-				interaction.Normal = ray.GeomNormal;
+				interaction.Normal = normalize(ray.GeomNormal);
 			}
 			if (m_scene->HasTexCoords(ray.GeomID)) {
 				interaction.TexCoord = m_scene->InterpolateTexCoord(ray.GeomID, ray.PrimID, ray.U, ray.V);
