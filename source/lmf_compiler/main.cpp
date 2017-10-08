@@ -122,9 +122,20 @@ void ConvertObjToLMF(CMDLineArgs *args) {
 			return;
 		}
 
+		std::string sanitizedName = shape.name;
+		std::replace(sanitizedName.begin(), sanitizedName.end(), ':', '-');
+		std::replace(sanitizedName.begin(), sanitizedName.end(), '\\', '-');
+		std::replace(sanitizedName.begin(), sanitizedName.end(), '/', '-');
+		std::replace(sanitizedName.begin(), sanitizedName.end(), '*', '-');
+		std::replace(sanitizedName.begin(), sanitizedName.end(), '?', '-');
+		std::replace(sanitizedName.begin(), sanitizedName.end(), '<', '-');
+		std::replace(sanitizedName.begin(), sanitizedName.end(), '>', '-');
+		std::replace(sanitizedName.begin(), sanitizedName.end(), '|', '-');
+		std::replace(sanitizedName.begin(), sanitizedName.end(), '"', '-');
+
 		// Create a unique name
 		std::stringstream strStream;
-		strStream << outputFile << shape.name << ".lmf";
+		strStream << outputFile << sanitizedName << ".lmf";
 
 		// Create the file
 		FILE *file = fopen(strStream.str().c_str(), "wb");
