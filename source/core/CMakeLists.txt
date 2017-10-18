@@ -106,4 +106,5 @@ set(LANTERN_CORE_SRC
 
 # Create lib
 add_library(lantern_core ${LANTERN_CORE_SRC})
-target_link_libraries(lantern_core glfw ${GLFW_LIBRARIES} ${OPENGL_gl_LIBRARY} imgui tbb_static tbbmalloc_static embree json json_schema_validator ez_option_parser tiny_obj_loader stb)
+target_link_libraries(lantern_core glfw ${OPENGL_gl_LIBRARY} ${VULKAN_LIBRARY} imgui tbb_static tbbmalloc_static embree json json_schema_validator ez_option_parser tiny_obj_loader stb)
+target_include_directories(lantern_core PRIVATE ${OPENGL_INCLUDE_DIR} PRIVATE ${VULKAN_INCLUDE_DIR})

@@ -14,12 +14,11 @@ find_package(OpenGL REQUIRED)
 
 
 # Add third party libs
-set( GLFW_BUILD_EXAMPLES OFF CACHE BOOL  "GLFW lib only" )
-set( GLFW_BUILD_TESTS OFF CACHE BOOL  "GLFW lib only" )
-set( GLFW_BUILD_DOCS OFF CACHE BOOL  "GLFW lib only" )
-set( GLFW_INSTALL OFF CACHE BOOL  "GLFW lib only" )
+set( GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE )
+set( GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE )
+set( GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE )
+set( GLFW_INSTALL OFF CACHE BOOL "" FORCE )
 add_subdirectory(third_party/glfw)
-include_directories(third_party/glfw/include)
 
 add_subdirectory(third_party/imgui)
 include_directories(third_party/imgui/include)
