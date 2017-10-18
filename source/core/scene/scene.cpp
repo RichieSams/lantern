@@ -24,7 +24,8 @@
 
 #include "io/lantern_model_file.h"
 
-#include <json.h>
+#include <json.hpp>
+#include <json_schema_validator.hpp>
 
 #define EMBREE_STATIC_LIB
 #include <embree2/rtcore.h>
@@ -140,15 +141,73 @@ float2 Scene::InterpolateTexCoord(uint meshId, uint primId, float u, float v) co
 	return texCoord;
 }
 
+void loader(const nlohmann::json_uri &uri, nlohmann::json &schema) {
+	std::fstream lf("." + uri.path());
+	if (!lf.good()) {
+		throw std::invalid_argument("could not open " + uri.url() + " tried with " + uri.path());
+	}
+
+	lf >> schema;
+}
+
 bool Scene::ParseJSON() {
+	// Load the schema
+	nlohmann::json schema;
+
+	// First, assume we're running from the 'build/...' directory, and try to load the schema from the scenes directory
+	std::fstream lf("../../../../scenes/scene.schema.json");
+	if (lf.good()) {
+		try {
+			lf >> schema;
+		} catch (std::exception &e) {
+			printf("%s at %llu - while parsing the schema\n", e.what(), lf.tellp());
+			return false;
+		}
+	} else {
+		lf.close();
+		// Next, try to find the schema in the working directory
+		lf.open("scene.schema.json");
+		if (lf.good()) {
+			try {
+				lf >> schema;
+			} catch (std::exception &e) {
+				printf("%s at %llu - while parsing the schema\n", e.what(), lf.tellp());
+				return false;
+			}
+		} else {
+			// Barf
+			printf("Failed to find scene.schema.json");
+			return false;
+		}
+	}
+
+	// Set up the validator
+	nlohmann::json_schema_draft4::json_validator validator(loader);
+
+	try {
+		validator.set_root_schema(schema);
+	} catch (const std::exception &e) {
+		printf("Setting root schema failed: %s", e.what());
+		return false;
+	}
+
+
 	m_scene = rtcDeviceNewScene(m_device, RTC_SCENE_STATIC, RTC_INTERSECT1 | RTC_INTERPOLATE);
 
 	std::ifstream ifs(m_jsonPath);
-	if (!ifs.is_open()) {
+	if (!ifs.good()) {
 		printf("Could not open %ls\n", m_jsonPath.c_str());
 		return false;
 	}
-	nlohmann::json j = nlohmann::json::parse(ifs);
+	nlohmann::json j;
+
+	try {
+		ifs >> j;
+		validator.validate(j);
+	} catch (std::exception &e) {
+		printf("Schema validation failed: %s at offset %ull\n", e.what(), ifs.tellg());
+		return false;
+	}
 
 	if (j.count("background_color") == 1) {
 		BackgroundColor.x = j["background_color"][0].get<float>();

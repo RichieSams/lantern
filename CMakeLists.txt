@@ -40,6 +40,7 @@ include_directories(third_party/embree/common)
 
 add_subdirectory(third_party/tiny_obj_loader)
 add_subdirectory(third_party/json)
+add_subdirectory(third_party/json_schema_validator)
 add_subdirectory(third_party/ez_option_parser)
 add_subdirectory(third_party/stb)
 
