@@ -38,10 +38,10 @@ add_subdirectory(third_party/embree)
 include_directories(third_party/embree/include)
 include_directories(third_party/embree/common)
 
-include_directories(third_party/tiny_obj_loader/include)
-include_directories(third_party/json)
-include_directories(third_party/ez_option_parser)
-include_directories(third_party/stb/include)
+add_subdirectory(third_party/tiny_obj_loader)
+add_subdirectory(third_party/json)
+add_subdirectory(third_party/ez_option_parser)
+add_subdirectory(third_party/stb)
 
 
 # Add the main source
