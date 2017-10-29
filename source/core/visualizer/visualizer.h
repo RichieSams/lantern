@@ -6,9 +6,8 @@
 
 #pragma once
 
-#include "math/vector_types.h"
-
-#include <imgui_impl.h>
+#define VULKAN_HPP_NO_EXCEPTIONS
+#include <vulkan/vulkan.hpp>
 
 
 struct GLFWwindow;
@@ -26,7 +25,6 @@ public:
 private:
 	Renderer *m_renderer;
 	Scene *m_scene;
-	float3 *m_tempFrameBuffer;
 
 	GLFWwindow *m_window;
 	double m_lastMousePosX;
@@ -34,7 +32,37 @@ private:
 	bool m_leftMouseCaptured;
 	bool m_middleMouseCaptured;
 
-	ImGui::ImGuiImpl m_imGuiImpl;
+	vk::Instance m_instance;
+	vk::DebugReportCallbackEXT m_debugCallback;
+
+	vk::SurfaceKHR m_surface;
+
+	vk::PhysicalDevice m_physicalDevice;
+	vk::Device m_device;
+	
+	vk::Queue m_graphicsQueue;
+	vk::Queue m_presentQueue;
+	vk::SwapchainKHR m_swapchain;
+	vk::Format m_swapchainFormat;
+	vk::Extent2D m_swapchainExtent;
+
+	std::vector<vk::Image> m_swapChainImages;
+	std::vector<vk::ImageView> m_swapChainImageViews;
+	std::vector<vk::Framebuffer> m_frameBuffers;
+
+	vk::ShaderModule m_vertexShader;
+	vk::ShaderModule m_pixelShader;
+
+	vk::PipelineLayout m_mainPipelineLayout;
+	vk::Pipeline m_mainPipeline;
+
+	vk::RenderPass m_renderPass;
+
+	vk::CommandPool m_commandPool;
+	std::vector<vk::CommandBuffer> m_commandBuffers;
+
+	vk::Semaphore m_imageAvailable;
+	vk::Semaphore m_renderFinished;
 
 public:
 	void Run();
@@ -46,9 +74,8 @@ public:
 	static void CharCallback(GLFWwindow *window, unsigned int c);
 
 private:
-	void Init();
+	bool Init();
 	void Shutdown();
-	void CopyFrameBufferToGPU();
 };
 
 } // End of namespace Lantern

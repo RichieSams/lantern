@@ -1,5 +1,8 @@
 include(SetSourceGroup)
 
+find_package(Vulkan)
+
+
 SetSourceGroup(NAME Camera
 	PREFIX LANTERN_CORE
 	SOURCE_FILES camera/pinhole_camera.h
@@ -87,6 +90,13 @@ SetSourceGroup(NAME Visualizer
 	PREFIX LANTERN_CORE
 	SOURCE_FILES visualizer/visualizer.h
 	             visualizer/visualizer.cpp
+	             visualizer/vulkan_function_loader.cpp
+)
+
+SetSourceGroup(NAME Visualizer/Shaders
+	PREFIX LANTERN_CORE
+	SOURCE_FILES visualizer/shaders/fullscreen_triangle_vs.glsl
+	             visualizer/shaders/final_resolve_ps.glsl
 )
 
 
@@ -102,9 +112,10 @@ set(LANTERN_CORE_SRC
 	${LANTERN_CORE_MATERIALS_TEXTURES}
 	${LANTERN_CORE_RENDERER}
 	${LANTERN_CORE_VISUALIZER}
+	${LANTERN_CORE_VISUALIZER_SHADERS}
 )
 
 # Create lib
-add_library(lantern_core ${LANTERN_CORE_SRC})
-target_link_libraries(lantern_core glfw ${OPENGL_gl_LIBRARY} ${VULKAN_LIBRARY} imgui tbb_static tbbmalloc_static embree json json_schema_validator ez_option_parser tiny_obj_loader stb)
-target_include_directories(lantern_core PRIVATE ${OPENGL_INCLUDE_DIR} PRIVATE ${VULKAN_INCLUDE_DIR})
+add_library(lantern_core STATIC ${LANTERN_CORE_SRC})
+target_link_libraries(lantern_core glfw ${VULKAN_LIBRARY} imgui tbb_static tbbmalloc_static embree json json_schema_validator ez_option_parser tiny_obj_loader stb)
+target_include_directories(lantern_core PUBLIC ${VULKAN_INCLUDE_DIR})
