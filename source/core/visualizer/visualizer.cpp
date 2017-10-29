@@ -100,21 +100,13 @@ void Visualizer::Run() {
 	while (!glfwWindowShouldClose(m_window)) {
 		glfwPollEvents();
 		
-		uint32 imageIndex = m_device.acquireNextImageKHR(m_swapchain, std::numeric_limits<uint64_t>::max(), m_imageAvailable, {}).value;
-		vk::PipelineStageFlags waitStages[] = {
-			vk::PipelineStageFlagBits::eColorAttachmentOutput
-		};
-		vk::SubmitInfo submitInfo(1, &m_imageAvailable, waitStages, 1, &m_commandBuffers[imageIndex], 1, &m_renderFinished);
-
-		if (m_graphicsQueue.submit(1, &submitInfo, {}) != vk::Result::eSuccess) {
-			printf("Failed to submit draw command buffer");
+		if (!RenderFrame()) {
 			break;
 		}
-
-		vk::Result results;
-		vk::PresentInfoKHR presentInfo(1, &m_renderFinished, 1, &m_swapchain, &imageIndex, &results);
-		m_presentQueue.presentKHR(presentInfo);
 	}
+
+	// Wait for the queues to flush before shutting down
+	m_device.waitIdle();
 
 	Shutdown();
 }
@@ -574,6 +566,32 @@ void Visualizer::Shutdown() {
 	m_instance.destroy(nullptr);
 	glfwDestroyWindow(m_window);
 	glfwTerminate();
+}
+
+bool Visualizer::RenderFrame() {
+	// Update application state
+	// TODO
+
+	// Let the previous frame's queue flush
+	m_presentQueue.waitIdle();
+
+	// Render the frame
+	uint32 imageIndex = m_device.acquireNextImageKHR(m_swapchain, std::numeric_limits<uint64_t>::max(), m_imageAvailable, {}).value;
+	vk::PipelineStageFlags waitStages[] = {
+		vk::PipelineStageFlagBits::eColorAttachmentOutput
+	};
+	vk::SubmitInfo submitInfo(1, &m_imageAvailable, waitStages, 1, &m_commandBuffers[imageIndex], 1, &m_renderFinished);
+
+	if (m_graphicsQueue.submit(1, &submitInfo, {}) != vk::Result::eSuccess) {
+		printf("Failed to submit draw command buffer");
+		return false;
+	}
+
+	vk::Result results;
+	vk::PresentInfoKHR presentInfo(1, &m_renderFinished, 1, &m_swapchain, &imageIndex, &results);
+	m_presentQueue.presentKHR(presentInfo);
+
+	return true;
 }
 
 } // End of namespace Lantern

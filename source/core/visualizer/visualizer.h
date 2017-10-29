@@ -76,6 +76,8 @@ public:
 private:
 	bool Init();
 	void Shutdown();
+
+	bool RenderFrame();
 };
 
 } // End of namespace Lantern
