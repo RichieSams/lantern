@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 3.2)
 project(lantern)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake")
@@ -21,7 +21,6 @@ set( GLFW_INSTALL OFF CACHE BOOL "" FORCE )
 add_subdirectory(third_party/glfw)
 
 add_subdirectory(third_party/imgui)
-include_directories(third_party/imgui/include)
 
 set( TBB_BUILD_SHARED OFF CACHE BOOL  "Only build TBB static" )
 set( TBB_BUILD_TBBMALLOC_PROXY OFF CACHE BOOL  "Don't need tbbmalloc_proxy" )
