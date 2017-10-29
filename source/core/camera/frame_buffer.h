@@ -25,13 +25,21 @@ public:
 private:
 	std::vector<float3> m_colorData;
 	std::vector<float> m_weights;
+	
+	std::vector<uint64> m_bounces;
 
 public:
-	void SplatPixel(uint x, uint y, float3 &color) {
-		uint index = y * Width + x;
+	void SplatColor(uint x, uint y, float3 &color) {
+		const uint index = y * Width + x;
 
 		m_colorData[index] += color;
 		m_weights[index] += 1.0f;
+	}
+
+	void SplatBounces(uint x, uint y, uint numBounces) {
+		const uint index = y * Width + x;
+
+		m_bounces[index] += numBounces;
 	}
 
 	void GetPixel(uint x, uint y, float3 &pixel) const {

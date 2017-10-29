@@ -226,7 +226,7 @@ void Renderer::RenderPixel(uint x, uint y, UniformSampler *sampler) const {
 		//printf("Over max bounces");
 	}
 
-	m_scene->Camera->FrameBufferData.SplatPixel(x, y, color);
+	m_scene->Camera->FrameBufferData.SplatColor(x, y, color);
 }
 
 float3 Renderer::SampleOneLight(UniformSampler *sampler, SurfaceInteraction interaction, BSDF *bsdf, Light *hitLight) const {
