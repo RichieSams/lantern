@@ -269,7 +269,7 @@ bool Visualizer::Init() {
 		return false;
 	}
 
-	if (glfwCreateWindowSurface(m_instance, window, nullptr, (VkSurfaceKHR *)&m_surface) != VK_SUCCESS) {
+	if (glfwCreateWindowSurface((VkInstance)m_instance, window, nullptr, (VkSurfaceKHR *)&m_surface) != VK_SUCCESS) {
 		printf("Failed to create Vulkan Surface. Error Code: %d", result);
 		return false;
 	}
