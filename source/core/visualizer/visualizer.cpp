@@ -329,11 +329,123 @@ bool Visualizer::Init() {
 	m_device.getQueue(indices.Present, 0, &m_presentQueue);
 
 
+	if (!CreateSwapChain(width, height)) {
+		return false;
+	}
+	if (!CreateImageViews()) {
+		return false;
+	}
+	
+	// Create the shaders
+	if (!CreateShader("fullscreen_triangle_vs.spv", m_device, &m_vertexShader)) {
+		printf("Failed to create the vertex shader: %s", "fullscreen_triangle_vs.spv");
+		return false;
+	}
+	if (!CreateShader("final_resolve_ps.spv", m_device, &m_pixelShader)) {
+		printf("Failed to create the pixel shader: %s", "final_resolve_ps.spv");
+		return false;
+	}
+
+	if (!CreateRenderPass()) {
+		return false;
+	}
+	if (!CreateGraphicsPipeline()) {
+		return false;
+	}
+	if (!CreateFrameBuffers()) {
+		return false;
+	}
+
+	// Create the command pool
+	vk::CommandPoolCreateInfo commandPoolInfo({}, indices.Graphics);
+	if (m_device.createCommandPool(&commandPoolInfo, nullptr, &m_commandPool) != vk::Result::eSuccess) {
+		printf("Failed to create the command pool");
+		return false;
+	}
+
+	if (!CreateCommandBuffers()) {
+		return false;
+	}
+
+	// Create the semaphores
+	vk::SemaphoreCreateInfo semaphoreInfo = {};
+	if (m_device.createSemaphore(&semaphoreInfo, nullptr, &m_imageAvailable) != vk::Result::eSuccess) {
+		printf("Failed to create Semaphore");
+		return false;
+	}
+	if (m_device.createSemaphore(&semaphoreInfo, nullptr, &m_renderFinished) != vk::Result::eSuccess) {
+		printf("Failed to create Semaphore");
+		return false;
+	}
+
+
+	return true;
+}
+
+void Visualizer::Shutdown() {
+	CleanUpSwapChainAndDependents();
+	
+	m_device.destroySemaphore(m_imageAvailable);
+	m_device.destroySemaphore(m_renderFinished);
+	m_device.destroyCommandPool(m_commandPool, nullptr);
+	m_device.destroyShaderModule(m_vertexShader, nullptr);
+	m_device.destroyShaderModule(m_pixelShader, nullptr);
+	m_device.destroy(nullptr);
+
+	m_instance.destroyDebugReportCallbackEXT(m_debugCallback, nullptr);
+	m_instance.destroySurfaceKHR(m_surface, nullptr);
+	m_instance.destroy(nullptr);
+
+	glfwDestroyWindow(m_window);
+	glfwTerminate();
+}
+
+bool Visualizer::RenderFrame() {
+	// Update application state
+	// TODO
+
+	// Let the previous frame's queue flush
+	m_presentQueue.waitIdle();
+
+	// Render the frame
+	uint32 imageIndex;
+	vk::Result result = m_device.acquireNextImageKHR(m_swapchain, std::numeric_limits<uint64_t>::max(), m_imageAvailable, {}, &imageIndex);
+	if (result == vk::Result::eErrorOutOfDateKHR) {
+		RecreateSwapChainAndDependents();
+		return true;
+	} else if (result != vk::Result::eSuccess) {
+		printf("Failed to acquire next image");
+		return false;
+	}
+
+	vk::PipelineStageFlags waitStages[] = {
+		vk::PipelineStageFlagBits::eColorAttachmentOutput
+	};
+	vk::SubmitInfo submitInfo(1, &m_imageAvailable, waitStages, 1, &m_commandBuffers[imageIndex], 1, &m_renderFinished);
+
+	if (m_graphicsQueue.submit(1, &submitInfo, {}) != vk::Result::eSuccess) {
+		printf("Failed to submit draw command buffer");
+		return false;
+	}
+
+	vk::PresentInfoKHR presentInfo(1, &m_renderFinished, 1, &m_swapchain, &imageIndex, &result);
+	result = m_presentQueue.presentKHR(presentInfo);
+	if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR) {
+		RecreateSwapChainAndDependents();
+	} else if (result != vk::Result::eSuccess) {
+		printf("Failed to present");
+		return false;
+	}
+
+	return true;
+}
+
+bool Visualizer::CreateSwapChain(uint width, uint height) {
 	// Set up the swap chain
 	SwapChainSupportDetails details = QuerySwapChainSupport(m_physicalDevice, m_surface);
 
 	// Find a suitable surface format
-	vk::SurfaceFormatKHR surfaceFormat;
+	vk::SurfaceFormatKHR surfaceFormat = {};
 
 	// If the device doesn't care what we choose, just pick the one we want
 	if (details.formats.size() == 1 && details.formats[0].format == vk::Format::eUndefined) {
@@ -371,8 +483,14 @@ bool Visualizer::Init() {
 
 	// Choose the best swap extent
 	vk::Extent2D swapExtent;
-	swapExtent.width = std::max(details.capabilities.minImageExtent.width, std::min(details.capabilities.maxImageExtent.width, (uint32_t)width));
-	swapExtent.height = std::max(details.capabilities.minImageExtent.height, std::min(details.capabilities.maxImageExtent.height, (uint32_t)height));
+	// If we already have an extent, just use that
+	// Otherwise, fall back on the width and height specified
+	if (details.capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
+		swapExtent = details.capabilities.currentExtent;
+	} else {
+		swapExtent.width = std::max(details.capabilities.minImageExtent.width, std::min(details.capabilities.maxImageExtent.width, width));
+		swapExtent.height = std::max(details.capabilities.minImageExtent.height, std::min(details.capabilities.maxImageExtent.height, height));
+	}
 
 	uint imageCount = 2;
 	if (presentMode == vk::PresentModeKHR::eMailbox) {
@@ -397,6 +515,54 @@ bool Visualizer::Init() {
 	m_swapchainFormat = surfaceFormat.format;
 	m_swapchainExtent = swapExtent;
 
+	return true;
+}
+
+void Visualizer::CleanUpSwapChainAndDependents() {
+	for (vk::Framebuffer &frameBuffer : m_frameBuffers) {
+		m_device.destroyFramebuffer(frameBuffer, nullptr);
+	}
+	m_device.freeCommandBuffers(m_commandPool, m_commandBuffers);
+	
+	m_device.destroyPipeline(m_mainPipeline, nullptr);
+	m_device.destroyPipelineLayout(m_mainPipelineLayout, nullptr);
+	m_device.destroyRenderPass(m_renderPass, nullptr);
+
+	for (vk::ImageView &view : m_swapChainImageViews) {
+		m_device.destroyImageView(view, nullptr);
+	}
+	
+	m_device.destroySwapchainKHR(m_swapchain, nullptr);
+}
+
+bool Visualizer::RecreateSwapChainAndDependents() {
+	m_device.waitIdle();
+
+	CleanUpSwapChainAndDependents();
+
+	if (!CreateSwapChain(1, 1)) {
+		return false;
+	}
+	if (!CreateImageViews()) {
+		return false;
+	}
+	if (!CreateRenderPass()) {
+		return false;
+	}
+	if (!CreateGraphicsPipeline()) {
+		return false;
+	}
+	if (!CreateFrameBuffers()) {
+		return false;
+	}
+	if (!CreateCommandBuffers()) {
+		return false;
+	}
+
+	return true;
+}
+
+bool Visualizer::CreateImageViews() {
 	// Get the handles for the swapchain image views
 	m_swapChainImages = m_device.getSwapchainImagesKHR(m_swapchain).value;
 
@@ -409,43 +575,10 @@ bool Visualizer::Init() {
 		}
 	}
 
+	return true;
+}
 
-	// Create the main pipeline
-	if (!CreateShader("fullscreen_triangle_vs.spv", m_device, &m_vertexShader)) {
-		printf("Failed to create the vertex shader: %s", "fullscreen_triangle_vs.spv");
-		return false;
-	}
-	if (!CreateShader("final_resolve_ps.spv", m_device, &m_pixelShader)) {
-		printf("Failed to create the pixel shader: %s", "final_resolve_ps.spv");
-		return false;
-	}
-
-	vk::PipelineShaderStageCreateInfo shaderStageInfos[] = {
-		{{}, vk::ShaderStageFlagBits::eVertex, m_vertexShader, "main"},
-		{{}, vk::ShaderStageFlagBits::eFragment, m_pixelShader, "main"}
-	};
-
-	vk::PipelineVertexInputStateCreateInfo inputStateInfo({}, 0, nullptr, 0, nullptr);
-	vk::PipelineInputAssemblyStateCreateInfo inputAssemblyInfo({}, vk::PrimitiveTopology::eTriangleList, VK_FALSE);
-
-	vk::Viewport viewport(0, 0, width, height, 0.0f, 1.0f);
-	vk::Rect2D scissor({0, 0}, m_swapchainExtent);
-	vk::PipelineViewportStateCreateInfo viewportInfo({}, 1, &viewport, 1, &scissor);
-
-	vk::PipelineRasterizationStateCreateInfo rasterInfo({}, VK_FALSE, VK_FALSE, vk::PolygonMode::eFill, vk::CullModeFlagBits::eBack, vk::FrontFace::eClockwise, VK_FALSE, 0.0f, 0.0f, 0.0f, 1.0f);
-	vk::PipelineMultisampleStateCreateInfo multisamplingInfo({}, vk::SampleCountFlagBits::e1, VK_FALSE, 1.0f, nullptr, VK_FALSE, VK_FALSE);
-	vk::PipelineColorBlendAttachmentState blendAttachment(VK_FALSE,
-	                                                      vk::BlendFactor::eOne, vk::BlendFactor::eZero, vk::BlendOp::eAdd,
-	                                                      vk::BlendFactor::eOne, vk::BlendFactor::eZero, vk::BlendOp::eAdd,
-	                                                      vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eA);
-	vk::PipelineColorBlendStateCreateInfo blendInfo({}, VK_FALSE, vk::LogicOp::eCopy, 1, &blendAttachment);
-
-	vk::PipelineLayoutCreateInfo pipelineLayoutInfo({}, 0, nullptr, 0, nullptr);
-	if (m_device.createPipelineLayout(&pipelineLayoutInfo, nullptr, &m_mainPipelineLayout) != vk::Result::eSuccess) {
-		printf("Failed to create the pipeline layout");
-		return false;
-	}
-
+bool Visualizer::CreateRenderPass() {
 	// Create the main render pass
 	vk::AttachmentDescription mainColorAttachment({}, m_swapchainFormat, vk::SampleCountFlagBits::e1,
 	                                              vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eStore,
@@ -479,6 +612,36 @@ bool Visualizer::Init() {
 		return false;
 	}
 
+	return true;
+}
+
+bool Visualizer::CreateGraphicsPipeline() {
+	vk::PipelineShaderStageCreateInfo shaderStageInfos[] = {
+		{{}, vk::ShaderStageFlagBits::eVertex, m_vertexShader, "main"},
+		{{}, vk::ShaderStageFlagBits::eFragment, m_pixelShader, "main"}
+	};
+
+	vk::PipelineVertexInputStateCreateInfo inputStateInfo({}, 0, nullptr, 0, nullptr);
+	vk::PipelineInputAssemblyStateCreateInfo inputAssemblyInfo({}, vk::PrimitiveTopology::eTriangleList, VK_FALSE);
+
+	vk::Viewport viewport(0, 0, m_swapchainExtent.width, m_swapchainExtent.height, 0.0f, 1.0f);
+	vk::Rect2D scissor({0, 0}, m_swapchainExtent);
+	vk::PipelineViewportStateCreateInfo viewportInfo({}, 1, &viewport, 1, &scissor);
+
+	vk::PipelineRasterizationStateCreateInfo rasterInfo({}, VK_FALSE, VK_FALSE, vk::PolygonMode::eFill, vk::CullModeFlagBits::eBack, vk::FrontFace::eClockwise, VK_FALSE, 0.0f, 0.0f, 0.0f, 1.0f);
+	vk::PipelineMultisampleStateCreateInfo multisamplingInfo({}, vk::SampleCountFlagBits::e1, VK_FALSE, 1.0f, nullptr, VK_FALSE, VK_FALSE);
+	vk::PipelineColorBlendAttachmentState blendAttachment(VK_FALSE,
+	                                                      vk::BlendFactor::eOne, vk::BlendFactor::eZero, vk::BlendOp::eAdd,
+	                                                      vk::BlendFactor::eOne, vk::BlendFactor::eZero, vk::BlendOp::eAdd,
+	                                                      vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eA);
+	vk::PipelineColorBlendStateCreateInfo blendInfo({}, VK_FALSE, vk::LogicOp::eCopy, 1, &blendAttachment);
+
+	vk::PipelineLayoutCreateInfo pipelineLayoutInfo({}, 0, nullptr, 0, nullptr);
+	if (m_device.createPipelineLayout(&pipelineLayoutInfo, nullptr, &m_mainPipelineLayout) != vk::Result::eSuccess) {
+		printf("Failed to create the pipeline layout");
+		return false;
+	}
+
 	// Create the pipeline
 	vk::GraphicsPipelineCreateInfo pipelineInfo({}, 2, shaderStageInfos, &inputStateInfo, &inputAssemblyInfo, nullptr, &viewportInfo, &rasterInfo, &multisamplingInfo, nullptr, &blendInfo, nullptr, m_mainPipelineLayout, m_renderPass);
 	if (m_device.createGraphicsPipelines({}, 1, &pipelineInfo, nullptr, &m_mainPipeline) != vk::Result::eSuccess) {
@@ -486,6 +649,10 @@ bool Visualizer::Init() {
 		return false;
 	}
 
+	return true;
+}
+
+bool Visualizer::CreateFrameBuffers() {
 	// Create the framebuffers
 	m_frameBuffers.resize(m_swapChainImageViews.size());
 	for (uint i = 0; i < m_swapChainImageViews.size(); ++i) {
@@ -496,13 +663,11 @@ bool Visualizer::Init() {
 		}
 	}
 
-	// Create the command buffers
-	vk::CommandPoolCreateInfo commandPoolInfo({}, indices.Graphics);
-	if (m_device.createCommandPool(&commandPoolInfo, nullptr, &m_commandPool) != vk::Result::eSuccess) {
-		printf("Failed to create the command pool");
-		return false;
-	}
+	return true;
+}
 
+bool Visualizer::CreateCommandBuffers() {
+	// Create the command buffers
 	m_commandBuffers.resize(m_frameBuffers.size());
 	vk::CommandBufferAllocateInfo commandBufferAllocateInfo(m_commandPool, vk::CommandBufferLevel::ePrimary, m_commandBuffers.size());
 	if (m_device.allocateCommandBuffers(&commandBufferAllocateInfo, m_commandBuffers.data()) != vk::Result::eSuccess) {
@@ -528,68 +693,6 @@ bool Visualizer::Init() {
 			return false;
 		}
 	}
-
-	// Create the semaphores
-	vk::SemaphoreCreateInfo semaphoreInfo = {};
-	if (m_device.createSemaphore(&semaphoreInfo, nullptr, &m_imageAvailable) != vk::Result::eSuccess) {
-		printf("Failed to create Semaphore");
-		return false;
-	}
-	if (m_device.createSemaphore(&semaphoreInfo, nullptr, &m_renderFinished) != vk::Result::eSuccess) {
-		printf("Failed to create Semaphore");
-		return false;
-	}
-
-
-	return true;
-}
-
-void Visualizer::Shutdown() {
-	m_device.destroySemaphore(m_imageAvailable);
-	m_device.destroySemaphore(m_renderFinished);
-	m_device.destroyCommandPool(m_commandPool, nullptr);
-	for (vk::Framebuffer &frameBuffer : m_frameBuffers) {
-		m_device.destroyFramebuffer(frameBuffer, nullptr);
-	}
-	for (vk::ImageView &view : m_swapChainImageViews) {
-		m_device.destroyImageView(view, nullptr);
-	}
-	m_device.destroyPipeline(m_mainPipeline, nullptr);
-	m_device.destroyRenderPass(m_renderPass, nullptr);
-	m_device.destroyPipelineLayout(m_mainPipelineLayout, nullptr);
-	m_device.destroyShaderModule(m_vertexShader, nullptr);
-	m_device.destroyShaderModule(m_pixelShader, nullptr);
-	m_device.destroySwapchainKHR(m_swapchain, nullptr);
-	m_device.destroy(nullptr);
-	m_instance.destroyDebugReportCallbackEXT(m_debugCallback, nullptr);
-	m_instance.destroySurfaceKHR(m_surface, nullptr);
-	m_instance.destroy(nullptr);
-	glfwDestroyWindow(m_window);
-	glfwTerminate();
-}
-
-bool Visualizer::RenderFrame() {
-	// Update application state
-	// TODO
-
-	// Let the previous frame's queue flush
-	m_presentQueue.waitIdle();
-
-	// Render the frame
-	uint32 imageIndex = m_device.acquireNextImageKHR(m_swapchain, std::numeric_limits<uint64_t>::max(), m_imageAvailable, {}).value;
-	vk::PipelineStageFlags waitStages[] = {
-		vk::PipelineStageFlagBits::eColorAttachmentOutput
-	};
-	vk::SubmitInfo submitInfo(1, &m_imageAvailable, waitStages, 1, &m_commandBuffers[imageIndex], 1, &m_renderFinished);
-
-	if (m_graphicsQueue.submit(1, &submitInfo, {}) != vk::Result::eSuccess) {
-		printf("Failed to submit draw command buffer");
-		return false;
-	}
-
-	vk::Result results;
-	vk::PresentInfoKHR presentInfo(1, &m_renderFinished, 1, &m_swapchain, &imageIndex, &results);
-	m_presentQueue.presentKHR(presentInfo);
 
 	return true;
 }

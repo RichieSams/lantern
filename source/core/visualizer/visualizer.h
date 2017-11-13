@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "math/int_types.h"
+
 #define VULKAN_HPP_NO_EXCEPTIONS
 #include <vulkan/vulkan.hpp>
 
@@ -78,6 +80,16 @@ private:
 	void Shutdown();
 
 	bool RenderFrame();
+
+	bool CreateSwapChain(uint width, uint height);
+	void CleanUpSwapChainAndDependents();
+	bool RecreateSwapChainAndDependents();
+
+	bool CreateImageViews();
+	bool CreateRenderPass();
+	bool CreateGraphicsPipeline();
+	bool CreateFrameBuffers();
+	bool CreateCommandBuffers();
 };
 
 } // End of namespace Lantern
