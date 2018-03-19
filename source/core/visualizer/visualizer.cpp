@@ -328,6 +328,13 @@ bool Visualizer::Init() {
 	m_device.getQueue(indices.Graphics, 0, &m_graphicsQueue);
 	m_device.getQueue(indices.Present, 0, &m_presentQueue);
 
+	// Create the memory allocator
+	VmaAllocatorCreateInfo allocatorCreateInfo = {};
+	allocatorCreateInfo.physicalDevice = static_cast<VkPhysicalDevice>(m_physicalDevice);
+	allocatorCreateInfo.device = static_cast<VkDevice>(m_device);
+
+	vmaCreateAllocator(&allocatorCreateInfo, &m_allocator);
+
 
 	if (!CreateSwapChain(width, height)) {
 		return false;
@@ -379,12 +386,50 @@ bool Visualizer::Init() {
 	}
 
 
+	// Create the staging buffer
+	vk::BufferCreateInfo stagingBufferCreateInfo;
+	stagingBufferCreateInfo.size = width * height * sizeof(float3);
+	stagingBufferCreateInfo.usage = vk::BufferUsageFlagBits::eTransferSrc;
+
+	VmaAllocationCreateInfo stagingBufferAllocCreateInfo = {};
+	stagingBufferAllocCreateInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
+	allocatorCreateInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
+
+	if (vmaCreateBuffer(m_allocator, (VkBufferCreateInfo *)&stagingBufferCreateInfo, &stagingBufferAllocCreateInfo, (VkBuffer *)&m_stagingBuffer, &m_stagingBufferAllocation, &m_stagingBufferAllocInfo) != VK_SUCCESS) {
+		printf("Failed to create staging buffer");
+		return false;
+	}
+
+	// Create the destination image
+	vk::ImageCreateInfo destImageCreateInfo;
+	destImageCreateInfo.imageType = vk::ImageType::e2D;
+	destImageCreateInfo.extent.width = width;
+	destImageCreateInfo.extent.height = height;
+	destImageCreateInfo.extent.depth = 1;
+	destImageCreateInfo.mipLevels = 1;
+	destImageCreateInfo.arrayLayers = 1;
+	destImageCreateInfo.format = vk::Format::eR32G32B32Sfloat;
+	destImageCreateInfo.usage = vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled;
+	destImageCreateInfo.tiling = vk::ImageTiling::eLinear;
+
+	VmaAllocationCreateInfo destImageAllocCreateInfo = {};
+	destImageAllocCreateInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+
+	if (vmaCreateImage(m_allocator, (VkImageCreateInfo *)&destImageCreateInfo, &destImageAllocCreateInfo, (VkImage *)&m_destImage, &m_destImageAllocation, &m_destImageAllocInfo) != VK_SUCCESS) {
+		printf("Failed to create dest image");
+		return false;
+	}
+
 	return true;
 }
 
 void Visualizer::Shutdown() {
 	CleanUpSwapChainAndDependents();
 	
+	vmaDestroyImage(m_allocator, (VkImage)m_destImage, m_destImageAllocation);
+	vmaDestroyBuffer(m_allocator, (VkBuffer)m_stagingBuffer, m_stagingBufferAllocation);
+	vmaDestroyAllocator(m_allocator);
+
 	m_device.destroySemaphore(m_imageAvailable);
 	m_device.destroySemaphore(m_renderFinished);
 	m_device.destroyCommandPool(m_commandPool, nullptr);
