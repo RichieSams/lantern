@@ -41,6 +41,7 @@ add_subdirectory(third_party/json)
 add_subdirectory(third_party/json_schema_validator)
 add_subdirectory(third_party/ez_option_parser)
 add_subdirectory(third_party/stb)
+add_subdirectory(third_party/vk_mem_alloc)
 
 
 # Add the main source
