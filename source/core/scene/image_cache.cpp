@@ -25,18 +25,18 @@ float3 ImageCache::SampleImage(uint imageId, float2 texCoord) {
 
 	// Wrap texCoord to [0, 1]
 	// We can't use frac() because that will exclude 1, which is a valid value
-	while (texCoord.x > 1.0f) {
-		texCoord.x -= 1.0f;
-	}
-	while (texCoord.x < 0.0f) {
-		texCoord.x += 1.0f;
-	}
-	while (texCoord.y > 1.0f) {
-		texCoord.y -= 1.0f;
-	}
-	while (texCoord.y < 1.0f) {
-		texCoord.y += 1.0f;
-	}
+	//while (texCoord.x > 1.0f) {
+	//	texCoord.x -= 1.0f;
+	//}
+	//while (texCoord.x < 0.0f) {
+	//	texCoord.x += 1.0f;
+	//}
+	//while (texCoord.y > 1.0f) {
+	//	texCoord.y -= 1.0f;
+	//}
+	//while (texCoord.y < 1.0f) {
+	//	texCoord.y += 1.0f;
+	//}
 
 	// Closest sampling for now because it's simple
 	std::size_t x = (uint)std::round(texCoord.x * (float)image->XSize);

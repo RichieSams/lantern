@@ -70,14 +70,9 @@ private:
 	vk::Semaphore m_imageAvailable;
 	vk::Semaphore m_renderFinished;
 
-	vk::Buffer m_stagingBuffer;
-	VmaAllocation m_stagingBufferAllocation;
-	VmaAllocationInfo m_stagingBufferAllocInfo;
-
-	vk::Image m_destImage;
-	VmaAllocation m_destImageAllocation;
-	VmaAllocationInfo m_destImageAllocInfo;
-
+	std::vector<vk::Image> m_stagingImage;
+	std::vector<VmaAllocation> m_stagingBufferAllocation;
+	std::vector<VmaAllocationInfo> m_stagingBufferAllocInfo;
 
 public:
 	void Run();

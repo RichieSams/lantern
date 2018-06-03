@@ -81,10 +81,10 @@ int main(int argc, const char *argv[]) {
 
 	// Load the scene
 	Lantern::Scene scene;
-	if (!scene.LoadSceneFromJSON(scenePath)) {
-		printf("Could not load scene.json\n");
-		return 1;
-	}
+	//if (!scene.LoadSceneFromJSON(scenePath)) {
+	//	printf("Could not load scene.json\n");
+	//	return 1;
+	//}
 
 	Lantern::Renderer renderer(&scene);
 

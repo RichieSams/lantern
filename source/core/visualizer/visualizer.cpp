@@ -175,12 +175,14 @@ QueueIndices GetQueueIndices(vk::PhysicalDevice *device, vk::SurfaceKHR surface)
 	auto properties = device->getQueueFamilyProperties();
 
 	QueueIndices indices;
-	for (int i = 0; i < properties.size(); ++i) {
+	for (int i = 0; i < 1; ++i) {
 		if (properties[i].queueFlags & vk::QueueFlagBits::eGraphics) {
 			indices.Graphics = i;
-		} else if (properties[i].queueFlags & vk::QueueFlagBits::eCompute) {
+		} 
+		if (properties[i].queueFlags & vk::QueueFlagBits::eCompute) {
 			indices.Compute = i;
-		} else if (properties[i].queueFlags & vk::QueueFlagBits::eTransfer) {
+		} 
+		if (properties[i].queueFlags & vk::QueueFlagBits::eTransfer) {
 			indices.Transfer = i;
 		}
 
@@ -289,11 +291,12 @@ bool Visualizer::Init() {
 
 		auto deviceExtensions = device.enumerateDeviceExtensionProperties().value;
 
-		printf("Found %s\n", deviceProperties.deviceName);
+		if (deviceProperties.deviceType == vk::PhysicalDeviceType::eDiscreteGpu) {
+			m_physicalDevice = device;
+			printf("Chose %s\n", deviceProperties.deviceName);
+			break;
+		}
 	}
-
-	// TODO: Do some more intelligent searching of devices, rather than just selecting the first one
-	m_physicalDevice = physicalDevices[0];
 
 	// Create the Device and Queues
 	QueueIndices indices = GetQueueIndices(&m_physicalDevice, m_surface);
@@ -363,6 +366,34 @@ bool Visualizer::Init() {
 		return false;
 	}
 
+	// Create the staging images
+	m_stagingImage.resize(m_frameBuffers.size());
+	m_stagingBufferAllocation.resize(m_frameBuffers.size());
+	m_stagingBufferAllocInfo.resize(m_frameBuffers.size());
+	for (uint i = 0; i < m_frameBuffers.size(); ++i) {
+		vk::ImageCreateInfo stagingImageCreateInfo{};
+		stagingImageCreateInfo.imageType = vk::ImageType::e2D;
+		stagingImageCreateInfo.format = vk::Format::eR8G8B8A8Unorm;
+		stagingImageCreateInfo.extent = vk::Extent3D(m_swapchainExtent.width, m_swapchainExtent.height, 1);
+		stagingImageCreateInfo.mipLevels = 1;
+		stagingImageCreateInfo.arrayLayers = 1;
+		stagingImageCreateInfo.samples = vk::SampleCountFlagBits::e1;
+		stagingImageCreateInfo.tiling = vk::ImageTiling::eLinear;
+		stagingImageCreateInfo.usage = vk::ImageUsageFlagBits::eTransferSrc;
+		stagingImageCreateInfo.sharingMode = vk::SharingMode::eExclusive;
+		stagingImageCreateInfo.initialLayout = vk::ImageLayout::eTransferSrcOptimal;
+
+		VmaAllocationCreateInfo stagingImageAllocCreateInfo{};
+		stagingImageAllocCreateInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
+		stagingImageAllocCreateInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
+
+		if (vmaCreateImage(m_allocator, (VkImageCreateInfo *)&stagingImageCreateInfo, &stagingImageAllocCreateInfo, (VkImage *)&m_stagingImage[i], &m_stagingBufferAllocation[i], &m_stagingBufferAllocInfo[i]) != VK_SUCCESS) {
+			printf("Failed to create staging image");
+			return false;
+		}
+	}
+	
+
 	// Create the command pool
 	vk::CommandPoolCreateInfo commandPoolInfo({}, indices.Graphics);
 	if (m_device.createCommandPool(&commandPoolInfo, nullptr, &m_commandPool) != vk::Result::eSuccess) {
@@ -385,49 +416,15 @@ bool Visualizer::Init() {
 		return false;
 	}
 
-
-	// Create the staging buffer
-	vk::BufferCreateInfo stagingBufferCreateInfo;
-	stagingBufferCreateInfo.size = width * height * sizeof(float3);
-	stagingBufferCreateInfo.usage = vk::BufferUsageFlagBits::eTransferSrc;
-
-	VmaAllocationCreateInfo stagingBufferAllocCreateInfo = {};
-	stagingBufferAllocCreateInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
-	allocatorCreateInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
-
-	if (vmaCreateBuffer(m_allocator, (VkBufferCreateInfo *)&stagingBufferCreateInfo, &stagingBufferAllocCreateInfo, (VkBuffer *)&m_stagingBuffer, &m_stagingBufferAllocation, &m_stagingBufferAllocInfo) != VK_SUCCESS) {
-		printf("Failed to create staging buffer");
-		return false;
-	}
-
-	// Create the destination image
-	vk::ImageCreateInfo destImageCreateInfo;
-	destImageCreateInfo.imageType = vk::ImageType::e2D;
-	destImageCreateInfo.extent.width = width;
-	destImageCreateInfo.extent.height = height;
-	destImageCreateInfo.extent.depth = 1;
-	destImageCreateInfo.mipLevels = 1;
-	destImageCreateInfo.arrayLayers = 1;
-	destImageCreateInfo.format = vk::Format::eR32G32B32Sfloat;
-	destImageCreateInfo.usage = vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled;
-	destImageCreateInfo.tiling = vk::ImageTiling::eLinear;
-
-	VmaAllocationCreateInfo destImageAllocCreateInfo = {};
-	destImageAllocCreateInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-
-	if (vmaCreateImage(m_allocator, (VkImageCreateInfo *)&destImageCreateInfo, &destImageAllocCreateInfo, (VkImage *)&m_destImage, &m_destImageAllocation, &m_destImageAllocInfo) != VK_SUCCESS) {
-		printf("Failed to create dest image");
-		return false;
-	}
-
 	return true;
 }
 
 void Visualizer::Shutdown() {
 	CleanUpSwapChainAndDependents();
 	
-	vmaDestroyImage(m_allocator, (VkImage)m_destImage, m_destImageAllocation);
-	vmaDestroyBuffer(m_allocator, (VkBuffer)m_stagingBuffer, m_stagingBufferAllocation);
+	for (uint i = 0; i < m_stagingImage.size(); ++i) {
+		vmaDestroyImage(m_allocator, (VkImage)m_stagingImage[i], m_stagingBufferAllocation[i]);
+	}
 	vmaDestroyAllocator(m_allocator);
 
 	m_device.destroySemaphore(m_imageAvailable);
@@ -445,6 +442,12 @@ void Visualizer::Shutdown() {
 	glfwTerminate();
 }
 
+byte counter = 0;
+UniformSampler sampler(1234);
+byte red;
+byte green;
+byte blue;
+
 bool Visualizer::RenderFrame() {
 	// Update application state
 	// TODO
@@ -460,6 +463,38 @@ bool Visualizer::RenderFrame() {
 		return true;
 	} else if (result != vk::Result::eSuccess) {
 		printf("Failed to acquire next image");
+		return false;
+	}
+
+	if (counter == 0) {
+		red = sampler.NextDiscrete(255);
+		green = sampler.NextDiscrete(255);
+		blue = sampler.NextDiscrete(255);
+	}
+
+	char *mappedData = (char *)m_stagingBufferAllocInfo[imageIndex].pMappedData;
+	for (uint j = 0; j < m_swapchainExtent.height; ++j) {
+		for (uint i = 0; i < m_swapchainExtent.width; ++i) {
+			uint index = (j * m_swapchainExtent.width + i) * 4;
+			mappedData[index + 0] = red; // Red
+			mappedData[index + 1] = green;   // Green
+			mappedData[index + 2] = blue;   // Blue
+			mappedData[index + 3] = 255; // Alpha
+		}
+	}
+	++counter;
+
+	// TODO: Wait on fence that the buffer is finished being transferred from
+	//       Outside this. Before we do the memcpy and submit the command buffer
+
+	// Flush to GPU
+	vk::MappedMemoryRange flushRange(
+		(vk::DeviceMemory)m_stagingBufferAllocInfo[imageIndex].deviceMemory,
+		0,
+		vk::DeviceSize(VK_WHOLE_SIZE)
+	);
+	if (m_device.flushMappedMemoryRanges(flushRange) != vk::Result::eSuccess) {
+		printf("Failed to flush staging buffer");
 		return false;
 	}
 
@@ -547,12 +582,22 @@ bool Visualizer::CreateSwapChain(uint width, uint height) {
 	}
 
 	// Finally create the swap chain
-	vk::SwapchainCreateInfoKHR swapChainInfo({}, m_surface,
-	                                         imageCount, surfaceFormat.format, surfaceFormat.colorSpace,
-	                                         swapExtent, 1, vk::ImageUsageFlagBits::eColorAttachment,
-	                                         vk::SharingMode::eExclusive, 0, nullptr,
-	                                         details.capabilities.currentTransform, vk::CompositeAlphaFlagBitsKHR::eOpaque,
-	                                         presentMode, VK_TRUE);
+	vk::SwapchainCreateInfoKHR swapChainInfo;
+	swapChainInfo.surface = m_surface;
+	swapChainInfo.minImageCount = imageCount;
+	swapChainInfo.imageFormat = surfaceFormat.format;
+	swapChainInfo.imageColorSpace = surfaceFormat.colorSpace;
+	swapChainInfo.imageExtent = swapExtent;
+	swapChainInfo.imageArrayLayers = 1;
+	swapChainInfo.imageUsage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferDst;
+	swapChainInfo.imageSharingMode = vk::SharingMode::eExclusive;
+	swapChainInfo.queueFamilyIndexCount = 0;
+	swapChainInfo.pQueueFamilyIndices = nullptr;
+	swapChainInfo.preTransform = details.capabilities.currentTransform;
+	swapChainInfo.compositeAlpha = vk::CompositeAlphaFlagBitsKHR::eOpaque;
+	swapChainInfo.presentMode = presentMode;
+	swapChainInfo.clipped = VK_TRUE;
+	
 	if (m_device.createSwapchainKHR(&swapChainInfo, nullptr, &m_swapchain) != vk::Result::eSuccess) {
 		printf("Failed to create the swapchain");
 		return false;
@@ -625,33 +670,78 @@ bool Visualizer::CreateImageViews() {
 
 bool Visualizer::CreateRenderPass() {
 	// Create the main render pass
-	vk::AttachmentDescription mainColorAttachment({}, m_swapchainFormat, vk::SampleCountFlagBits::e1,
-	                                              vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eStore,
-	                                              vk::AttachmentLoadOp::eDontCare, vk::AttachmentStoreOp::eDontCare,
-	                                              vk::ImageLayout::eUndefined, vk::ImageLayout::ePresentSrcKHR);
+
 	vk::AttachmentDescription attachments[] = {
-		mainColorAttachment
+		// Backbuffer
+		vk::AttachmentDescription(
+			{},                                      // flags
+			m_swapchainFormat,                       // format
+			vk::SampleCountFlagBits::e1,             // samples
+			vk::AttachmentLoadOp::eDontCare,         // loadOp
+			vk::AttachmentStoreOp::eStore,           // storeOp
+			vk::AttachmentLoadOp::eDontCare,         // stencilLoadOp
+			vk::AttachmentStoreOp::eDontCare,        // stencilStoreOp
+			vk::ImageLayout::eUndefined,             // initialLayout
+			vk::ImageLayout::ePresentSrcKHR          // finalLayout
+		)
 	};
 
-	vk::AttachmentReference mainColorReference(0, vk::ImageLayout::eColorAttachmentOptimal);
-	vk::AttachmentReference attachmentReferences[] = {
-		mainColorReference
+	vk::AttachmentReference colorAttachmentReferences[] = {
+		// The backbuffer is a color attachment
+		vk::AttachmentReference(
+			0,                                          // attachmentIndex
+			vk::ImageLayout::eColorAttachmentOptimal    // layout
+		)
 	};
 
-	vk::SubpassDescription finalResolvePass({}, vk::PipelineBindPoint::eGraphics, 0, nullptr, SizeOfArray(attachmentReferences), attachmentReferences, nullptr, nullptr, 0, nullptr);
 	vk::SubpassDescription subpasses[] = {
-		finalResolvePass
+		// Final resolve pass
+		vk::SubpassDescription(
+			{},                                        // flags
+			vk::PipelineBindPoint::eGraphics,          // pipelineBindPoint
+			0,                                         // inputAttachmentCount
+			nullptr,                                   // pInputAttachments
+			SizeOfArray(colorAttachmentReferences),    // colorAttachmentCount
+			colorAttachmentReferences,                 // pColorAttachments
+			nullptr,                                   // pResolveAttachments
+			nullptr,                                   // pDepthStencilAttachment
+			0,                                         // preserveAttachmentCount
+			nullptr                                    // pPreserveAttachments
+		)
 	};
 
-	vk::SubpassDependency finalResolveDependency(VK_SUBPASS_EXTERNAL, 0,
-	                                             vk::PipelineStageFlagBits::eColorAttachmentOutput, vk::PipelineStageFlagBits::eColorAttachmentOutput,
-	                                             {}, vk::AccessFlagBits::eColorAttachmentRead | vk::AccessFlagBits::eColorAttachmentWrite,
-	                                             {});
 	vk::SubpassDependency subpassDependencies[] = {
-		finalResolveDependency
+		// External to final resolve pass
+		vk::SubpassDependency(
+			VK_SUBPASS_EXTERNAL,                                  // srcSubpass
+			0,                                                    // dstSubpass
+			vk::PipelineStageFlagBits::eBottomOfPipe,             // srcStageMask
+			vk::PipelineStageFlagBits::eTransfer,                 // dstStageMask
+			(vk::AccessFlagBits)0,                                // srcAccessMask
+			vk::AccessFlagBits::eColorAttachmentWrite,            // dstAccessMask
+			vk::DependencyFlagBits::eByRegion                     // dependencyFlags
+		),
+		// Final resolve to external
+		vk::SubpassDependency(
+			0,                                                    // srcSubpass
+			VK_SUBPASS_EXTERNAL,                                  // dstSubpass
+			vk::PipelineStageFlagBits::eColorAttachmentOutput,    // srcStageMask
+			vk::PipelineStageFlagBits::eBottomOfPipe,             // dstStageMask
+			vk::AccessFlagBits::eColorAttachmentWrite,            // srcAccessMask
+			vk::AccessFlagBits::eMemoryRead,                      // dstAccessMask
+			vk::DependencyFlagBits::eByRegion                     // dependencyFlags
+		)
 	};
 
-	vk::RenderPassCreateInfo renderPassInfo({}, SizeOfArray(attachments), attachments, SizeOfArray(subpasses), subpasses, SizeOfArray(subpassDependencies), subpassDependencies);
+	vk::RenderPassCreateInfo renderPassInfo(
+		{},                                  // flags
+		SizeOfArray(attachments),            // attachmentCount
+		attachments,                         // pAttachments
+		SizeOfArray(subpasses),              // subpassCount
+		subpasses,                           // pSubpasses
+		SizeOfArray(subpassDependencies),    // dependencyCount
+		subpassDependencies                  // pDependencies
+	);
 	if (m_device.createRenderPass(&renderPassInfo, nullptr, &m_renderPass) != vk::Result::eSuccess) {
 		printf("Failed to create render pass");
 		return false;
@@ -721,18 +811,88 @@ bool Visualizer::CreateCommandBuffers() {
 	}
 
 	for (uint i = 0; i < m_commandBuffers.size(); ++i) {
-		vk::CommandBufferBeginInfo commandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eSimultaneousUse, nullptr);
+		vk::CommandBufferBeginInfo commandBufferBeginInfo({}, nullptr);
 		m_commandBuffers[i].begin(commandBufferBeginInfo);
 
-		vk::ClearValue clearValue(vk::ClearColorValue(std::array<float, 4>{0.0f, 0.0f, 0.0f, 0.0f}));
-		vk::RenderPassBeginInfo renderPassBeginInfo(m_renderPass, m_frameBuffers[i], vk::Rect2D({0, 0}, m_swapchainExtent), 1, &clearValue);
+		vk::RenderPassBeginInfo renderPassBeginInfo{};
+		renderPassBeginInfo.renderPass = m_renderPass;
+		renderPassBeginInfo.framebuffer = m_frameBuffers[i];
+		renderPassBeginInfo.renderArea = vk::Rect2D({0, 0}, m_swapchainExtent);
+		renderPassBeginInfo.clearValueCount = 0;
+		renderPassBeginInfo.pClearValues = nullptr;
+		
 		m_commandBuffers[i].beginRenderPass(&renderPassBeginInfo, vk::SubpassContents::eInline);
-
 		m_commandBuffers[i].bindPipeline(vk::PipelineBindPoint::eGraphics, m_mainPipeline);
 
-		m_commandBuffers[i].draw(3, 1, 0, 0);
+		// Transition image to Transfer Dest Optimal 
+		vk::ImageMemoryBarrier imageToTransferSrc(
+			(vk::AccessFlagBits)0,                   // srcAccessMask 
+			vk::AccessFlagBits::eTransferWrite,      // dstAccessMask 
+			vk::ImageLayout::eUndefined,             // oldLayout 
+			vk::ImageLayout::eTransferDstOptimal,    // newLayout 
+			VK_QUEUE_FAMILY_IGNORED,                 // srcQueueFamilyIndex 
+			VK_QUEUE_FAMILY_IGNORED,                 // dstQueueFamilyIndex 
+			m_swapChainImages[i],                    // image 
+			vk::ImageSubresourceRange(               // subresourceRange 
+				vk::ImageAspectFlagBits::eColor,     // aspectMask 
+				0,                                   // baseMipLevel 
+				1,                                   // levelCount 
+				0,                                   // baseArrayLayer 
+				1                                    // layerCount 
+			)
+		);
+		m_commandBuffers[i].pipelineBarrier(
+			vk::PipelineStageFlagBits::eTopOfPipe,    // srcStageMask 
+			vk::PipelineStageFlagBits::eTransfer,     // dstStageMask 
+			vk::DependencyFlagBits(),                 // dependencyFlags 
+			0,                                        // memoryBarrierCount 
+			nullptr,                                  // pMemoryBarriers 
+			0,                                        // bufferMemoryBarrierCount 
+			nullptr,                                  // pBufferMemoryBarriers 
+			1,                                        // imageMemoryBarrierCount 
+			&imageToTransferSrc                       // pImageMemoryBarriers 
+		);
+
+		vk::ImageBlit blitRegion{};
+		blitRegion.srcSubresource.aspectMask = vk::ImageAspectFlagBits::eColor;
+		blitRegion.srcSubresource.layerCount = 1;
+		blitRegion.srcOffsets[1] = vk::Offset3D(m_swapchainExtent.width, m_swapchainExtent.height, 1);
+		blitRegion.dstSubresource.aspectMask = vk::ImageAspectFlagBits::eColor;
+		blitRegion.dstSubresource.layerCount = 1;
+		blitRegion.dstOffsets[1] = vk::Offset3D(m_swapchainExtent.width, m_swapchainExtent.height, 1);
+		m_commandBuffers[i].blitImage(m_stagingImage[i], vk::ImageLayout::eTransferSrcOptimal, m_swapChainImages[i], vk::ImageLayout::eTransferDstOptimal, 1, &blitRegion, vk::Filter::eLinear);
+
+		// Transition image to ePresentSrcKHR 
+		vk::ImageMemoryBarrier imageToShaderRead(
+			vk::AccessFlagBits::eTransferWrite,         // srcAccessMask 
+			vk::AccessFlagBits::eMemoryRead,            // dstAccessMask 
+			vk::ImageLayout::eTransferDstOptimal,       // oldLayout 
+			vk::ImageLayout::ePresentSrcKHR,            // newLayout 
+			VK_QUEUE_FAMILY_IGNORED,                    // srcQueueFamilyIndex 
+			VK_QUEUE_FAMILY_IGNORED,                    // dstQueueFamilyIndex 
+			m_swapChainImages[i],                       // image 
+			vk::ImageSubresourceRange(                  // subresourceRange 
+				vk::ImageAspectFlagBits::eColor,        // aspectMask 
+				0,                                      // baseMipLevel 
+				1,                                      // levelCount 
+				0,                                      // baseArrayLayer 
+				1                                       // layerCount 
+			)
+		);
+		m_commandBuffers[i].pipelineBarrier(
+			vk::PipelineStageFlagBits::eTransfer,          // srcStageMask 
+			vk::PipelineStageFlagBits::eBottomOfPipe,      // dstStageMask 
+			vk::DependencyFlagBits(),                      // dependencyFlags 
+			0,                                             // memoryBarrierCount 
+			nullptr,                                       // pMemoryBarriers 
+			0,                                             // bufferMemoryBarrierCount 
+			nullptr,                                       // pBufferMemoryBarriers 
+			1,                                             // imageMemoryBarrierCount 
+			&imageToShaderRead                             // pImageMemoryBarriers 
+		);
 
 		m_commandBuffers[i].endRenderPass();
+
 		if (m_commandBuffers[i].end() != vk::Result::eSuccess) {
 			printf("Failed to record command buffer");
 			return false;
