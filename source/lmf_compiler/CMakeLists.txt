@@ -7,4 +7,4 @@ SetSourceGroup(NAME Root
 
 # Create exe
 add_executable(lmf_compiler ${LMF_COMPILER_ROOT})
-target_link_libraries(lmf_compiler lantern_core)
+target_link_libraries(lmf_compiler lantern_core argparse)

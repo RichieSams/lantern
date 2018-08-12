@@ -10,74 +10,44 @@
 
 #include "renderer/renderer.h"
 
-#include <ez_option_parser.h>
+#include "argparse.h"
 
 #include <xmmintrin.h>
 #include <pmmintrin.h>
 
 
-void PrintHelpString(ez::ezOptionParser &parser) {
-	std::string usage;
-	parser.getUsage(usage);
-	printf("%s", usage.c_str());
-}
+
+
 
 int main(int argc, const char *argv[]) {
 	_MM_SET_FLUSH_ZERO_MODE(_MM_FLUSH_ZERO_ON);
 	_MM_SET_DENORMALS_ZERO_MODE(_MM_DENORMALS_ZERO_ON);
 
-	ez::ezOptionParser parser;
-	parser.overview = "Renders a scene with an interactive preview";
-	parser.syntax = "lantern [OPTIONS]";
-	parser.example = "lantern -s dragon_scene.json\n\n";
+	struct LanternOpts {
+		const char *ScenePath = "scene.json";
+		bool Verbose = false;
+	} options;
 
-	// Help message
-	parser.add(
-		"", false, 1, NULL,
-		"Display usage instructions",
-		"-h",
-		"--help"
-	);
+	const char *const usage[] = {
+		"lantern [options] [[--] args]",
+		"lantern [options]",
+		NULL,
+	};
+	
+	struct argparse_option parseOptions[] = {
+		OPT_HELP(),
+		OPT_GROUP("Root options"),
+		OPT_BOOLEAN('v', "verbose", &options.Verbose, "Use verbose logging"),
+		OPT_GROUP("Basic Options"),
+		OPT_STRING('s', "scene", &options.ScenePath, "Path to the scene.json file. If ommited, Lantern will search for 'scene.json' in the working directory"),
+		OPT_END(),
+	};
 
-	parser.add(
-		"", false, 1, NULL,
-		"The path to the scene JSON file\n"
-		"This defaults to 'scene.json'",
-		"-s",
-		"--scene"
-	);
+	argparse argparse;
+	argparse_init(&argparse, parseOptions, usage, 0);
+	argparse_describe(&argparse, "Renders a scene with an interactive preview", "");
 
-	parser.parse(argc, argv);
-
-	if (parser.isSet("-h")) {
-		PrintHelpString(parser);
-		exit(1);
-	}
-
-	// Check that the options are valid
-	std::vector<std::string> badOptions;
-	if (!parser.gotRequired(badOptions)) {
-		for (std::size_t i = 0; i < badOptions.size(); ++i) {
-			std::cerr << "ERROR: Missing required option " << badOptions[i] << ".\n\n";
-		}
-		PrintHelpString(parser);
-		exit(1);
-	}
-	badOptions.clear();
-
-	if (!parser.gotExpected(badOptions)) {
-		for (std::size_t i = 0; i < badOptions.size(); ++i)
-			std::cerr << "ERROR: Got an unexpected number of arguments for option " << badOptions[i] << ".\n\n";
-
-		PrintHelpString(parser);
-		exit(1);
-	}
-
-	// Load the args
-	std::string scenePath("scene.json");
-	if (parser.isSet("-s")) {
-		parser.get("-s")->getString(scenePath);
-	}
+	argc = argparse_parse(&argparse, argc, argv);
 
 	// Load the scene
 	Lantern::Scene scene;

@@ -6,112 +6,88 @@
 
 #include "io/lantern_model_file.h"
 
-#include <ez_option_parser.h>
+#include "argparse.h"
 
-#include <tiny_obj_loader/tiny_obj_loader.h>
+#include "tiny_obj_loader/tiny_obj_loader.h"
 
-#include <cstdio>
+#include <stdio.h>
 #include <stdexcept>
+#include <algorithm>
 
-
-void PrintHelpString(ez::ezOptionParser &parser) {
-	std::string usage;
-	parser.getUsage(usage);
-	std::cout << usage;
-}
-
-struct CMDLineArgs {
-	std::string inputFile;
-	std::string outputFile;
+struct LMFCompilerOpts {
+	const char *InputPath = nullptr;
+	const char *OutputPath = nullptr;
 };
 
-void ParseCommandLine(int argc, const char *argv[], CMDLineArgs *args);
-void ConvertObjToLMF(CMDLineArgs *args);
+void ParseCommandLine(int argc, const char *argv[], LMFCompilerOpts *opts);
+void ConvertObjToLMF(LMFCompilerOpts *opts);
 
 int main(int argc, const char *argv[]) {
-	CMDLineArgs args;
-	ParseCommandLine(argc, argv, &args);
-	ConvertObjToLMF(&args);
+	LMFCompilerOpts options;
+
+	ParseCommandLine(argc, argv, &options);
+	ConvertObjToLMF(&options);
 }
 
-void ParseCommandLine(int argc, const char *argv[], CMDLineArgs *args) {
-	ez::ezOptionParser parser;
-	parser.overview = "Converts OBJ files to Lantern Model Files";
-	parser.syntax = "lmf_compiler [OPTIONS] <input obj file>";
-	parser.example = "lmf_compiler -o dragon.lmf dragon.obj\n\n";
+void ParseCommandLine(int argc, const char *argv[], LMFCompilerOpts *opts) {
+	const char *const usage[] = {
+		"lmf_compiler [options] [--] <input_file>",
+		NULL,
+	};
 
-	// Help message
-	parser.add(
-		"", false, 1, NULL,
-		"Display usage instructions",
-		"-h",
-		"--help"
-	);
+	struct argparse_option parseOptions[] = {
+		OPT_HELP(),
+		OPT_GROUP("Basic options"),
+		OPT_STRING('o', "output", &opts->OutputPath, "Output Path for the .lmf file"),
+		OPT_END(),
+	};
 
-	parser.add(
-		"", true, 1, NULL,
-		"The output file. This can be relative or absolute.\n"
-		"The file name should have the .lmf extension",
-		"-o",
-		"--output"
-	);
+	argparse argparse;
+	argparse_init(&argparse, parseOptions, usage, 0);
+	argparse_describe(&argparse, "Converts OBJ files to Lantern Model Files", "Example:\nlmf_compiler -o dragon.lmf dragon.obj");
 
-	parser.parse(argc, argv);
+	argc = argparse_parse(&argparse, argc, argv);
 
-	if (parser.isSet("-h")) {
-		PrintHelpString(parser);
-		exit(1);
-	}
 
-	// Check that the options are valid
-	std::vector<std::string> badOptions;
-	if (!parser.gotRequired(badOptions)) {
-		for (std::size_t i = 0; i < badOptions.size(); ++i) {
-			std::cerr << "ERROR: Missing required option " << badOptions[i] << ".\n\n";
-		}
-		PrintHelpString(parser);
-		exit(1);
-	}
-	badOptions.clear();
+	//parser.add(
+	//	"", true, 1, NULL,
+	//	"The output file. This can be relative or absolute.\n"
+	//	"The file name should have the .lmf extension",
+	//	"-o",
+	//	"--output"
+	//);
 
-	if (!parser.gotExpected(badOptions)) {
-		for (std::size_t i = 0; i < badOptions.size(); ++i)
-			std::cerr << "ERROR: Got an unexpected number of arguments for option " << badOptions[i] << ".\n\n";
-
-		PrintHelpString(parser);
-		exit(1);
-	}
+	//argparse.flags
 
 	// Check that we have the correct number of arguments
-	if (parser.lastArgs.size() != 1) {
-		std::cerr << "ERROR: Got an unexpected number of arguments.\n\n";
-		PrintHelpString(parser);
+	if (argc != 1) {
+		printf("ERROR: Got an unexpected number of arguments.\n\n");
+		argparse_usage(&argparse);
 		exit(1);
 	}
 
-	// Load the data
-	args->inputFile = *parser.lastArgs[0];
-	parser.get("-o")->getString(args->outputFile);
+	opts->InputPath = argv[0];
 }
 
-void ConvertObjToLMF(CMDLineArgs *args) {
+void ConvertObjToLMF(LMFCompilerOpts *opts) {
 	std::vector<tinyobj::shape_t> tinyObjShapes;
 	std::vector<tinyobj::material_t> tinyObjMaterials;
 	std::string err;
 
-	if (!tinyobj::LoadObj(tinyObjShapes, tinyObjMaterials, err, args->inputFile.c_str())) {
+	if (!tinyobj::LoadObj(tinyObjShapes, tinyObjMaterials, err, opts->InputPath)) {
 		printf("Unable to parse obj file\n");
 		printf("%s\n", err.c_str());
 		return;
 	}
 
-	// Strip off the extension
-	std::string outputFile;
-	std::size_t pos = args->outputFile.find_last_of('.');
-	if (pos != std::string::npos) {
-		outputFile = args->outputFile.substr(0, pos);
+	char outputPath[260];
+	char const *pos = strrchr(opts->InputPath, '.');
+	if (pos != nullptr) {
+		size_t strLen = pos - opts->InputPath;
+		memcpy(outputPath, opts->InputPath, strLen);
+		outputPath[strLen] = '\0';
 	} else {
-		outputFile = args->outputFile;
+		strncpy(outputPath, opts->InputPath, sizeof(outputPath));
 	}
 
 	// Write out one lmf file per shape
@@ -123,24 +99,20 @@ void ConvertObjToLMF(CMDLineArgs *args) {
 		}
 
 		std::string sanitizedName = shape.name;
-		std::replace(sanitizedName.begin(), sanitizedName.end(), ':', '-');
-		std::replace(sanitizedName.begin(), sanitizedName.end(), '\\', '-');
-		std::replace(sanitizedName.begin(), sanitizedName.end(), '/', '-');
-		std::replace(sanitizedName.begin(), sanitizedName.end(), '*', '-');
-		std::replace(sanitizedName.begin(), sanitizedName.end(), '?', '-');
-		std::replace(sanitizedName.begin(), sanitizedName.end(), '<', '-');
-		std::replace(sanitizedName.begin(), sanitizedName.end(), '>', '-');
-		std::replace(sanitizedName.begin(), sanitizedName.end(), '|', '-');
-		std::replace(sanitizedName.begin(), sanitizedName.end(), '"', '-');
+		for (auto iter = sanitizedName.begin(); iter != sanitizedName.end(); ++iter) {
+			if (*iter == ':' || *iter == '\\' || *iter == '/' || *iter == '*' || *iter == '?' || *iter == '<' || *iter == '>' || *iter == '|' || *iter == '"') {
+				*iter = '-';
+			}
+		}
 
 		// Create a unique name
-		std::stringstream strStream;
-		strStream << outputFile << sanitizedName << ".lmf";
+		char uniqueName[260];
+		snprintf(uniqueName, sizeof(uniqueName), "%s%s.lmf", outputPath, sanitizedName.c_str());
 
 		// Create the file
-		FILE *file = fopen(strStream.str().c_str(), "wb");
+		FILE *file = fopen(uniqueName, "wb");
 		if (!file) {
-			printf("Unable to open \"%s\" for writing\n", strStream.str().c_str());
+			printf("Unable to open \"%s\" for writing\n",uniqueName);
 			return;
 		}
 
@@ -151,7 +123,7 @@ void ConvertObjToLMF(CMDLineArgs *args) {
 		byte verticesPerPrimative = shape.mesh.num_vertices[0];
 		for (std::size_t i = 1; i < shape.mesh.num_vertices.size(); ++i) {
 			if (shape.mesh.num_vertices[i] != verticesPerPrimative) {
-				printf("The number of vertices per primitive is not consistent across [%s]\nThe first face has %u vertices. Found %u vertices for face #%llu\n", shape.name.c_str(), verticesPerPrimative, shape.mesh.num_vertices[i], i / verticesPerPrimative);
+				printf("The number of vertices per primitive is not consistent across [%s]\nThe first face has %u vertices. Found %u vertices for face #%zu\n", shape.name.c_str(), verticesPerPrimative, shape.mesh.num_vertices[i], i / verticesPerPrimative);
 				return;
 			}
 		}

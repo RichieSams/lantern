@@ -19,7 +19,7 @@
 #include "math/vector_math.h"
 #include "math/sampling.h"
 
-#include <tbb/parallel_for.h>
+#include "tbb/parallel_for.h"
 
 #include <algorithm>
 

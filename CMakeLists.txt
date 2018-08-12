@@ -8,41 +8,8 @@ set(CMAKE_CXX_STANDARD 11) # C++11...
 set(CMAKE_CXX_STANDARD_REQUIRED ON) #...is required...
 set(CMAKE_CXX_EXTENSIONS OFF) #...without compiler extensions like gnu++11
 
-
-# Add necessary dependencies
-find_package(OpenGL REQUIRED)
-
-
 # Add third party libs
-set( GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE )
-set( GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE )
-set( GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE )
-set( GLFW_INSTALL OFF CACHE BOOL "" FORCE )
-add_subdirectory(third_party/glfw)
-
-add_subdirectory(third_party/imgui)
-
-set( TBB_BUILD_SHARED OFF CACHE BOOL  "Only build TBB static" )
-set( TBB_BUILD_TBBMALLOC_PROXY OFF CACHE BOOL  "Don't need tbbmalloc_proxy" )
-set( TBB_BUILD_TESTS OFF CACHE BOOL  "Build TBB lib only" )
-add_subdirectory(third_party/tbb)
-include_directories(third_party/tbb/include)
-
-
-SET(EMBREE_ISPC_SUPPORT OFF CACHE BOOL "No ISPC support needed atm" )
-SET(EMBREE_TUTORIALS OFF CACHE BOOL "Only build lib" )
-SET(EMBREE_STATIC_LIB ON CACHE BOOL "Build Embree as a static lib")
-add_subdirectory(third_party/embree)
-include_directories(third_party/embree/include)
-include_directories(third_party/embree/common)
-
-add_subdirectory(third_party/tiny_obj_loader)
-add_subdirectory(third_party/json)
-add_subdirectory(third_party/json_schema_validator)
-add_subdirectory(third_party/ez_option_parser)
-add_subdirectory(third_party/stb)
-add_subdirectory(third_party/vk_mem_alloc)
-
+add_subdirectory(third_party)
 
 # Add the main source
 add_subdirectory(source)
