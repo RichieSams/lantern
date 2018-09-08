@@ -72,9 +72,11 @@ SwapChainSupportDetails QuerySwapChainSupport(vk::PhysicalDevice device, vk::Sur
 // Needed for message pump callbacks
 Visualizer *g_visualizer;
 
-Visualizer::Visualizer(Renderer *renderer, Scene *scene)
-		: m_renderer(renderer),
-		  m_scene(scene),
+Visualizer::Visualizer(Scene *scene, FrameBuffer *currentFrameBuffer, std::atomic<FrameBuffer *> *swapFrameBuffer)
+		: m_scene(scene),
+          m_currentFrameBuffer(currentFrameBuffer),
+          m_swapFrameBuffer(swapFrameBuffer),
+          m_accumulationFrameBuffer(scene->Camera->FrameBufferWidth, scene->Camera->FrameBufferHeight),
 		  m_window(nullptr),
 		  m_leftMouseCaptured(false),
 		  m_middleMouseCaptured(false) {
@@ -136,7 +138,7 @@ void Visualizer::CursorPosCallback(GLFWwindow *window, double xpos, double ypos)
 		g_visualizer->m_scene->Camera->Rotate((float)(oldY - g_visualizer->m_lastMousePosY) / 300,
 		                                      (float)(oldX - g_visualizer->m_lastMousePosX) / 300);
 
-		g_visualizer->m_scene->Camera->FrameBufferData.Reset();
+		g_visualizer->m_accumulationFrameBuffer.Reset();
 	} else if (g_visualizer->m_middleMouseCaptured) {
 		double oldX = g_visualizer->m_lastMousePosX;
 		double oldY = g_visualizer->m_lastMousePosY;
@@ -145,13 +147,13 @@ void Visualizer::CursorPosCallback(GLFWwindow *window, double xpos, double ypos)
 		g_visualizer->m_scene->Camera->Pan((float)(oldX - g_visualizer->m_lastMousePosX) * 0.01f,
 		                                   (float)(g_visualizer->m_lastMousePosY - oldY) * 0.01f);
 
-		g_visualizer->m_scene->Camera->FrameBufferData.Reset();
+		g_visualizer->m_accumulationFrameBuffer.Reset();
 	}
 }
 
 void Visualizer::ScrollCallback(GLFWwindow *window, double xoffset, double yoffset) {
 	g_visualizer->m_scene->Camera->Zoom((float)yoffset);
-	g_visualizer->m_scene->Camera->FrameBufferData.Reset();
+	g_visualizer->m_accumulationFrameBuffer.Reset();
 
 	//g_visualizer->m_imGuiImpl.ScrollCallback(window, xoffset, yoffset);
 }
@@ -442,15 +444,22 @@ void Visualizer::Shutdown() {
 	glfwTerminate();
 }
 
-byte counter = 0;
-UniformSampler sampler(1234);
-byte red;
-byte green;
-byte blue;
-
 bool Visualizer::RenderFrame() {
-	// Update application state
-	// TODO
+	// Get the next framebuffer to accumulate from
+	m_currentFrameBuffer = std::atomic_exchange(m_swapFrameBuffer, m_currentFrameBuffer);
+
+	if (!m_currentFrameBuffer->Empty) {
+		for (uint y = 0; y < m_currentFrameBuffer->Height; ++y) {
+			const size_t offset = y * m_currentFrameBuffer->Width;
+			for (uint x = 0; x < m_currentFrameBuffer->Width; ++x) {
+				const size_t index = offset + x;
+				m_accumulationFrameBuffer.ColorData[index] += m_currentFrameBuffer->ColorData[index];
+				m_accumulationFrameBuffer.Bounces[index] += m_currentFrameBuffer->Bounces[index];
+				m_accumulationFrameBuffer.Weights[index] += m_currentFrameBuffer->Weights[index];
+			}
+		}
+		m_currentFrameBuffer->Reset();
+	}
 
 	// Let the previous frame's queue flush
 	m_presentQueue.waitIdle();
@@ -466,23 +475,21 @@ bool Visualizer::RenderFrame() {
 		return false;
 	}
 
-	if (counter == 0) {
-		red = sampler.NextDiscrete(255);
-		green = sampler.NextDiscrete(255);
-		blue = sampler.NextDiscrete(255);
-	}
-
 	char *mappedData = (char *)m_stagingBufferAllocInfo[imageIndex].pMappedData;
-	for (uint j = 0; j < m_swapchainExtent.height; ++j) {
-		for (uint i = 0; i < m_swapchainExtent.width; ++i) {
-			uint index = (j * m_swapchainExtent.width + i) * 4;
-			mappedData[index + 0] = red; // Red
-			mappedData[index + 1] = green;   // Green
-			mappedData[index + 2] = blue;   // Blue
-			mappedData[index + 3] = 255; // Alpha
+	for (uint j = 0; j < m_accumulationFrameBuffer.Height; ++j) {
+		const size_t offset = j * m_accumulationFrameBuffer.Width;
+		for (uint i = 0; i < m_accumulationFrameBuffer.Width; ++i) {
+			const size_t frameBufferIndex = offset + i;
+			const size_t mappedDataIndex = frameBufferIndex * 4;
+
+			float3 *color = &m_accumulationFrameBuffer.ColorData[frameBufferIndex];
+			float weight = m_accumulationFrameBuffer.Weights[frameBufferIndex];
+			mappedData[mappedDataIndex + 0] = color->x / weight * 255; // Red
+			mappedData[mappedDataIndex + 1] = color->y / weight * 255;   // Green
+			mappedData[mappedDataIndex + 2] = color->z / weight * 255;   // Blue
+			mappedData[mappedDataIndex + 3] = 255; // Alpha
 		}
 	}
-	++counter;
 
 	// TODO: Wait on fence that the buffer is finished being transferred from
 	//       Outside this. Before we do the memcpy and submit the command buffer

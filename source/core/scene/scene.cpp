@@ -81,7 +81,7 @@ float4 CalculateBoundingSphere(float3a *positions, std::size_t len) {
 	return float4(center, radius);
 }
 
-bool Scene::LoadSceneFromJSON(std::string &filePath) {
+bool Scene::LoadSceneFromJSON(const char *filePath) {
 	m_jsonPath = canonical(fs::path(filePath));
 
 	if (ParseJSON()) {
@@ -160,7 +160,7 @@ bool Scene::ParseJSON() {
 		try {
 			lf >> schema;
 		} catch (std::exception &e) {
-			printf("%s at %llu - while parsing the schema\n", e.what(), lf.tellp());
+			printf("%s at %zu - while parsing the schema\n", e.what(), lf.tellp());
 			return false;
 		}
 	} else {
@@ -171,7 +171,7 @@ bool Scene::ParseJSON() {
 			try {
 				lf >> schema;
 			} catch (std::exception &e) {
-				printf("%s at %llu - while parsing the schema\n", e.what(), lf.tellp());
+				printf("%s at %zu - while parsing the schema\n", e.what(), lf.tellp());
 				return false;
 			}
 		} else {
@@ -205,7 +205,7 @@ bool Scene::ParseJSON() {
 		ifs >> j;
 		validator.validate(j);
 	} catch (std::exception &e) {
-		printf("Schema validation failed: %s at offset %ull\n", e.what(), ifs.tellg());
+		printf("Schema validation failed: %s at offset %zu\n", e.what(), ifs.tellg());
 		return false;
 	}
 

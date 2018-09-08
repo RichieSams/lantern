@@ -15,8 +15,7 @@
 #include <xmmintrin.h>
 #include <pmmintrin.h>
 
-
-
+#include <thread>
 
 
 int main(int argc, const char *argv[]) {
@@ -51,18 +50,31 @@ int main(int argc, const char *argv[]) {
 
 	// Load the scene
 	Lantern::Scene scene;
-	//if (!scene.LoadSceneFromJSON(scenePath)) {
-	//	printf("Could not load scene.json\n");
-	//	return 1;
-	//}
-
-	Lantern::Renderer renderer(&scene);
-
-	bool visualizing = true;
-	if (visualizing) {
-		Lantern::Visualizer visualizer(&renderer, &scene);
-		visualizer.Run();
-	} else {
-		// renderer.Run();
+	if (!scene.LoadSceneFromJSON(options.ScenePath)) {
+		printf("Could not load scene.json\n");
+		return 1;
 	}
+
+	Lantern::FrameBuffer transferFrames[3] = {
+		Lantern::FrameBuffer(scene.Camera->FrameBufferWidth, scene.Camera->FrameBufferHeight),
+		Lantern::FrameBuffer(scene.Camera->FrameBufferWidth, scene.Camera->FrameBufferHeight),
+		Lantern::FrameBuffer(scene.Camera->FrameBufferWidth, scene.Camera->FrameBufferHeight)
+	};
+	std::atomic<Lantern::FrameBuffer *> swapBuffer(&transferFrames[1]);
+
+	Lantern::Renderer renderer(&scene, &transferFrames[0], &swapBuffer);
+	Lantern::Visualizer visualizer(&scene, &transferFrames[2], &swapBuffer);
+	
+	std::atomic_bool quit(false);
+	std::thread rendererThread(
+		[](Lantern::Renderer *renderer, std::atomic_bool *quit) {
+			while (!quit->load(std::memory_order_relaxed)) {
+				renderer->RenderFrame();
+			}
+	}, &renderer, &quit);
+
+	visualizer.Run();
+
+	quit.store(true);
+	rendererThread.join();
 }

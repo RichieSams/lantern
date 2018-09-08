@@ -73,7 +73,7 @@ private:
 	RTCScene m_scene;
 
 public:
-	bool LoadSceneFromJSON(std::string &filePath);
+	bool LoadSceneFromJSON(const char *filePath);
 	bool ReloadSceneFromJSON();
 
 	Material *GetMaterial(uint modelId) {

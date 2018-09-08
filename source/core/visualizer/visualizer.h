@@ -8,27 +8,34 @@
 
 #include "math/int_types.h"
 
+#include "camera/frame_buffer.h"
+
 #define VULKAN_HPP_NO_EXCEPTIONS
 #include <vulkan/vulkan.hpp>
 
 #include "vk_mem_alloc.h"
+
+#include <atomic>
 
 
 struct GLFWwindow;
 
 namespace Lantern {
 
-class Renderer;
 class Scene;
 
 class Visualizer {
 public:
-	Visualizer(Renderer *renderer, Scene *scene);
+	Visualizer(Scene *scene, FrameBuffer *currentFrameBuffer, std::atomic<FrameBuffer *> *swapFrameBuffer);
 	~Visualizer();
 
 private:
-	Renderer *m_renderer;
 	Scene *m_scene;
+
+	FrameBuffer *m_currentFrameBuffer;
+	std::atomic<FrameBuffer *> *m_swapFrameBuffer;
+
+	FrameBuffer m_accumulationFrameBuffer;
 
 	GLFWwindow *m_window;
 	double m_lastMousePosX;

@@ -9,6 +9,8 @@
 #include "math/int_types.h"
 #include "math/vector_types.h"
 
+#include <atomic>
+
 
 namespace Lantern {
 
@@ -17,11 +19,14 @@ struct SurfaceInteraction;
 class BSDF;
 class Scene;
 class Light;
+class FrameBuffer;
 
 class Renderer {
 public:
-	Renderer(Scene *scene)
+	Renderer(Scene *scene, FrameBuffer *currentFrameBuffer, std::atomic<FrameBuffer *> *swapFrameBuffer)
 		: m_scene(scene),
+	      m_currentFrameBuffer(currentFrameBuffer),
+	      m_swapFrameBuffer(swapFrameBuffer),
 		  m_frameNumber(0u) {
 	};
 
@@ -29,6 +34,10 @@ private:
 	static const uint kTileSize = 8;
 
 	Scene *m_scene;
+
+	FrameBuffer *m_currentFrameBuffer;
+	std::atomic<FrameBuffer *> *m_swapFrameBuffer;
+
 	uint m_frameNumber;
 
 public:

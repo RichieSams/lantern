@@ -48,3 +48,6 @@ TODO List
 	- ~~Implement ideal specular refraction and transmission~~ - Added in [4feb070](https://github.com/RichieSams/lantern/commit/4feb07069a95c1175402552432e4e81f36489521)
 	- ~~Implement isotropic scattering media~~ - Added in [eff77d8](https://github.com/RichieSams/lantern/commit/eff77d848a511656ba0196a60332b6685688c788)
 	- Implement non-isotripic scattering media (Henyey-Greenstein, Raleigh, etc.)
+- **Have a framebuffer / visualization that shows how many bounces each pixel is averaging**
+	- Heatmap??
+- **Update camera to full cartesian**

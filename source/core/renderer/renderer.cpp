@@ -27,11 +27,14 @@
 namespace Lantern {
 
 void Renderer::RenderFrame() {
-	uint width = m_scene->Camera->FrameBufferData.Width;
-	uint height = m_scene->Camera->FrameBufferData.Height;
+	uint width = m_scene->Camera->FrameBufferWidth;
+	uint height = m_scene->Camera->FrameBufferHeight;
 
 	const uint numTilesX = (width + kTileSize - 1) / kTileSize;
 	const uint numTilesY = (height + kTileSize - 1) / kTileSize;
+
+	m_currentFrameBuffer = std::atomic_exchange(m_swapFrameBuffer, m_currentFrameBuffer);
+	m_currentFrameBuffer->Empty = false;
 
 	tbb::parallel_for(uint(0), uint(numTilesX * numTilesY), [=](uint i) {
 		RenderTile(i, width, height, numTilesX, numTilesY);
@@ -222,11 +225,11 @@ void Renderer::RenderPixel(uint x, uint y, UniformSampler *sampler) const {
 		}
 	}
 
-	if (bounces == maxBounces) {
-		//printf("Over max bounces");
-	}
+	size_t index = y * m_currentFrameBuffer->Width + x;
 
-	m_scene->Camera->FrameBufferData.SplatColor(x, y, color);
+	m_currentFrameBuffer->ColorData[index] += color;
+	m_currentFrameBuffer->Bounces[index] += bounces;
+	m_currentFrameBuffer->Weights[index] += 1.0f;
 }
 
 float3 Renderer::SampleOneLight(UniformSampler *sampler, SurfaceInteraction interaction, BSDF *bsdf, Light *hitLight) const {

@@ -12,33 +12,34 @@
 namespace Lantern {
 
 PinholeCamera::PinholeCamera()
-		: m_phi((float)M_PI_2),
+		: FrameBufferWidth(0),
+          FrameBufferHeight(0),
+          m_filter(ReconstructionFilter::Type::Tent),
+		  m_phi((float)M_PI_2),
 		  m_theta(0.0f),
 		  m_radius(10.0f),
 		  m_up(1.0f),
 		  m_target(0.0f, 0.0f, 0.0f),
 		  m_tanFovXDiv2(0.5773503f /* tan(60 degrees / 2) */),
-		  m_tanFovYDiv2(tanf(0.5235f /* 60 degrees / 2 */ * 720 / 1280)),
-		  FrameBufferData(1280, 720),
-		  m_filter(ReconstructionFilter::Type::Tent) {
+
+		  m_tanFovYDiv2(tanf(0.5235f /* 60 degrees / 2 */ * 720 / 1280)) {
 	UpdateOrigin();
 	UpdateCartesianCoordSystem();
-	FrameBufferData.Reset();
 }
 
 PinholeCamera::PinholeCamera(float phi, float theta, float radius, uint clientWidth, uint clientHeight, float3 target, float fov, ReconstructionFilter::Type filterType)
-		: m_phi(phi),
+		: FrameBufferWidth(clientWidth),
+          FrameBufferHeight(clientHeight),
+          m_filter(filterType),
+		  m_phi(phi),
 		  m_theta(theta),
 		  m_radius(radius),
 		  m_up(1.0f),
 		  m_target(target),
 		  m_tanFovXDiv2(tanf(fov * 0.5f)),
-		  m_tanFovYDiv2(tanf(fov * 0.5f * clientHeight / clientWidth)),
-		  FrameBufferData(clientWidth, clientHeight),
-		  m_filter(filterType) {
+		  m_tanFovYDiv2(tanf(fov * 0.5f * clientHeight / clientWidth)) {
 	UpdateOrigin();
 	UpdateCartesianCoordSystem();
-	FrameBufferData.Reset();
 }
 
 void PinholeCamera::Rotate(float dPhi, float dTheta) {
@@ -102,8 +103,8 @@ Ray PinholeCamera::CalculateRayFromPixel(uint x, uint y, UniformSampler *sampler
 	float u = m_filter.Sample(sampler->NextFloat());
 	float v = m_filter.Sample(sampler->NextFloat());
 	
-	float3a viewVector((((x + 0.5f + u) / FrameBufferData.Width) * 2.0f - 1.0f) * m_tanFovXDiv2,
-	                   -(((y + 0.5f + v) / FrameBufferData.Height) * 2.0f - 1.0f) * m_tanFovYDiv2,
+	float3a viewVector((((x + 0.5f + u) / FrameBufferWidth) * 2.0f - 1.0f) * m_tanFovXDiv2,
+	                   -(((y + 0.5f + v) / FrameBufferHeight) * 2.0f - 1.0f) * m_tanFovYDiv2,
 	                   -1.0f);
 
 	// Matrix multiply
