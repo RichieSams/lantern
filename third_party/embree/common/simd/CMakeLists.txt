@@ -1,5 +1,5 @@
 ## ======================================================================== ##
-## Copyright 2009-2017 Intel Corporation                                    ##
+## Copyright 2009-2018 Intel Corporation                                    ##
 ##                                                                          ##
 ## Licensed under the Apache License, Version 2.0 (the "License");          ##
 ## you may not use this file except in compliance with the License.         ##
@@ -16,4 +16,9 @@
 
 ADD_LIBRARY(simd STATIC sse.cpp)
 SET_PROPERTY(TARGET simd PROPERTY FOLDER common)
+SET_PROPERTY(TARGET simd APPEND PROPERTY COMPILE_FLAGS " ${FLAGS_LOWEST}")
 
+IF (EMBREE_STATIC_LIB)
+  INSTALL(TARGETS simd ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT devel)
+  SIGN_TARGET(simd)
+ENDIF()

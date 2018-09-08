@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2017 Intel Corporation                                    //
+// Copyright 2009-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -26,17 +26,17 @@ namespace embree
   class MutexSys {
     friend struct ConditionImplementation;
   public:
-    MutexSys( void );
-    ~MutexSys( void );
+    MutexSys();
+    ~MutexSys();
 
   private:
     MutexSys (const MutexSys& other) DELETED; // do not implement
     MutexSys& operator= (const MutexSys& other) DELETED; // do not implement
 
   public:
-    void lock( void );
-    bool try_lock( void );
-    void unlock( void );
+    void lock();
+    bool try_lock();
+    void unlock();
 
   protected:
     void* mutex;

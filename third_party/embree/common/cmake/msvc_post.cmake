@@ -1,5 +1,5 @@
 ## ======================================================================== ##
-## Copyright 2009-2017 Intel Corporation                                    ##
+## Copyright 2009-2018 Intel Corporation                                    ##
 ##                                                                          ##
 ## Licensed under the Apache License, Version 2.0 (the "License");          ##
 ## you may not use this file except in compliance with the License.         ##
@@ -15,7 +15,7 @@
 ## ======================================================================== ##
 
 # optionally use static runtime library
-OPTION(EMBREE_STATIC_RUNTIME "Use the static version of the C/C++ runtime library." ON)
+OPTION(EMBREE_STATIC_RUNTIME "Use the static version of the C/C++ runtime library." OFF)
 IF (EMBREE_STATIC_RUNTIME)
   STRING(REPLACE "/MDd" "/MTd" CMAKE_CXX_FLAGS_DEBUG ${CMAKE_CXX_FLAGS_DEBUG})
   STRING(REPLACE "/MD" "/MT" CMAKE_CXX_FLAGS_RELWITHDEBINFO ${CMAKE_CXX_FLAGS_RELWITHDEBINFO})

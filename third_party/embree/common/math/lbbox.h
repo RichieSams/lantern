@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2017 Intel Corporation                                    //
+// Copyright 2009-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -94,7 +94,7 @@ namespace embree
       BBox<T> b0 = lerp(blower0, blower1, lower-ilowerf);
       BBox<T> b1 = lerp(bupper1, bupper0, iupperf-upper);
 
-      for (size_t i = ilower+1; i < iupper; i++)
+      for (int i = ilower+1; i < iupper; i++)
       {
         const float f = (float(i)/numTimeSegments - time_range.lower) / time_range.size();
         const BBox<T> bt = lerp(b0, b1, f);
@@ -125,7 +125,7 @@ namespace embree
         return;
       }
   
-      for (size_t i = ilower+1; i<iupper; i++)
+      for (int i = ilower+1; i<iupper; i++)
       {
         const float f = float(i - time_range.begin()) / float(time_range.size());
         const BBox<T> bt = lerp(b0, b1, f);
@@ -195,6 +195,12 @@ namespace embree
     BBox<T> bounds0, bounds1;
   };
 
+  /*! tests if box is finite */
+  template<typename T>
+    __forceinline bool isvalid( const LBBox<T>& v ) {
+    return isvalid(v.bounds0) && isvalid(v.bounds1);
+  }
+  
   template<typename T>
     __forceinline T expectedArea(const T& a0, const T& a1, const T& b0, const T& b1)
   {

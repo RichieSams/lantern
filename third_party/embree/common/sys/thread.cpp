@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2017 Intel Corporation                                    //
+// Copyright 2009-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -175,13 +175,14 @@ namespace embree
 
 namespace embree
 {
+  static MutexSys mutex;
+  static std::vector<size_t> threadIDs;
+  
   /* changes thread ID mapping such that we first fill up all thread on one core */
   size_t mapThreadID(size_t threadID)
   {
-    static MutexSys mutex;
     Lock<MutexSys> lock(mutex);
-    static std::vector<size_t> threadIDs;
-
+    
     if (threadIDs.size() == 0)
     {
       /* parse thread/CPU topology */

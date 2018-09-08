@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2017 Intel Corporation                                    //
+// Copyright 2009-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -15,19 +15,19 @@
 // ======================================================================== //
 
 #include "../builders/bvh_builder_hair.h"
-#include "../builders/bvh_builder_msmblur_hair.h"
 #include "../builders/primrefgen.h"
 
-#include "../geometry/bezier1v.h"
-#include "../geometry/bezier1i.h"
+#include "../geometry/linei.h"
+#include "../geometry/curveNi.h"
+#include "../geometry/curveNv.h"
 
-#if defined(EMBREE_GEOMETRY_HAIR)
+#if defined(EMBREE_GEOMETRY_CURVE)
 
 namespace embree
 {
   namespace isa
   {
-    template<int N, typename Primitive>
+    template<int N, typename CurvePrimitive, typename LinePrimitive>
     struct BVHNHairBuilderSAH : public Builder
     {
       typedef BVHN<N> BVH;
@@ -36,14 +36,19 @@ namespace embree
       BVH* bvh;
       Scene* scene;
       mvector<PrimRef> prims;
+      BVHBuilderHair::Settings settings;
 
       BVHNHairBuilderSAH (BVH* bvh, Scene* scene)
         : bvh(bvh), scene(scene), prims(scene->device,0) {}
       
       void build() 
       {
+        /* if we use the primrefarray for allocations we have to take it back from the BVH */
+        if (settings.finished_range_threshold != size_t(inf))
+          bvh->alloc.unshare(prims);
+      
         /* fast path for empty BVH */
-        const size_t numPrimitives = scene->getNumPrimitives<NativeCurves,false>();
+        const size_t numPrimitives = scene->getNumPrimitives<CurveGeometry,false>();
         if (numPrimitives == 0) {
           prims.clear();
           bvh->set(BVH::emptyNode,empty,0);
@@ -52,35 +57,44 @@ namespace embree
 
         double t0 = bvh->preBuild(TOSTRING(isa) "::BVH" + toString(N) + "HairBuilderSAH");
 
-        //profile(1,5,numPrimitives,[&] (ProfileTimer& timer) {
-        
         /* create primref array */
         prims.resize(numPrimitives);
-        const PrimInfo pinfo = createPrimRefArray<NativeCurves,false>(scene,prims,scene->progressInterface);
+        const PrimInfo pinfo = createPrimRefArray(scene,Geometry::MTY_CURVES,false,prims,scene->progressInterface);
 
         /* estimate acceleration structure size */
         const size_t node_bytes = pinfo.size()*sizeof(typename BVH::UnalignedNode)/(4*N);
-        const size_t leaf_bytes = pinfo.size()*sizeof(Primitive);
+        const size_t leaf_bytes = CurvePrimitive::bytes(pinfo.size());
         bvh->alloc.init_estimate(node_bytes+leaf_bytes);
         
         /* builder settings */
-        BVHBuilderHair::Settings settings;
         settings.branchingFactor = N;
         settings.maxDepth = BVH::maxBuildDepthLeaf;
-        settings.logBlockSize = 0;
-        settings.minLeafSize = 1;
-        settings.maxLeafSize = BVH::maxLeafBlocks;
+        settings.logBlockSize = bsf(CurvePrimitive::max_size());
+        settings.minLeafSize = CurvePrimitive::max_size();
+        settings.maxLeafSize = CurvePrimitive::max_size();
+        settings.finished_range_threshold = numPrimitives/1000;
+        if (settings.finished_range_threshold < 1000)
+          settings.finished_range_threshold = inf;
 
         /* creates a leaf node */
-        auto createLeaf = [&] (size_t depth, const range<size_t>& set, const FastAllocator::CachedAllocator& alloc) -> NodeRef
+        auto createLeaf = [&] (const PrimRef* prims, const range<size_t>& set, const FastAllocator::CachedAllocator& alloc) -> NodeRef {
+          
+          if (set.size() == 0)
+            return BVH::emptyNode;
+
+          const unsigned int geomID0 = prims[set.begin()].geomID();
+          if (scene->get(geomID0)->getCurveBasis() == Geometry::GTY_BASIS_LINEAR)
+            return LinePrimitive::createLeaf(bvh,prims,set,alloc);
+          else
+            return CurvePrimitive::createLeaf(bvh,prims,set,alloc);
+        };
+        
+        auto reportFinishedRange = [&] (const range<size_t>& range) -> void
           {
-            size_t start = set.begin();
-            size_t items = set.size();
-            Primitive* accel = (Primitive*) alloc.malloc1(items*sizeof(Primitive),BVH::byteAlignment);
-            for (size_t i=0; i<items; i++) {
-              accel[i].fill(prims.data(),start,set.end(),bvh->scene);
-            }
-            return bvh->encodeLeaf((char*)accel,items);
+            PrimRef* begin = prims.data()+range.begin();
+            PrimRef* end   = prims.data()+range.end(); // FIXME: extended end for spatial split builder!!!!!
+            size_t bytes = (size_t)end - (size_t)begin;
+            bvh->alloc.addBlock(begin,bytes);
           };
           
         /* build hierarchy */
@@ -90,14 +104,17 @@ namespace embree
            typename BVH::AlignedNode::Set(),
            typename BVH::UnalignedNode::Create(),
            typename BVH::UnalignedNode::Set(),
-           createLeaf,scene->progressInterface,scene,prims.data(),pinfo,settings);
+           createLeaf,scene->progressInterface,
+           reportFinishedRange,
+           scene,prims.data(),pinfo,settings);
         
         bvh->set(root,LBBox3fa(pinfo.geomBounds),pinfo.size());
-        
-        //});
+        /* if we allocated using the primrefarray we have to keep it alive */
+        if (settings.finished_range_threshold != size_t(inf))
+          bvh->alloc.share(prims);
         
         /* clear temporary data for static geometry */
-        if (scene->isStatic()) {
+        if (scene->isStaticAccel()) {
           prims.clear();
           bvh->shrink();
         }
@@ -109,105 +126,14 @@ namespace embree
         prims.clear();
       }
     };
-
-    /* FIXME: add fast path for single-segment motion blur */
-    template<int N, typename Primitive>
-    struct BVHNHairMBlurBuilderSAH : public Builder
-    {
-      typedef BVHN<N> BVH;
-      typedef typename BVH::NodeRef NodeRef;
-      typedef typename BVH::NodeRecordMB NodeRecordMB;
-
-      BVH* bvh;
-      Scene* scene;
-
-      BVHNHairMBlurBuilderSAH (BVH* bvh, Scene* scene)
-        : bvh(bvh), scene(scene) {}
-      
-      void build() 
-      {
-        /* fast path for empty BVH */
-        const size_t numPrimitives = scene->getNumPrimitives<NativeCurves,true>();
-        if (numPrimitives == 0) {
-          bvh->set(BVH::emptyNode,empty,0);
-          return;
-        }
-
-        double t0 = bvh->preBuild(TOSTRING(isa) "::BVH" + toString(N) + "HairMBlurBuilderSAH");
-
-        //profile(1,5,numPrimitives,[&] (ProfileTimer& timer) {
-
-        /* create primref array */
-        mvector<PrimRefMB> prims0(scene->device,numPrimitives);
-        const PrimInfoMB pinfo = createPrimRefArrayMSMBlur<NativeCurves>(scene,prims0,bvh->scene->progressInterface);
-
-        /* estimate acceleration structure size */
-        const size_t node_bytes = pinfo.num_time_segments*sizeof(typename BVH::AlignedNodeMB)/(4*N);
-        const size_t leaf_bytes = size_t(1.2*Primitive::blocks(pinfo.num_time_segments)*sizeof(Primitive));
-        bvh->alloc.init_estimate(node_bytes+leaf_bytes);
-    
-        /* settings for BVH build */
-        BVHBuilderHairMSMBlur::Settings settings;
-        settings.branchingFactor = N;
-        settings.maxDepth = BVH::maxBuildDepthLeaf;
-        settings.logBlockSize = 1;
-        settings.minLeafSize = 1;
-        settings.maxLeafSize = BVH::maxLeafBlocks;
-
-        /* creates a leaf node */
-        auto createLeaf = [&] (const SetMB& prims, const FastAllocator::CachedAllocator& alloc) -> NodeRecordMB
-          {
-            size_t start = prims.object_range.begin();
-            size_t end   = prims.object_range.end();
-            size_t items = prims.object_range.size();
-            Primitive* accel = (Primitive*) alloc.malloc1(items*sizeof(Primitive));
-            const NodeRef node = bvh->encodeLeaf((char*)accel,items);
-
-            LBBox3fa bounds = empty;
-            for (size_t i=0; i<items; i++)
-              bounds.extend(accel[i].fillMB(prims.prims->data(),start,end,bvh->scene,prims.time_range));
-            
-            return NodeRecordMB(node,bounds);
-          };
-
-        /* build the hierarchy */
-        auto root = BVHBuilderHairMSMBlur::build<NodeRef>
-          (scene, prims0, pinfo,
-           RecalculatePrimRef<NativeCurves>(scene),
-           typename BVH::CreateAlloc(bvh),
-           typename BVH::AlignedNodeMB::Create(),
-           typename BVH::AlignedNodeMB::Set(),
-           typename BVH::UnalignedNodeMB::Create(),
-           typename BVH::UnalignedNodeMB::Set(),
-           typename BVH::AlignedNodeMB4D::Create(),
-           typename BVH::AlignedNodeMB4D::Set(),
-           createLeaf,
-           bvh->scene->progressInterface,
-           settings);
-        
-        bvh->set(root.ref,root.lbounds,pinfo.num_time_segments);
-        
-        //});
-        
-        /* clear temporary data for static geometry */
-        if (scene->isStatic()) bvh->shrink();
-        bvh->cleanup();
-        bvh->postBuild(t0);
-      }
-
-      void clear() {
-      }
-    };
     
     /*! entry functions for the builder */
-    Builder* BVH4Bezier1vBuilder_OBB_New   (void* bvh, Scene* scene, size_t mode) { return new BVHNHairBuilderSAH<4,Bezier1v>((BVH4*)bvh,scene); }
-    Builder* BVH4Bezier1iBuilder_OBB_New   (void* bvh, Scene* scene, size_t mode) { return new BVHNHairBuilderSAH<4,Bezier1i>((BVH4*)bvh,scene); }
-    Builder* BVH4OBBBezier1iMBBuilder_OBB (void* bvh, Scene* scene, size_t mode) { return new BVHNHairMBlurBuilderSAH<4,Bezier1i>((BVH4*)bvh,scene); }
+    Builder* BVH4Curve4vBuilder_OBB_New   (void* bvh, Scene* scene, size_t mode) { return new BVHNHairBuilderSAH<4,Curve4v,Line4i>((BVH4*)bvh,scene); }
+    Builder* BVH4Curve4iBuilder_OBB_New   (void* bvh, Scene* scene, size_t mode) { return new BVHNHairBuilderSAH<4,Curve4i,Line4i>((BVH4*)bvh,scene); }
 
 #if defined(__AVX__)
-    Builder* BVH8Bezier1vBuilder_OBB_New   (void* bvh, Scene* scene, size_t mode) { return new BVHNHairBuilderSAH<8,Bezier1v>((BVH8*)bvh,scene); }
-    Builder* BVH8Bezier1iBuilder_OBB_New   (void* bvh, Scene* scene, size_t mode) { return new BVHNHairBuilderSAH<8,Bezier1i>((BVH8*)bvh,scene); }
-    Builder* BVH8OBBBezier1iMBBuilder_OBB (void* bvh, Scene* scene, size_t mode) { return new BVHNHairMBlurBuilderSAH<8,Bezier1i>((BVH8*)bvh,scene); }
+    Builder* BVH8Curve8vBuilder_OBB_New   (void* bvh, Scene* scene, size_t mode) { return new BVHNHairBuilderSAH<8,Curve8v,Line8i>((BVH8*)bvh,scene); }
+    Builder* BVH4Curve8iBuilder_OBB_New   (void* bvh, Scene* scene, size_t mode) { return new BVHNHairBuilderSAH<4,Curve8i,Line8i>((BVH4*)bvh,scene); }
 #endif
 
   }

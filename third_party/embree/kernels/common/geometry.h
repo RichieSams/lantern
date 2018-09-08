@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2017 Intel Corporation                                    //
+// Copyright 2009-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -17,6 +17,9 @@
 #pragma once
 
 #include "default.h"
+#include "device.h"
+#include "buffer.h"
+#include "../builders/priminfo.h"
 
 namespace embree
 {
@@ -26,7 +29,7 @@ namespace embree
   __forceinline int getTimeSegment(float time, float numTimeSegments, float& ftime)
   {
     const float timeScaled = time * numTimeSegments;
-    const float itimef = clamp(floor(timeScaled), 0.0f, numTimeSegments-1.0f);
+    const float itimef = clamp(floorf(timeScaled), 0.0f, numTimeSegments-1.0f);
     ftime = timeScaled - itimef;
     return int(itimef);
   }
@@ -49,18 +52,97 @@ namespace embree
   }
 
   /*! Base class all geometries are derived from */
-  class Geometry
+  class Geometry : public RefCount
   {
     friend class Scene;
   public:
 
     /*! type of geometry */
-    enum Type { TRIANGLE_MESH = 1, USER_GEOMETRY = 2, BEZIER_CURVES = 4, SUBDIV_MESH = 8, INSTANCE = 16, QUAD_MESH = 32, LINE_SEGMENTS = 64, GROUP = 128 };
+    enum GType
+    {
+      GTY_FLAT_LINEAR_CURVE = 0,
+      GTY_ROUND_LINEAR_CURVE = 1,
+      GTY_ORIENTED_LINEAR_CURVE = 2,
+      
+      GTY_FLAT_BEZIER_CURVE = 4,
+      GTY_ROUND_BEZIER_CURVE = 5,
+      GTY_ORIENTED_BEZIER_CURVE = 6,
+      
+      GTY_FLAT_BSPLINE_CURVE = 8,
+      GTY_ROUND_BSPLINE_CURVE = 9,
+      GTY_ORIENTED_BSPLINE_CURVE = 10,
+
+      GTY_FLAT_HERMITE_CURVE = 12,
+      GTY_ROUND_HERMITE_CURVE = 13,
+      GTY_ORIENTED_HERMITE_CURVE = 14,
+
+      GTY_TRIANGLE_MESH = 16,
+      GTY_QUAD_MESH = 17,
+      GTY_GRID_MESH = 18,
+      GTY_SUBDIV_MESH = 19,
+      
+      GTY_USER_GEOMETRY = 20,
+      GTY_INSTANCE = 21,
+      GTY_END = 22,
+
+      GTY_BASIS_LINEAR = 0,
+      GTY_BASIS_BEZIER = 4,
+      GTY_BASIS_BSPLINE = 8,
+      GTY_BASIS_HERMITE = 12,
+      GTY_BASIS_MASK = 12,
+      
+      GTY_SUBTYPE_FLAT_CURVE = 0,
+      GTY_SUBTYPE_ROUND_CURVE = 1,
+      GTY_SUBTYPE_ORIENTED_CURVE = 2,
+      GTY_SUBTYPE_MASK = 3,
+    };
+
+    enum GTypeMask
+    {
+      MTY_FLAT_LINEAR_CURVE = 1 << GTY_FLAT_LINEAR_CURVE,
+      MTY_ROUND_LINEAR_CURVE = 1 << GTY_ROUND_LINEAR_CURVE,
+      MTY_ORIENTED_LINEAR_CURVE = 1 << GTY_ORIENTED_LINEAR_CURVE,
+      
+      MTY_FLAT_BEZIER_CURVE = 1 << GTY_FLAT_BEZIER_CURVE,
+      MTY_ROUND_BEZIER_CURVE = 1 << GTY_ROUND_BEZIER_CURVE,
+      MTY_ORIENTED_BEZIER_CURVE = 1 << GTY_ORIENTED_BEZIER_CURVE,
+      
+      MTY_FLAT_BSPLINE_CURVE = 1 << GTY_FLAT_BSPLINE_CURVE,
+      MTY_ROUND_BSPLINE_CURVE = 1 << GTY_ROUND_BSPLINE_CURVE,
+      MTY_ORIENTED_BSPLINE_CURVE = 1 << GTY_ORIENTED_BSPLINE_CURVE,
+
+      MTY_FLAT_HERMITE_CURVE = 1 << GTY_FLAT_HERMITE_CURVE,
+      MTY_ROUND_HERMITE_CURVE = 1 << GTY_ROUND_HERMITE_CURVE,
+      MTY_ORIENTED_HERMITE_CURVE = 1 << GTY_ORIENTED_HERMITE_CURVE,
+
+      MTY_CURVE2 = MTY_FLAT_LINEAR_CURVE | MTY_ROUND_LINEAR_CURVE | MTY_ORIENTED_LINEAR_CURVE,
+      
+      MTY_CURVE4 = MTY_FLAT_BEZIER_CURVE | MTY_ROUND_BEZIER_CURVE | MTY_ORIENTED_BEZIER_CURVE |
+                   MTY_FLAT_BSPLINE_CURVE | MTY_ROUND_BSPLINE_CURVE | MTY_ORIENTED_BSPLINE_CURVE |
+                   MTY_FLAT_HERMITE_CURVE | MTY_ROUND_HERMITE_CURVE | MTY_ORIENTED_HERMITE_CURVE,
+
+      MTY_CURVES = MTY_CURVE2 | MTY_CURVE4,
+
+      MTY_TRIANGLE_MESH = 1 << GTY_TRIANGLE_MESH,
+      MTY_QUAD_MESH = 1 << GTY_QUAD_MESH,
+      MTY_GRID_MESH = 1 << GTY_GRID_MESH,
+      MTY_SUBDIV_MESH = 1 << GTY_SUBDIV_MESH,
+      MTY_USER_GEOMETRY = 1 << GTY_USER_GEOMETRY,
+      MTY_INSTANCE = 1 << GTY_INSTANCE,
+    };
+
+    static const char* gtype_names[GTY_END];
+
+    enum State {
+      MODIFIED = 0,
+      COMMITTED = 1,
+      BUILD = 2
+    };
 
   public:
     
     /*! Geometry constructor */
-    Geometry (Scene* scene, Type type, size_t numPrimitives, size_t numTimeSteps, RTCGeometryFlags flags);
+    Geometry (Device* device, GType gtype, unsigned int numPrimitives, unsigned int numTimeSteps);
 
     /*! Geometry destructor */
     virtual ~Geometry();
@@ -71,69 +153,77 @@ namespace embree
   public:
 
     /*! tests if geometry is enabled */
-    __forceinline bool isEnabled() const { return numPrimitives && enabled; }
+    __forceinline bool isEnabled() const { return enabled; }
 
     /*! tests if geometry is disabled */
     __forceinline bool isDisabled() const { return !isEnabled(); }
 
-    /*! tests if geomery is used by any instance (including world space instance) */
-    __forceinline bool isUsed() const { return used; }
-
-     /*! tests if geometry is used by any non-world space instance */
-    __forceinline bool isInstanced() const { return used-enabled; }
-
     /*! tests if geometry is modified */
-    __forceinline bool isModified() const { return numPrimitives && modified; }
-
-    /*! clears modified flag */
-    __forceinline void clearModified() { modified = false; }
-
-    /*! test if this is a static geometry */
-    __forceinline bool isStatic() const { return flags == RTC_GEOMETRY_STATIC; }
-
-    /*! test if this is a deformable geometry */
-    __forceinline bool isDeformable() const { return flags == RTC_GEOMETRY_DEFORMABLE; }
-
-    /*! test if this is a dynamic geometry */
-    __forceinline bool isDynamic() const { return flags == RTC_GEOMETRY_DYNAMIC; }
+    __forceinline bool isModified() const { return state != BUILD; }
 
     /*! returns geometry type */
-    __forceinline Type getType() const { return type; }
+    __forceinline GType getType() const { return gtype; }
+
+    /*! returns curve type */
+    __forceinline GType getCurveType() const { return (GType)(gtype & GTY_SUBTYPE_MASK); }
+
+    /*! returns curve basis */
+    __forceinline GType getCurveBasis() const { return (GType)(gtype & GTY_BASIS_MASK); }
+
+    /*! returns geometry type mask */
+    __forceinline GTypeMask getTypeMask() const { return (GTypeMask)(1 << gtype); }
 
     /*! returns number of primitives */
     __forceinline size_t size() const { return numPrimitives; }
 
     /*! sets the number of primitives */
-    __forceinline void setNumPrimitives(size_t numPrimitives_in)
-    { 
-      if ((ssize_t)numPrimitives_in == -1) return;
-      if (numPrimitives_in == numPrimitives) return;
-      numPrimitives = numPrimitives_in;
-      numPrimitivesChanged = true;
+    virtual void setNumPrimitives(unsigned int numPrimitives_in);
+
+    /*! sets number of time steps */
+    virtual void setNumTimeSteps (unsigned int numTimeSteps_in);
+
+    /*! sets number of vertex attributes */
+    virtual void setVertexAttributeCount (unsigned int N) {
+      throw_RTCError(RTC_ERROR_INVALID_OPERATION,"operation not supported for this geometry"); 
     }
 
+    /*! sets number of topologies */
+    virtual void setTopologyCount (unsigned int N) {
+      throw_RTCError(RTC_ERROR_INVALID_OPERATION,"operation not supported for this geometry"); 
+    }
+
+    /*! sets the build quality */
+    void setBuildQuality(RTCBuildQuality quality_in)
+    {
+      this->quality = quality_in;
+      Geometry::update();
+    }
+    
     /*! for all geometries */
   public:
 
+    Geometry* attach(Scene* scene, unsigned int geomID);
+    void detach();
+
     /*! Enable geometry. */
-    virtual void enable ();
+    virtual void enable();
 
     /*! Update geometry. */
-    virtual void update ();
+    void update();
+    
+    /*! commit of geometry */
+    virtual void commit();
 
     /*! Update geometry buffer. */
-    virtual void updateBuffer (RTCBufferType type) {
+    virtual void updateBuffer(RTCBufferType type, unsigned int slot) {
       update(); // update everything for geometries not supporting this call
     }
     
     /*! Disable geometry. */
-    virtual void disable ();
-
-    /*! Free buffers that are unused */
-    virtual void immutable () {}
+    virtual void disable();
 
     /*! Verify the geometry */
-    virtual bool verify () { return true; }
+    virtual bool verify() { return true; }
 
     /*! called if geometry is switching from disabled to enabled state */
     virtual void enabling() = 0;
@@ -143,17 +233,17 @@ namespace embree
 
     /*! called before every build */
     virtual void preCommit();
-
+  
     /*! called after every build */
     virtual void postCommit();
 
     /*! sets constant tessellation rate for the geometry */
     virtual void setTessellationRate(float N) {
-      throw_RTCError(RTC_INVALID_OPERATION,"operation not supported for this geometry"); 
+      throw_RTCError(RTC_ERROR_INVALID_OPERATION,"operation not supported for this geometry"); 
     }
 
     /*! Set user data pointer. */
-    virtual void setUserData (void* ptr);
+    virtual void setUserData(void* ptr);
       
     /*! Get user data pointer. */
     __forceinline void* getUserData() const {
@@ -161,172 +251,107 @@ namespace embree
     }
 
     /*! interpolates user data to the specified u/v location */
-    virtual void interpolate(unsigned primID, float u, float v, RTCBufferType buffer, float* P, float* dPdu, float* dPdv, float* ddPdudu, float* ddPdvdv, float* ddPdudv, size_t numFloats) {
-      throw_RTCError(RTC_INVALID_OPERATION,"operation not supported for this geometry"); 
+    virtual void interpolate(const RTCInterpolateArguments* const args) {
+      throw_RTCError(RTC_ERROR_INVALID_OPERATION,"operation not supported for this geometry"); 
     }
 
     /*! interpolates user data to the specified u/v locations */
-    virtual void interpolateN(const void* valid_i, const unsigned* primIDs, const float* u, const float* v, size_t numUVs, 
-                              RTCBufferType buffer, float* P, float* dPdu, float* dPdv, float* ddPdudu, float* ddPdvdv, float* ddPdudv, size_t numFloats);
+    virtual void interpolateN(const RTCInterpolateNArguments* const args);
 
     /*! for subdivision surfaces only */
   public:
     virtual void setSubdivisionMode (unsigned topologyID, RTCSubdivisionMode mode) {
-      throw_RTCError(RTC_INVALID_OPERATION,"operation not supported for this geometry"); 
+      throw_RTCError(RTC_ERROR_INVALID_OPERATION,"operation not supported for this geometry"); 
     }
 
-    virtual void setIndexBuffer(RTCBufferType vertexBuffer, RTCBufferType indexBuffer) {
-      throw_RTCError(RTC_INVALID_OPERATION,"operation not supported for this geometry"); 
+    virtual void setVertexAttributeTopology(unsigned int vertexBufferSlot, unsigned int indexBufferSlot) {
+      throw_RTCError(RTC_ERROR_INVALID_OPERATION,"operation not supported for this geometry"); 
+    }
+
+    /*! Set displacement function. */
+    virtual void setDisplacementFunction (RTCDisplacementFunctionN filter) {
+      throw_RTCError(RTC_ERROR_INVALID_OPERATION,"operation not supported for this geometry"); 
+    }
+
+    virtual unsigned int getFirstHalfEdge(unsigned int faceID) {
+      throw_RTCError(RTC_ERROR_INVALID_OPERATION,"operation not supported for this geometry"); 
+    }
+
+    virtual unsigned int getFace(unsigned int edgeID) {
+      throw_RTCError(RTC_ERROR_INVALID_OPERATION,"operation not supported for this geometry"); 
+    }
+    
+    virtual unsigned int getNextHalfEdge(unsigned int edgeID) {
+      throw_RTCError(RTC_ERROR_INVALID_OPERATION,"operation not supported for this geometry"); 
+    }
+
+    virtual unsigned int getPreviousHalfEdge(unsigned int edgeID) {
+      throw_RTCError(RTC_ERROR_INVALID_OPERATION,"operation not supported for this geometry"); 
+    }
+
+    virtual unsigned int getOppositeHalfEdge(unsigned int topologyID, unsigned int edgeID) {
+      throw_RTCError(RTC_ERROR_INVALID_OPERATION,"operation not supported for this geometry"); 
     }
 
     /*! for triangle meshes and bezier curves only */
   public:
 
+
     /*! Sets ray mask. */
-    virtual void setMask (unsigned mask) { 
-      throw_RTCError(RTC_INVALID_OPERATION,"operation not supported for this geometry"); 
+    virtual void setMask(unsigned mask) { 
+      throw_RTCError(RTC_ERROR_INVALID_OPERATION,"operation not supported for this geometry"); 
     }
-
-    /*! Maps specified buffer. */
-    virtual void* map(RTCBufferType type) { 
-      throw_RTCError(RTC_INVALID_OPERATION,"operation not supported for this geometry"); 
-      return nullptr; 
-    }
-
-    /*! Unmap specified buffer. */
-    virtual void unmap(RTCBufferType type) { 
-      throw_RTCError(RTC_INVALID_OPERATION,"operation not supported for this geometry"); 
-    }
-
+    
     /*! Sets specified buffer. */
-    virtual void setBuffer(RTCBufferType type, void* ptr, size_t offset, size_t stride, size_t size) { 
-      throw_RTCError(RTC_INVALID_OPERATION,"operation not supported for this geometry"); 
+    virtual void setBuffer(RTCBufferType type, unsigned int slot, RTCFormat format, const Ref<Buffer>& buffer, size_t offset, size_t stride, unsigned int num) {
+      throw_RTCError(RTC_ERROR_INVALID_OPERATION,"operation not supported for this geometry"); 
     }
 
-    /*! Set displacement function. */
-    virtual void setDisplacementFunction (RTCDisplacementFunc filter, RTCBounds* bounds) {
-      throw_RTCError(RTC_INVALID_OPERATION,"operation not supported for this geometry"); 
+    /*! Gets specified buffer. */
+    virtual void* getBuffer(RTCBufferType type, unsigned int slot) {
+      throw_RTCError(RTC_ERROR_INVALID_OPERATION,"operation not supported for this geometry");
     }
-
-    /*! Set displacement function. */
-    virtual void setDisplacementFunction2 (RTCDisplacementFunc2 filter, RTCBounds* bounds) {
-      throw_RTCError(RTC_INVALID_OPERATION,"operation not supported for this geometry"); 
-    }
-
-    /*! Set intersection filter function for single rays. */
-    virtual void setIntersectionFilterFunction (RTCFilterFunc filter, bool ispc = false);
-    
-    /*! Set intersection filter function for ray packets of size 4. */
-    virtual void setIntersectionFilterFunction4 (RTCFilterFunc4 filter4, bool ispc = false);
-    
-    /*! Set intersection filter function for ray packets of size 8. */
-    virtual void setIntersectionFilterFunction8 (RTCFilterFunc8 filter8, bool ispc = false);
-    
-    /*! Set intersection filter function for ray packets of size 16. */
-    virtual void setIntersectionFilterFunction16 (RTCFilterFunc16 filter16, bool ispc = false);
 
     /*! Set intersection filter function for ray packets of size N. */
-    virtual void setIntersectionFilterFunctionN (RTCFilterFuncN filterN);
-
-    /*! Set occlusion filter function for single rays. */
-    virtual void setOcclusionFilterFunction (RTCFilterFunc filter, bool ispc = false);
-    
-    /*! Set occlusion filter function for ray packets of size 4. */
-    virtual void setOcclusionFilterFunction4 (RTCFilterFunc4 filter4, bool ispc = false);
-    
-    /*! Set occlusion filter function for ray packets of size 8. */
-    virtual void setOcclusionFilterFunction8 (RTCFilterFunc8 filter8, bool ispc = false);
-    
-    /*! Set occlusion filter function for ray packets of size 16. */
-    virtual void setOcclusionFilterFunction16 (RTCFilterFunc16 filter16, bool ispc = false);
+    virtual void setIntersectionFilterFunctionN (RTCFilterFunctionN filterN);
 
     /*! Set occlusion filter function for ray packets of size N. */
-    virtual void setOcclusionFilterFunctionN (RTCFilterFuncN filterN);
+    virtual void setOcclusionFilterFunctionN (RTCFilterFunctionN filterN);
 
     /*! for instances only */
   public:
+
+    /*! Sets the instanced scene */
+    virtual void setInstancedScene(const Ref<Scene>& scene) {
+      throw_RTCError(RTC_ERROR_INVALID_OPERATION,"operation not supported for this geometry"); 
+    }
     
     /*! Sets transformation of the instance */
-    virtual void setTransform(const AffineSpace3fa& transform, size_t timeStep) {
-      throw_RTCError(RTC_INVALID_OPERATION,"operation not supported for this geometry"); 
+    virtual void setTransform(const AffineSpace3fa& transform, unsigned int timeStep) {
+      throw_RTCError(RTC_ERROR_INVALID_OPERATION,"operation not supported for this geometry"); 
+    }
+
+    /*! Returns the transformation of the instance */
+    virtual AffineSpace3fa getTransform(float time) {
+      throw_RTCError(RTC_ERROR_INVALID_OPERATION,"operation not supported for this geometry"); 
     }
 
     /*! for user geometries only */
   public:
 
     /*! Set bounds function. */
-    virtual void setBoundsFunction (RTCBoundsFunc bounds) { 
-      throw_RTCError(RTC_INVALID_OPERATION,"operation not supported for this geometry"); 
-    }
-
-    /*! Set bounds function. */
-    virtual void setBoundsFunction2 (RTCBoundsFunc2 bounds, void* userPtr) { 
-      throw_RTCError(RTC_INVALID_OPERATION,"operation not supported for this geometry"); 
-    }
-
-    /*! Set bounds function. */
-    virtual void setBoundsFunction3 (RTCBoundsFunc3 bounds, void* userPtr) { 
-      throw_RTCError(RTC_INVALID_OPERATION,"operation not supported for this geometry"); 
-    }
-
-    /*! Set intersect function for single rays. */
-    virtual void setIntersectFunction (RTCIntersectFunc intersect, bool ispc = false) { 
-      throw_RTCError(RTC_INVALID_OPERATION,"operation not supported for this geometry"); 
-    }
-    
-    /*! Set intersect function for ray packets of size 4. */
-    virtual void setIntersectFunction4 (RTCIntersectFunc4 intersect4, bool ispc = false) { 
-      throw_RTCError(RTC_INVALID_OPERATION,"operation not supported for this geometry"); 
-    }
-    
-    /*! Set intersect function for ray packets of size 8. */
-    virtual void setIntersectFunction8 (RTCIntersectFunc8 intersect8, bool ispc = false) { 
-      throw_RTCError(RTC_INVALID_OPERATION,"operation not supported for this geometry"); 
-    }
-    
-    /*! Set intersect function for ray packets of size 16. */
-    virtual void setIntersectFunction16 (RTCIntersectFunc16 intersect16, bool ispc = false) { 
-      throw_RTCError(RTC_INVALID_OPERATION,"operation not supported for this geometry"); 
-    }
-
-    /*! Set intersect function for streams of single rays. */
-    virtual void setIntersectFunction1Mp (RTCIntersectFunc1Mp intersect) { 
-      throw_RTCError(RTC_INVALID_OPERATION,"operation not supported for this geometry"); 
+    virtual void setBoundsFunction (RTCBoundsFunction bounds, void* userPtr) { 
+      throw_RTCError(RTC_ERROR_INVALID_OPERATION,"operation not supported for this geometry"); 
     }
 
     /*! Set intersect function for ray packets of size N. */
-    virtual void setIntersectFunctionN (RTCIntersectFuncN intersect) { 
-      throw_RTCError(RTC_INVALID_OPERATION,"operation not supported for this geometry"); 
+    virtual void setIntersectFunctionN (RTCIntersectFunctionN intersect) { 
+      throw_RTCError(RTC_ERROR_INVALID_OPERATION,"operation not supported for this geometry"); 
     }
     
-    /*! Set occlusion function for single rays. */
-    virtual void setOccludedFunction (RTCOccludedFunc occluded, bool ispc = false) { 
-      throw_RTCError(RTC_INVALID_OPERATION,"operation not supported for this geometry"); 
-    }
-    
-    /*! Set occlusion function for ray packets of size 4. */
-    virtual void setOccludedFunction4 (RTCOccludedFunc4 occluded4, bool ispc = false) { 
-      throw_RTCError(RTC_INVALID_OPERATION,"operation not supported for this geometry"); 
-    }
-    
-    /*! Set occlusion function for ray packets of size 8. */
-    virtual void setOccludedFunction8 (RTCOccludedFunc8 occluded8, bool ispc = false) { 
-      throw_RTCError(RTC_INVALID_OPERATION,"operation not supported for this geometry"); 
-    }
-    
-    /*! Set occlusion function for ray packets of size 16. */
-    virtual void setOccludedFunction16 (RTCOccludedFunc16 occluded16, bool ispc = false) { 
-      throw_RTCError(RTC_INVALID_OPERATION,"operation not supported for this geometry"); 
-    }
-
-    /*! Set occlusion function for streams of single rays. */
-    virtual void setOccludedFunction1Mp (RTCOccludedFunc1Mp occluded) { 
-      throw_RTCError(RTC_INVALID_OPERATION,"operation not supported for this geometry"); 
-    }
-
     /*! Set occlusion function for ray packets of size N. */
-    virtual void setOccludedFunctionN (RTCOccludedFuncN occluded) { 
-      throw_RTCError(RTC_INVALID_OPERATION,"operation not supported for this geometry"); 
+    virtual void setOccludedFunctionN (RTCOccludedFunctionN occluded) { 
+      throw_RTCError(RTC_ERROR_INVALID_OPERATION,"operation not supported for this geometry"); 
     }
 
     /*! returns number of time segments */
@@ -335,71 +360,84 @@ namespace embree
     }
 
   public:
-    __forceinline bool hasIntersectionFilter1() const { return (hasIntersectionFilterMask & (HAS_FILTER1 | HAS_FILTERN)) != 0;  }
-    __forceinline bool hasOcclusionFilter1   () const { return (hasOcclusionFilterMask    & (HAS_FILTER1 | HAS_FILTERN)) != 0; }
-    template<typename simd> __forceinline bool hasIntersectionFilter() const;
-    template<typename simd> __forceinline bool hasOcclusionFilter() const;
 
-    template<typename simd> __forceinline bool hasISPCIntersectionFilter() const;
-    template<typename simd> __forceinline bool hasISPCOcclusionFilter() const;
+    virtual PrimInfo createPrimRefArray(mvector<PrimRef>& prims, const range<size_t>& r, size_t k) const {
+      throw_RTCError(RTC_ERROR_INVALID_OPERATION,"createPrimRefArray not implemented for this geometry"); 
+    }
 
-  public:
-    Scene* scene;              //!< pointer to scene this mesh belongs to
-    unsigned geomID;           //!< internal geometry ID
-    Type type;                 //!< geometry type 
-    size_t numPrimitives;      //!< number of primitives of this geometry
-    bool numPrimitivesChanged; //!< true if number of primitives changed
-    unsigned numTimeSteps;     //!< number of time steps
-    float fnumTimeSegments;    //!< number of time segments (precalculation)
-    RTCGeometryFlags flags;    //!< flags of geometry
-    bool enabled;              //!< true if geometry is enabled
-    bool modified;             //!< true if geometry is modified
-    void* userPtr;             //!< user pointer
-    unsigned mask;             //!< for masking out geometry
-    std::atomic<size_t> used;  //!< counts by how many enabled instances this geometry is used
+    virtual PrimInfo createPrimRefArrayMB(mvector<PrimRef>& prims, size_t itime, const range<size_t>& r, size_t k) const {
+      throw_RTCError(RTC_ERROR_INVALID_OPERATION,"createPrimRefMBArray not implemented for this geometry"); 
+    }
+
+    virtual PrimInfoMB createPrimRefMBArray(mvector<PrimRefMB>& prims, const BBox1f& t0t1, const range<size_t>& r, size_t k) const {
+      throw_RTCError(RTC_ERROR_INVALID_OPERATION,"createPrimRefMBArray not implemented for this geometry"); 
+    }
+
+    virtual LinearSpace3fa computeAlignedSpace(const size_t primID) const {
+      throw_RTCError(RTC_ERROR_INVALID_OPERATION,"computeAlignedSpace not implemented for this geometry"); 
+    }
+
+    virtual LinearSpace3fa computeAlignedSpaceMB(const size_t primID, const BBox1f time_range) const {
+      throw_RTCError(RTC_ERROR_INVALID_OPERATION,"computeAlignedSpace not implemented for this geometry"); 
+    }
+    
+    virtual Vec3fa computeDirection(unsigned int primID) const {
+      throw_RTCError(RTC_ERROR_INVALID_OPERATION,"computeDirection not implemented for this geometry"); 
+    }
+
+    virtual Vec3fa computeDirection(unsigned int primID, size_t time) const {
+      throw_RTCError(RTC_ERROR_INVALID_OPERATION,"computeDirection not implemented for this geometry"); 
+    }
+
+    virtual BBox3fa vbounds(size_t primID) const {
+      throw_RTCError(RTC_ERROR_INVALID_OPERATION,"vbounds not implemented for this geometry"); 
+    }
+    
+    virtual BBox3fa vbounds(const LinearSpace3fa& space, size_t primID) const {
+      throw_RTCError(RTC_ERROR_INVALID_OPERATION,"vbounds not implemented for this geometry"); 
+    }
+
+    virtual BBox3fa vbounds(const Vec3fa& ofs, const float scale, const float r_scale0, const LinearSpace3fa& space, size_t i, size_t itime = 0) const {
+      throw_RTCError(RTC_ERROR_INVALID_OPERATION,"vbounds not implemented for this geometry"); 
+    }
+
+    virtual LBBox3fa vlinearBounds(size_t primID, const BBox1f& time_range) const {
+      throw_RTCError(RTC_ERROR_INVALID_OPERATION,"vlinearBounds not implemented for this geometry"); 
+    }
+    
+    virtual LBBox3fa vlinearBounds(const LinearSpace3fa& space, size_t primID, const BBox1f& time_range) const {
+      throw_RTCError(RTC_ERROR_INVALID_OPERATION,"vlinearBounds not implemented for this geometry"); 
+    }
+
+    virtual LBBox3fa vlinearBounds(const Vec3fa& ofs, const float scale, const float r_scale0, const LinearSpace3fa& space, size_t primID, const BBox1f& time_range) const {
+      throw_RTCError(RTC_ERROR_INVALID_OPERATION,"vlinearBounds not implemented for this geometry"); 
+    }
     
   public:
-    RTCFilterFunc intersectionFilter1;
-    RTCFilterFunc occlusionFilter1;
+    __forceinline bool hasIntersectionFilter() const { return intersectionFilterN != nullptr; }
+    __forceinline bool hasOcclusionFilter() const { return occlusionFilterN != nullptr; }
 
-    RTCFilterFunc4 intersectionFilter4;
-    RTCFilterFunc4 occlusionFilter4;
+  public:
+    Device* device;             //!< device this geometry belongs to
+    Scene* scene;               //!< pointer to scene this mesh belongs to
 
-    RTCFilterFunc8 intersectionFilter8;
-    RTCFilterFunc8 occlusionFilter8;
-
-    RTCFilterFunc16 intersectionFilter16;
-    RTCFilterFunc16 occlusionFilter16;
-
-    RTCFilterFuncN intersectionFilterN;
-    RTCFilterFuncN occlusionFilterN;
-
-  public: 
-    enum { HAS_FILTER1 = 1, HAS_FILTER4 = 2, HAS_FILTER8 = 4, HAS_FILTER16 = 8, HAS_FILTERN = 16 };  
-    int hasIntersectionFilterMask;
-    int hasOcclusionFilterMask;
-    int ispcIntersectionFilterMask;
-    int ispcOcclusionFilterMask;
+    void* userPtr;             //!< user pointer
+    unsigned int geomID;        //!< internal geometry ID
+    unsigned int numPrimitives; //!< number of primitives of this geometry
+    
+    unsigned int numTimeSteps;     //!< number of time steps
+    float fnumTimeSegments;    //!< number of time segments (precalculation)
+    unsigned int mask;             //!< for masking out geometry
+    struct {
+      GType gtype : 6;                 //!< geometry type
+      RTCBuildQuality quality : 3;    //!< build quality for geometry
+      State state : 2;
+      bool numPrimitivesChanged : 1; //!< true if number of primitives changed
+      bool enabled : 1;              //!< true if geometry is enabled
+    };
+        
+  public:
+    RTCFilterFunctionN intersectionFilterN;
+    RTCFilterFunctionN occlusionFilterN;
   };
-
-#if defined(__SSE__)
-  template<> __forceinline bool Geometry::hasIntersectionFilter<vfloat4>() const { return (hasIntersectionFilterMask & (HAS_FILTER4 | HAS_FILTERN)) != 0; }
-  template<> __forceinline bool Geometry::hasOcclusionFilter   <vfloat4>() const { return (hasOcclusionFilterMask    & (HAS_FILTER4 | HAS_FILTERN)) != 0; }
-  template<> __forceinline bool Geometry::hasISPCIntersectionFilter<vfloat4>() const { return (ispcIntersectionFilterMask & HAS_FILTER4) != 0; }
-  template<> __forceinline bool Geometry::hasISPCOcclusionFilter   <vfloat4>() const { return (ispcOcclusionFilterMask    & HAS_FILTER4) != 0; }
-#endif
-
-#if defined(__AVX__)
-  template<> __forceinline bool Geometry::hasIntersectionFilter<vfloat8>() const { return (hasIntersectionFilterMask & (HAS_FILTER8 | HAS_FILTERN)) != 0; }
-  template<> __forceinline bool Geometry::hasOcclusionFilter   <vfloat8>() const { return (hasOcclusionFilterMask    & (HAS_FILTER8 | HAS_FILTERN)) != 0; }
-  template<> __forceinline bool Geometry::hasISPCIntersectionFilter<vfloat8>() const { return (ispcIntersectionFilterMask & HAS_FILTER8) != 0; }
-  template<> __forceinline bool Geometry::hasISPCOcclusionFilter   <vfloat8>() const { return (ispcOcclusionFilterMask    & HAS_FILTER8) != 0; }
-#endif
-
-#if defined(__AVX512F__)
-  template<> __forceinline bool Geometry::hasIntersectionFilter<vfloat16>() const { return (hasIntersectionFilterMask & (HAS_FILTER16 | HAS_FILTERN)) != 0; }
-  template<> __forceinline bool Geometry::hasOcclusionFilter   <vfloat16>() const { return (hasOcclusionFilterMask    & (HAS_FILTER16 | HAS_FILTERN)) != 0; }
-  template<> __forceinline bool Geometry::hasISPCIntersectionFilter<vfloat16>() const { return (ispcIntersectionFilterMask & HAS_FILTER16) != 0; }
-  template<> __forceinline bool Geometry::hasISPCOcclusionFilter   <vfloat16>() const { return (ispcOcclusionFilterMask    & HAS_FILTER16) != 0; }
-#endif
 }

@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2017 Intel Corporation                                    //
+// Copyright 2009-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -25,7 +25,7 @@ namespace embree
   struct QuadMesh : public Geometry
   {
     /*! type of this geometry */
-    static const Geometry::Type geom_type = Geometry::QUAD_MESH;
+    static const Geometry::GTypeMask geom_type = Geometry::MTY_QUAD_MESH;
     
     /*! triangle indices */
     struct Quad
@@ -41,29 +41,24 @@ namespace embree
   public:
 
     /*! quad mesh construction */
-    QuadMesh (Scene* scene, RTCGeometryFlags flags, size_t numQuads, size_t numVertices, size_t numTimeSteps); 
+    QuadMesh (Device* device); 
   
     /* geometry interface */
   public:
     void enabling();
     void disabling();
-    void setMask (unsigned mask);
-    void setBuffer(RTCBufferType type, void* ptr, size_t offset, size_t stride, size_t size);
-    void* map(RTCBufferType type);
-    void unmap(RTCBufferType type);
+    void setMask(unsigned mask);
+    void setNumTimeSteps (unsigned int numTimeSteps);
+    void setVertexAttributeCount (unsigned int N);
+    void setBuffer(RTCBufferType type, unsigned int slot, RTCFormat format, const Ref<Buffer>& buffer, size_t offset, size_t stride, unsigned int num);
+    void* getBuffer(RTCBufferType type, unsigned int slot);
+    void updateBuffer(RTCBufferType type, unsigned int slot);
     void preCommit();
-    void postCommit ();
-    void immutable ();
-    bool verify ();
-    void interpolate(unsigned primID, float u, float v, RTCBufferType buffer, float* P, float* dPdu, float* dPdv, float* ddPdudu, float* ddPdvdv, float* ddPdudv, size_t numFloats);
-    // FIXME: implement interpolateN
+    void postCommit();
+    bool verify();
+    void interpolate(const RTCInterpolateArguments* const args);
 
   public:
-
-    /*! returns number of quads */
-    __forceinline size_t size() const {
-      return quads.size();
-    }
 
     /*! returns number of vertices */
     __forceinline size_t numVertices() const {
@@ -156,7 +151,7 @@ namespace embree
       if (q.v[2] >= numVertices()) return false;
       if (q.v[3] >= numVertices()) return false;
 
-      for (size_t t=0; t<numTimeSteps; t++)
+      for (unsigned int t=0; t<numTimeSteps; t++)
       {
         const Vec3fa v0 = vertex(q.v[0],t);
         const Vec3fa v1 = vertex(q.v[1],t);
@@ -210,21 +205,67 @@ namespace embree
       return true;
     }
 
+    /* returns true if topology changed */
+    bool topologyChanged() const {
+      return quads.isModified() || numPrimitivesChanged;
+    }
+
   public:
-    APIBuffer<Quad> quads;                            //!< array of quads
-    BufferRefT<Vec3fa> vertices0;                     //!< fast access to first vertex buffer
-    vector<APIBuffer<Vec3fa>> vertices;               //!< vertex array for each timestep
-    vector<APIBuffer<char>> userbuffers;              //!< user buffers
+    BufferView<Quad> quads;                 //!< array of quads
+    BufferView<Vec3fa> vertices0;           //!< fast access to first vertex buffer
+    vector<BufferView<Vec3fa>> vertices;    //!< vertex array for each timestep
+    vector<BufferView<char>> vertexAttribs; //!< vertex attribute buffers
   };
 
   namespace isa
   {
     struct QuadMeshISA : public QuadMesh
     {
-      QuadMeshISA (Scene* scene, RTCGeometryFlags flags, size_t numQuads, size_t numVertices, size_t numTimeSteps)
-        : QuadMesh(scene,flags,numQuads,numVertices,numTimeSteps) {}
+      QuadMeshISA (Device* device)
+        : QuadMesh(device) {}
+
+      PrimInfo createPrimRefArray(mvector<PrimRef>& prims, const range<size_t>& r, size_t k) const
+      {
+        PrimInfo pinfo(empty);
+        for (size_t j=r.begin(); j<r.end(); j++)
+        {
+          BBox3fa bounds = empty;
+          if (!buildBounds(j,&bounds)) continue;
+          const PrimRef prim(bounds,geomID,unsigned(j));
+          pinfo.add_center2(prim);
+          prims[k++] = prim;
+        }
+        return pinfo;
+      }
+
+      PrimInfo createPrimRefArrayMB(mvector<PrimRef>& prims, size_t itime, const range<size_t>& r, size_t k) const
+      {
+        PrimInfo pinfo(empty);
+        for (size_t j=r.begin(); j<r.end(); j++)
+        {
+          BBox3fa bounds = empty;
+          if (!buildBounds(j,itime,bounds)) continue;
+          const PrimRef prim(bounds,geomID,unsigned(j));
+          pinfo.add_center2(prim);
+          prims[k++] = prim;
+        }
+        return pinfo;
+      }
+      
+      PrimInfoMB createPrimRefMBArray(mvector<PrimRefMB>& prims, const BBox1f& t0t1, const range<size_t>& r, size_t k) const
+      {
+        PrimInfoMB pinfo(empty);
+        for (size_t j=r.begin(); j<r.end(); j++)
+        {
+          if (!valid(j, getTimeSegmentRange(t0t1, fnumTimeSegments))) continue;
+          const PrimRefMB prim(linearBounds(j,t0t1),this->numTimeSegments(),this->numTimeSegments(),this->geomID,unsigned(j));
+          pinfo.add_primref(prim);
+          prims[k++] = prim;
+        }
+        return pinfo;
+      }
     };
   }
 
-  DECLARE_ISA_FUNCTION(QuadMesh*, createQuadMesh, Scene* COMMA RTCGeometryFlags COMMA size_t COMMA size_t COMMA size_t);
+  DECLARE_ISA_FUNCTION(QuadMesh*, createQuadMesh, Device*);
 }

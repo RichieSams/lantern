@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2017 Intel Corporation                                    //
+// Copyright 2009-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -28,7 +28,7 @@ namespace embree
 
   struct __aligned(16) Vec3ba
   {
-    ALIGNED_STRUCT;
+    ALIGNED_STRUCT_(16);
     
     union {
       __m128 m128;
@@ -48,12 +48,12 @@ namespace embree
     __forceinline Vec3ba& operator =(const Vec3ba& other) { m128 = other.m128; return *this; }
 
     __forceinline explicit Vec3ba( bool a )
-      : m128(_mm_lookupmask_ps[(size_t(a) << 3) | (size_t(a) << 2) | (size_t(a) << 1) | size_t(a)]) {}
+      : m128(mm_lookupmask_ps[(size_t(a) << 3) | (size_t(a) << 2) | (size_t(a) << 1) | size_t(a)]) {}
     __forceinline Vec3ba( bool a, bool b, bool c)
-      : m128(_mm_lookupmask_ps[(size_t(c) << 2) | (size_t(b) << 1) | size_t(a)]) {}
+      : m128(mm_lookupmask_ps[(size_t(c) << 2) | (size_t(b) << 1) | size_t(a)]) {}
 
-    __forceinline operator const __m128&( void ) const { return m128; }
-    __forceinline operator       __m128&( void )       { return m128; }
+    __forceinline operator const __m128&() const { return m128; }
+    __forceinline operator       __m128&()       { return m128; }
 
     ////////////////////////////////////////////////////////////////////////////////
     /// Constants
@@ -75,23 +75,23 @@ namespace embree
   /// Unary Operators
   ////////////////////////////////////////////////////////////////////////////////
 
-  __forceinline const Vec3ba operator !( const Vec3ba& a ) { return _mm_xor_ps(a.m128, Vec3ba(embree::True)); }
+  __forceinline Vec3ba operator !( const Vec3ba& a ) { return _mm_xor_ps(a.m128, Vec3ba(embree::True)); }
 
   ////////////////////////////////////////////////////////////////////////////////
   /// Binary Operators
   ////////////////////////////////////////////////////////////////////////////////
 
-  __forceinline const Vec3ba operator &( const Vec3ba& a, const Vec3ba& b ) { return _mm_and_ps(a.m128, b.m128); }
-  __forceinline const Vec3ba operator |( const Vec3ba& a, const Vec3ba& b ) { return _mm_or_ps (a.m128, b.m128); }
-  __forceinline const Vec3ba operator ^( const Vec3ba& a, const Vec3ba& b ) { return _mm_xor_ps(a.m128, b.m128); }
+  __forceinline Vec3ba operator &( const Vec3ba& a, const Vec3ba& b ) { return _mm_and_ps(a.m128, b.m128); }
+  __forceinline Vec3ba operator |( const Vec3ba& a, const Vec3ba& b ) { return _mm_or_ps (a.m128, b.m128); }
+  __forceinline Vec3ba operator ^( const Vec3ba& a, const Vec3ba& b ) { return _mm_xor_ps(a.m128, b.m128); }
   
   ////////////////////////////////////////////////////////////////////////////////
   /// Assignment Operators
   ////////////////////////////////////////////////////////////////////////////////
   
-  __forceinline const Vec3ba operator &=( Vec3ba& a, const Vec3ba& b ) { return a = a & b; }
-  __forceinline const Vec3ba operator |=( Vec3ba& a, const Vec3ba& b ) { return a = a | b; }
-  __forceinline const Vec3ba operator ^=( Vec3ba& a, const Vec3ba& b ) { return a = a ^ b; }
+  __forceinline Vec3ba& operator &=( Vec3ba& a, const Vec3ba& b ) { return a = a & b; }
+  __forceinline Vec3ba& operator |=( Vec3ba& a, const Vec3ba& b ) { return a = a | b; }
+  __forceinline Vec3ba& operator ^=( Vec3ba& a, const Vec3ba& b ) { return a = a ^ b; }
   
   ////////////////////////////////////////////////////////////////////////////////
   /// Comparison Operators + Select

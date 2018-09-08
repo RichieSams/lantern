@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2017 Intel Corporation                                    //
+// Copyright 2009-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -69,13 +69,19 @@ namespace embree
   template<int N> using vreal = vfloat<N>;
   template<int N> using vbool = vboolf<N>;
 
-  /* Maximum supported varying size */
-#if defined(__AVX512F__)
+  /* Varying size constants */
+#if defined(__AVX512VL__) // SKX
+  const int VSIZEX = 8;  // default size
+  const int VSIZEL = 16; // large size
+#elif defined(__AVX512F__) // KNL
   const int VSIZEX = 16;
+  const int VSIZEL = 16;
 #elif defined(__AVX__)
   const int VSIZEX = 8;
+  const int VSIZEL = 8;
 #else
   const int VSIZEX = 4;
+  const int VSIZEL = 4;
 #endif
 
   /* Extends varying size N to optimal or up to max(N, N2) */
@@ -109,6 +115,7 @@ namespace embree
   typedef vdouble<8> vdouble8;
   typedef vreal<8>   vreal8;
   typedef vint<8>    vint8;
+  typedef vuint<8>    vuint8;
   typedef vllong<8>  vllong8;
   typedef vbool<8>   vbool8;
   typedef vboolf<8>  vboolf8;
@@ -125,11 +132,12 @@ namespace embree
   typedef vboolf<16>  vboolf16;
   typedef vboold<16>  vboold16;
 
-  /* Maximum shortcuts */
+  /* Default shortcuts */
   typedef vfloat<VSIZEX>  vfloatx;
   typedef vdouble<VSIZEX> vdoublex;
   typedef vreal<VSIZEX>   vrealx;
   typedef vint<VSIZEX>    vintx;
+  typedef vuint<VSIZEX>   vuintx;
   typedef vllong<VSIZEX>  vllongx;
   typedef vbool<VSIZEX>   vboolx;
   typedef vboolf<VSIZEX>  vboolfx;

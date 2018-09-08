@@ -1,5 +1,5 @@
 ## ======================================================================== ##
-## Copyright 2009-2017 Intel Corporation                                    ##
+## Copyright 2009-2018 Intel Corporation                                    ##
 ##                                                                          ##
 ## Licensed under the Apache License, Version 2.0 (the "License");          ##
 ## you may not use this file except in compliance with the License.         ##
@@ -23,7 +23,6 @@ ADD_LIBRARY(sys STATIC
   filename.cpp
   library.cpp
   thread.cpp
-  network.cpp
   string.cpp
   regression.cpp
   mutex.cpp
@@ -33,3 +32,9 @@ ADD_LIBRARY(sys STATIC
 
 TARGET_LINK_LIBRARIES(sys ${CMAKE_THREAD_LIBS_INIT} ${CMAKE_DL_LIBS})
 SET_PROPERTY(TARGET sys PROPERTY FOLDER common)
+SET_PROPERTY(TARGET sys APPEND PROPERTY COMPILE_FLAGS " ${FLAGS_LOWEST}")
+
+IF (EMBREE_STATIC_LIB)
+  INSTALL(TARGETS sys ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT devel)
+  SIGN_TARGET(sys)
+ENDIF()

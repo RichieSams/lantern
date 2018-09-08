@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2017 Intel Corporation                                    //
+// Copyright 2009-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -15,7 +15,7 @@
 // ======================================================================== //
 
 #include "state.h"
-#include "../common/lexers/streamfilters.h"
+#include "../../common/lexers/streamfilters.h"
 
 namespace embree
 {
@@ -41,13 +41,13 @@ namespace embree
     if (stored_error) return stored_error;
 
     Lock<MutexSys> lock(errors_mutex);
-    stored_error = new RTCError(RTC_NO_ERROR);
+    stored_error = new RTCError(RTC_ERROR_NONE);
     thread_errors.push_back(stored_error);
     setTls(thread_error,stored_error);
     return stored_error;
   }
 
-  State::State (bool singledevice) 
+  State::State () 
     : enabled_cpu_features(getCPUFeatures()),
       enabled_builder_cpu_features(enabled_cpu_features)
   {
@@ -97,15 +97,13 @@ namespace embree
 
     tessellation_cache_size = 128*1024*1024;
 
-    /* large default cache size only for old mode single device mode */
-#if defined(__X86_64__)
-      if (singledevice) tessellation_cache_size = 1024*1024*1024;
-#else
-      if (singledevice) tessellation_cache_size = 128*1024*1024;
-#endif
-
     subdiv_accel = "default";
     subdiv_accel_mb = "default";
+
+    grid_accel = "default";
+    grid_builder = "default";
+    grid_accel_mb = "default";
+    grid_builder_mb = "default";
 
     instancing_open_min = 0;
     instancing_block_size = 0;
@@ -115,6 +113,7 @@ namespace embree
 
     ignore_config_files = false;
     float_exceptions = false;
+    quality_flags = -1;
     scene_flags = -1;
     verbose = 0;
     benchmark = 0;
@@ -143,11 +142,9 @@ namespace embree
     alloc_single_thread_alloc = -1;
 
     error_function = nullptr;
-    error_function2 = nullptr;
     error_function_userptr = nullptr;
 
     memory_monitor_function = nullptr;
-    memory_monitor_function2 = nullptr;
     memory_monitor_userptr = nullptr;
   }
 
@@ -380,28 +377,38 @@ namespace embree
         subdiv_accel = cin->get().Identifier();
       else if (tok == Token::Id("subdiv_accel_mb") && cin->trySymbol("="))
         subdiv_accel_mb = cin->get().Identifier();
+
+      else if (tok == Token::Id("grid_accel") && cin->trySymbol("="))
+        grid_accel = cin->get().Identifier();
+      else if (tok == Token::Id("grid_accel_mb") && cin->trySymbol("="))
+        grid_accel_mb = cin->get().Identifier();
       
       else if (tok == Token::Id("verbose") && cin->trySymbol("="))
         verbose = cin->get().Int();
       else if (tok == Token::Id("benchmark") && cin->trySymbol("="))
         benchmark = cin->get().Int();
       
-      else if (tok == Token::Id("flags")) {
+      else if (tok == Token::Id("quality")) {
+        if (cin->trySymbol("=")) {
+          Token flag = cin->get();
+          if      (flag == Token::Id("low"))    quality_flags = RTC_BUILD_QUALITY_LOW;
+          else if (flag == Token::Id("medium")) quality_flags = RTC_BUILD_QUALITY_MEDIUM;
+          else if (flag == Token::Id("high"))   quality_flags = RTC_BUILD_QUALITY_HIGH;
+        }
+      }
+
+      else if (tok == Token::Id("scene_flags")) {
         scene_flags = 0;
         if (cin->trySymbol("=")) {
           do {
             Token flag = cin->get();
-            if      (flag == Token::Id("static") ) scene_flags |= RTC_SCENE_STATIC;
-            else if (flag == Token::Id("dynamic")) scene_flags |= RTC_SCENE_DYNAMIC;
-            else if (flag == Token::Id("compact")) scene_flags |= RTC_SCENE_COMPACT;
-            else if (flag == Token::Id("coherent")) scene_flags |= RTC_SCENE_COHERENT;
-            else if (flag == Token::Id("incoherent")) scene_flags |= RTC_SCENE_INCOHERENT;
-            else if (flag == Token::Id("high_quality")) scene_flags |= RTC_SCENE_HIGH_QUALITY;
-            else if (flag == Token::Id("robust")) scene_flags |= RTC_SCENE_ROBUST;
+            if (flag == Token::Id("dynamic") ) scene_flags |= RTC_SCENE_FLAG_DYNAMIC;
+            else if (flag == Token::Id("compact")) scene_flags |= RTC_SCENE_FLAG_COMPACT;
+            else if (flag == Token::Id("robust")) scene_flags |= RTC_SCENE_FLAG_ROBUST;
           } while (cin->trySymbol("|"));
         }
       }
-
+      
       else if (tok == Token::Id("max_spatial_split_replications") && cin->trySymbol("="))
         max_spatial_split_replications = cin->get().Float();
 
@@ -485,6 +492,14 @@ namespace embree
     
     std::cout << "subdivision surfaces:" << std::endl;
     std::cout << "  accel         = " << subdiv_accel << std::endl;
+
+    std::cout << "grids:" << std::endl;
+    std::cout << "  accel         = " << grid_accel << std::endl;
+    std::cout << "  builder       = " << grid_builder << std::endl;
+
+    std::cout << "motion blur grids:" << std::endl;
+    std::cout << "  accel         = " << grid_accel_mb << std::endl;
+    std::cout << "  builder       = " << grid_builder_mb << std::endl;
 
     std::cout << "object_accel:" << std::endl;
     std::cout << "  min_leaf_size = " << object_accel_min_leaf_size << std::endl;

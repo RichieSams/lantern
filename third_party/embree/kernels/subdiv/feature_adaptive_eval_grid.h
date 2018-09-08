@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2017 Intel Corporation                                    //
+// Copyright 2009-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -279,7 +279,7 @@ namespace embree
       
       const unsigned y0s = stitch(y0,fine_y,coarse_y);
       const unsigned y1s = stitch(y1,fine_y,coarse_y);
-      const unsigned M = y1s-y0s+1;
+      const unsigned M = y1s-y0s+1 + VSIZEX;
       
       dynamic_large_stack_array(float,px,M,64*sizeof(float));
       dynamic_large_stack_array(float,py,M,64*sizeof(float));
@@ -321,16 +321,16 @@ namespace embree
       
       const unsigned x0s = stitch(x0,fine_x,coarse_x);
       const unsigned x1s = stitch(x1,fine_x,coarse_x);
-      const unsigned M = x1s-x0s+1;
+      const unsigned M = x1s-x0s+1 + VSIZEX;
 
-      dynamic_large_stack_array(float,px,M,64*sizeof(float));
-      dynamic_large_stack_array(float,py,M,64*sizeof(float));
-      dynamic_large_stack_array(float,pz,M,64*sizeof(float));
-      dynamic_large_stack_array(float,u,M,64*sizeof(float));
-      dynamic_large_stack_array(float,v,M,64*sizeof(float));
-      dynamic_large_stack_array(float,nx,M,64*sizeof(float));
-      dynamic_large_stack_array(float,ny,M,64*sizeof(float));
-      dynamic_large_stack_array(float,nz,M,64*sizeof(float));
+      dynamic_large_stack_array(float,px,M,32*sizeof(float));
+      dynamic_large_stack_array(float,py,M,32*sizeof(float));
+      dynamic_large_stack_array(float,pz,M,32*sizeof(float));
+      dynamic_large_stack_array(float,u,M,32*sizeof(float));
+      dynamic_large_stack_array(float,v,M,32*sizeof(float));
+      dynamic_large_stack_array(float,nx,M,32*sizeof(float));
+      dynamic_large_stack_array(float,ny,M,32*sizeof(float));
+      dynamic_large_stack_array(float,nz,M,32*sizeof(float));
       const bool has_Nxyz = Nx; assert(!Nx || (Ny && Nz));
       Eval(patch,subPatch, x0s,x1s, bottom,bottom, coarse_x+1,2, px,py,pz,u,v, 
            has_Nxyz ? (float*)nx :nullptr, has_Nxyz ? (float*)ny : nullptr , has_Nxyz ? (float*)nz : nullptr, 4097,1);

@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2017 Intel Corporation                                    //
+// Copyright 2009-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -30,7 +30,7 @@ namespace embree
     ParseLocation location() { return cin->loc(); }
     std::string next();
   private:
-    __forceinline bool isSeparator(int c) const { return isSepMap[c]; }
+    __forceinline bool isSeparator(int c) const { return c<256 && isSepMap[c]; }
   private:
     Ref<Stream<int> > cin; /*! source character stream */
     bool isSepMap[256];    /*! map for fast classification of separators */

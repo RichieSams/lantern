@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2017 Intel Corporation                                    //
+// Copyright 2009-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -29,13 +29,13 @@ namespace embree
 {
   class SubdivMesh : public Geometry
   {
-    ALIGNED_CLASS;
+    ALIGNED_CLASS_(16);
   public:
 
     typedef HalfEdge::Edge Edge;
     
     /*! type of this geometry */
-    static const Geometry::Type geom_type = Geometry::SUBDIV_MESH;
+    static const Geometry::GTypeMask geom_type = Geometry::MTY_SUBDIV_MESH;
 
     /*! structure used to sort half edges using radix sort by their key */
     struct KeyHalfEdge 
@@ -61,32 +61,31 @@ namespace embree
   public:
 
     /*! subdiv mesh construction */
-    SubdivMesh(Scene* scene, RTCGeometryFlags flags, size_t numFaces, size_t numEdges, size_t numVertices, 
-               size_t numCreases, size_t numCorners, size_t numHoles, size_t numTimeSteps);
+    SubdivMesh(Device* device);
 
   public:
     void enabling();
     void disabling();
     void setMask (unsigned mask);
-    void setSubdivisionMode (unsigned topologyID, RTCSubdivisionMode mode);
-    void setIndexBuffer(RTCBufferType vertexBuffer, RTCBufferType indexBuffer);
-    void setBuffer(RTCBufferType type, void* ptr, size_t offset, size_t stride, size_t size);
-    void* map(RTCBufferType type);
-    void unmap(RTCBufferType type);
-    void update ();
-    void updateBuffer (RTCBufferType type);
+    void setSubdivisionMode (unsigned int topologyID, RTCSubdivisionMode mode);
+    void setVertexAttributeTopology(unsigned int vertexAttribID, unsigned int topologyID);
+    void setNumTimeSteps (unsigned int numTimeSteps);
+    void setVertexAttributeCount (unsigned int N);
+    void setTopologyCount (unsigned int N);
+    void setBuffer(RTCBufferType type, unsigned int slot, RTCFormat format, const Ref<Buffer>& buffer, size_t offset, size_t stride, unsigned int num);
+    void* getBuffer(RTCBufferType type, unsigned int slot);
+    void updateBuffer(RTCBufferType type, unsigned int slot);
     void setTessellationRate(float N);
-    void immutable ();
-    bool verify ();
-    void setDisplacementFunction (RTCDisplacementFunc func, RTCBounds* bounds);
-    void setDisplacementFunction2 (RTCDisplacementFunc2 func, RTCBounds* bounds);
+    bool verify();
+    void commit();
+    void setDisplacementFunction (RTCDisplacementFunctionN func);
+    unsigned int getFirstHalfEdge(unsigned int faceID);
+    unsigned int getFace(unsigned int edgeID);
+    unsigned int getNextHalfEdge(unsigned int edgeID);
+    unsigned int getPreviousHalfEdge(unsigned int edgeID);
+    unsigned int getOppositeHalfEdge(unsigned int topologyID, unsigned int edgeID);
 
   public:
-
-    /*! return the number of faces */
-    size_t size() const { 
-      return faceVertices.size(); 
-    }
 
     /*! return the number of faces */
     size_t numFaces() const { 
@@ -127,7 +126,7 @@ namespace embree
   public:
 
     /*! returns the vertex buffer for some time step */
-    __forceinline const BufferRefT<Vec3fa>& getVertexBuffer( const size_t t = 0 ) const {
+    __forceinline const BufferView<Vec3fa>& getVertexBuffer( const size_t t = 0 ) const {
       return vertices[t];
     }
 
@@ -139,9 +138,7 @@ namespace embree
     }
 
   public:
-    RTCDisplacementFunc displFunc;    //!< displacement function
-    RTCDisplacementFunc2 displFunc2;    //!< displacement function
-    BBox3fa             displBounds;  //!< bounds for maximal displacement 
+    RTCDisplacementFunctionN displFunc;    //!< displacement function
 
     /*! all buffers in this section are provided by the application */
   public:
@@ -156,7 +153,7 @@ namespace embree
       Topology () : halfEdges(nullptr,0) {}
 
       /*! Topology initialization */
-      Topology (SubdivMesh* mesh, size_t numEdges);
+      Topology (SubdivMesh* mesh);
 
       /*! make the class movable */
     public: 
@@ -183,7 +180,7 @@ namespace embree
       /*! check if the i'th primitive is valid in this topology */
       __forceinline bool valid(size_t i) const 
       {
-        if (unlikely(subdiv_mode == RTC_SUBDIV_NO_BOUNDARY)) {
+        if (unlikely(subdiv_mode == RTC_SUBDIVISION_MODE_NO_BOUNDARY)) {
           if (getHalfEdge(i)->faceHasBorder()) return false;
         }
         return true;
@@ -194,9 +191,6 @@ namespace embree
 
       /*! marks all buffers as modified */
       void update ();
-
-      /*! frees unused buffers */
-      void immutable();
 
       /*! verifies index array */
       bool verify (size_t numVertices);
@@ -218,7 +212,7 @@ namespace embree
       SubdivMesh* mesh;
 
       /*! indices of the vertices composing each face */
-      APIBuffer<unsigned> vertexIndices;
+      BufferView<unsigned int> vertexIndices;
       
       /*! subdiv interpolation mode */
       RTCSubdivisionMode subdiv_mode;
@@ -249,35 +243,35 @@ namespace embree
     }
 
     /*! buffer containing the number of vertices for each face */
-    APIBuffer<unsigned> faceVertices;
+    BufferView<unsigned int> faceVertices;
 
     /*! array of topologies */
     vector<Topology> topology;
 
     /*! vertex buffer (one buffer for each time step) */
-    vector<APIBuffer<Vec3fa>> vertices;
+    vector<BufferView<Vec3fa>> vertices;
 
     /*! user data buffers */
-    vector<APIBuffer<char>> userbuffers;
+    vector<RawBufferView> vertexAttribs;
 
     /*! edge crease buffer containing edges (pairs of vertices) that carry edge crease weights */
-    APIBuffer<Edge> edge_creases;
+    BufferView<Edge> edge_creases;
     
     /*! edge crease weights for each edge of the edge_creases buffer */
-    APIBuffer<float> edge_crease_weights;
+    BufferView<float> edge_crease_weights;
     
     /*! vertex crease buffer containing all vertices that carry vertex crease weights */
-    APIBuffer<unsigned> vertex_creases;
+    BufferView<unsigned int> vertex_creases;
     
     /*! vertex crease weights for each vertex of the vertex_creases buffer */
-    APIBuffer<float> vertex_crease_weights;
+    BufferView<float> vertex_crease_weights;
 
     /*! subdivision level for each half edge of the vertexIndices buffer */
-    APIBuffer<float> levels;
+    BufferView<float> levels;
     float tessellationRate;  // constant rate that is used when levels is not set
 
     /*! buffer that marks specific faces as holes */
-    APIBuffer<unsigned> holes;
+    BufferView<unsigned> holes;
 
     /*! all data in this section is generated by initializeHalfEdgeStructures function */
   private:
@@ -287,6 +281,9 @@ namespace embree
 
     /*! fast lookup table to find the first half edge for some face */
     mvector<uint32_t> faceStartEdge;
+
+    /*! fast lookup table to find the face for some half edge */
+    mvector<uint32_t> halfEdgeFace;
 
     /*! set with all holes */
     parallel_set<uint32_t> holeSet;
@@ -308,37 +305,36 @@ namespace embree
       return slots*prim+slot;
     }
     std::vector<std::vector<SharedLazyTessellationCache::CacheEntry>> vertex_buffer_tags;
-    std::vector<std::vector<SharedLazyTessellationCache::CacheEntry>> user_buffer_tags;
+    std::vector<std::vector<SharedLazyTessellationCache::CacheEntry>> vertex_attrib_buffer_tags;
     std::vector<Patch3fa::Ref> patch_eval_trees;
     
     /*! the following data is only required during construction of the
      *  half edge structure and can be cleared for static scenes */
   private:
-    
+
     /*! map with all vertex creases */
     parallel_map<uint32_t,float> vertexCreaseMap;
     
     /*! map with all edge creases */
     parallel_map<uint64_t,float> edgeCreaseMap;
+
+  protected:
+    
+    /*! counts number of geometry commits */
+    size_t commitCounter;
   };
 
   namespace isa
   {
     struct SubdivMeshISA : public SubdivMesh
     {
-      SubdivMeshISA (Scene* scene, RTCGeometryFlags flags, size_t numFaces, size_t numEdges, size_t numVertices, size_t numCreases, size_t numCorners, size_t numHoles, size_t numTimeSteps)
-        : SubdivMesh(scene,flags,numFaces,numEdges,numVertices,numCreases,numCorners,numHoles,numTimeSteps) {}
+      SubdivMeshISA (Device* device)
+        : SubdivMesh(device) {}
 
-      void interpolate(unsigned primID, float u, float v, RTCBufferType buffer, float* P, float* dPdu, float* dPdv, float* ddPdudu, float* ddPdvdv, float* ddPdudv, size_t numFloats);
-      void interpolateN(const void* valid_i, const unsigned* primIDs, const float* u, const float* v, size_t numUVs, 
-                        RTCBufferType buffer, float* P, float* dPdu, float* dPdv, float* ddPdudu, float* ddPdvdv, float* ddPdudv, size_t numFloats);
-      
-      template<typename vbool, typename vint, typename vfloat>
-        void interpolateHelper(const vbool& valid1, const vint& primID, const vfloat& uu, const vfloat& vv, size_t numUVs, 
-                               RTCBufferType buffer, float* P, float* dPdu, float* dPdv, float* ddPdudu, float* ddPdvdv, float* ddPdudv, size_t numFloats);
-      
+      void interpolate(const RTCInterpolateArguments* const args);
+      void interpolateN(const RTCInterpolateNArguments* const args);
     };
   }
 
-  DECLARE_ISA_FUNCTION(SubdivMesh*, createSubdivMesh, Scene* COMMA RTCGeometryFlags COMMA size_t COMMA size_t COMMA size_t COMMA size_t COMMA size_t COMMA size_t COMMA size_t);
+  DECLARE_ISA_FUNCTION(SubdivMesh*, createSubdivMesh, Device*);
 };

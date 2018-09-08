@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2017 Intel Corporation                                    //
+// Copyright 2009-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -23,9 +23,9 @@
 
 #include "vboolf16_avx512.h"
 #include "vint16_avx512.h"
+#include "vuint16_avx512.h"
 #include "vfloat16_avx512.h"
 
-#include "vuint16_avx512.h"
 #include "vboold8_avx512.h"
 #include "vllong8_avx512.h"
 #include "vdouble8_avx512.h"

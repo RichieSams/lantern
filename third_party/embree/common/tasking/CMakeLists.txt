@@ -1,5 +1,5 @@
 ## ======================================================================== ##
-## Copyright 2009-2017 Intel Corporation                                    ##
+## Copyright 2009-2018 Intel Corporation                                    ##
 ##                                                                          ##
 ## Licensed under the Apache License, Version 2.0 (the "License");          ##
 ## you may not use this file except in compliance with the License.         ##
@@ -16,16 +16,18 @@
 
 IF (TASKING_INTERNAL)
   ADD_LIBRARY(tasking STATIC taskschedulerinternal.cpp)
-ENDIF()
-
-IF (TASKING_TBB)
+ELSEIF (TASKING_TBB)
   ADD_LIBRARY(tasking STATIC taskschedulertbb.cpp)
-  TARGET_LINK_LIBRARIES(tasking sys tbb_static tbbmalloc_static)
-ENDIF()
-
-IF (TASKING_PPL)
+  TARGET_LINK_LIBRARIES(tasking sys math ${TBB_LIBRARIES})
+ELSEIF (TASKING_PPL)
   ADD_LIBRARY(tasking STATIC taskschedulerppl.cpp)
-  TARGET_LINK_LIBRARIES(tasking sys ${PPL_LIBRARIES})
+  TARGET_LINK_LIBRARIES(tasking sys math ${PPL_LIBRARIES})
 ENDIF()
 
 SET_PROPERTY(TARGET tasking PROPERTY FOLDER common)
+SET_PROPERTY(TARGET tasking APPEND PROPERTY COMPILE_FLAGS " ${FLAGS_LOWEST}")
+
+IF (EMBREE_STATIC_LIB)
+  INSTALL(TARGETS tasking ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT devel)
+  SIGN_TARGET(tasking)
+ENDIF()

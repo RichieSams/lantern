@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2017 Intel Corporation                                    //
+// Copyright 2009-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -27,6 +27,12 @@
 #if defined(__WIN32__)
 #  define NOMINMAX
 #endif
+
+// We need to define these to avoid implicit linkage against
+// tbb_debug.lib under Windows. When removing these lines debug build
+// under Windows fails.
+#define __TBB_NO_IMPLICIT_LINKAGE 1
+#define __TBBMALLOC_NO_IMPLICIT_LINKAGE 1
 
 #include "tbb/tbb.h"
 #include "tbb/parallel_sort.h"
@@ -67,5 +73,7 @@ namespace embree
       return tbb::task_scheduler_init::default_num_threads();
 #endif
     }
+
   };
+
 };

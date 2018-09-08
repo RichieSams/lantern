@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2017 Intel Corporation                                    //
+// Copyright 2009-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -15,7 +15,6 @@
 // ======================================================================== //
 
 #include "bvh_intersector_stream.h"
-#include "bvh_intersector_node.h"
 
 #include "../geometry/intersector_iterators.h"
 #include "../geometry/triangle_intersector.h"
@@ -24,128 +23,72 @@
 #include "../geometry/trianglei_intersector.h"
 #include "../geometry/quadv_intersector.h"
 #include "../geometry/quadi_intersector.h"
-#include "../geometry/bezier1v_intersector.h"
-#include "../geometry/bezier1i_intersector.h"
 #include "../geometry/linei_intersector.h"
-#include "../geometry/subdivpatch1eager_intersector.h"
-#include "../geometry/subdivpatch1cached_intersector.h"
+#include "../geometry/subdivpatch1_intersector.h"
 #include "../geometry/object_intersector.h"
+#include "../geometry/instance_intersector.h"
 
 #include "../common/scene.h"
 #include <bitset>
-
-// todo: parent ptr also for single stream, should improve culling.
-
-#define MAX_RAYS 64
 
 namespace embree
 {
   namespace isa
   {
-    /* enable traversal of either two small streams or one large stream */
-#if !defined(__AVX512F__)
-    static const size_t MAX_RAYS_PER_OCTANT = 8*sizeof(unsigned int);
-#else
-    static const size_t MAX_RAYS_PER_OCTANT = 8*sizeof(size_t);
-#endif
-    static_assert(MAX_RAYS_PER_OCTANT <= MAX_INTERNAL_STREAM_SIZE, "maximal internal stream size exceeded");
+    __aligned(64) static const int shiftTable[32] = { 
+      (int)1 << 0, (int)1 << 1, (int)1 << 2, (int)1 << 3, (int)1 << 4, (int)1 << 5, (int)1 << 6, (int)1 << 7,  
+      (int)1 << 8, (int)1 << 9, (int)1 << 10, (int)1 << 11, (int)1 << 12, (int)1 << 13, (int)1 << 14, (int)1 << 15,  
+      (int)1 << 16, (int)1 << 17, (int)1 << 18, (int)1 << 19, (int)1 << 20, (int)1 << 21, (int)1 << 22, (int)1 << 23,  
+      (int)1 << 24, (int)1 << 25, (int)1 << 26, (int)1 << 27, (int)1 << 28, (int)1 << 29, (int)1 << 30, (int)1 << 31
+    };
 
-    // =====================================================================================================
-    // =====================================================================================================
-    // =====================================================================================================
+    template<int N, int Nx, int types, bool robust, typename PrimitiveIntersector>
+    __forceinline void BVHNIntersectorStream<N, Nx, types, robust, PrimitiveIntersector>::intersect(Accel::Intersectors* __restrict__ This,
+                                                                                                    RayHitN** inputPackets,
+                                                                                                    size_t numOctantRays,
+                                                                                                    IntersectContext* context)
+    {
+      // Only the coherent code path is implemented
+      assert(context->isCoherent());
+      intersectCoherent(This, (RayHitK<VSIZEL>**)inputPackets, numOctantRays, context);
+    }
 
+    template<int N, int Nx, int types, bool robust, typename PrimitiveIntersector>
     template<int K>
-    __forceinline size_t AOStoSOA(RayK<K>* rayK, Ray** inputRays, const size_t numTotalRays)
+    __forceinline void BVHNIntersectorStream<N, Nx, types, robust, PrimitiveIntersector>::intersectCoherent(Accel::Intersectors* __restrict__ This,
+                                                                                                            RayHitK<K>** inputPackets,
+                                                                                                            size_t numOctantRays,
+                                                                                                            IntersectContext* context)
     {
-      const size_t numPackets = (numTotalRays+K-1)/K; //todo : OPTIMIZE
-      for (size_t i = 0; i < numPackets; i++)
-        new (&rayK[i]) RayK<K>(zero,zero,zero,neg_inf);
+      assert(context->isCoherent());
 
-      Vec3fa min_dir = pos_inf;
-      Vec3fa max_dir = neg_inf;
+      BVH* __restrict__ bvh = (BVH*) This->ptr;
+      __aligned(64) StackItemMaskCoherent stack[stackSizeSingle];  // stack of nodes
+      assert(numOctantRays <= MAX_INTERNAL_STREAM_SIZE);
 
-      for (size_t i = 0; i < numTotalRays; i++) {
-        const Vec3fa& org = inputRays[i]->org;
-        const Vec3fa& dir = inputRays[i]->dir;
-        min_dir = min(min_dir, dir);
-        max_dir = max(max_dir, dir);
-        const float tnear = max(0.0f, inputRays[i]->tnear);
-        const float tfar  = inputRays[i]->tfar;
-        const size_t packetID = i / K;
-        const size_t slotID   = i % K;
-        rayK[packetID].dir.x[slotID]  = dir.x;
-        rayK[packetID].dir.y[slotID]  = dir.y;
-        rayK[packetID].dir.z[slotID]  = dir.z;
-        rayK[packetID].org.x[slotID]  = org.x;
-        rayK[packetID].org.y[slotID]  = org.y;
-        rayK[packetID].org.z[slotID]  = org.z;
-        rayK[packetID].tnear[slotID]  = tnear;
-        rayK[packetID].tfar[slotID]   = tfar;
-        rayK[packetID].mask[slotID]   = inputRays[i]->mask;
-        rayK[packetID].instID[slotID] = inputRays[i]->instID;
-      }
-      const size_t sign_min_dir = movemask(vfloat4(min_dir) < 0.0f);
-      const size_t sign_max_dir = movemask(vfloat4(max_dir) < 0.0f);
-      return ((sign_min_dir^sign_max_dir) & 0x7);
-    }
+      __aligned(64) TravRayKStream<K, robust> packets[MAX_INTERNAL_STREAM_SIZE/K];
+      __aligned(64) Frustum<robust> frustum;
 
-    template<int K, bool occlusion>
-    __forceinline void SOAtoAOS(Ray** inputRays, RayK<K>* rayK, const size_t numTotalRays)
-    {
-      for (size_t i = 0; i < numTotalRays; i++)
-      {
-        const size_t packetID = i / K;
-        const size_t slotID   = i % K;
-        const RayK<K>& ray = rayK[packetID];
-        if (likely((unsigned)ray.geomID[slotID] != RTC_INVALID_GEOMETRY_ID))
-        {
-          if (occlusion)
-            inputRays[i]->geomID = ray.geomID[slotID];
-          else
-          {
-            inputRays[i]->tfar   = ray.tfar[slotID];
-            inputRays[i]->Ng.x   = ray.Ng.x[slotID];
-            inputRays[i]->Ng.y   = ray.Ng.y[slotID];
-            inputRays[i]->Ng.z   = ray.Ng.z[slotID];
-            inputRays[i]->u      = ray.u[slotID];
-            inputRays[i]->v      = ray.v[slotID];
-            inputRays[i]->geomID = ray.geomID[slotID];
-            inputRays[i]->primID = ray.primID[slotID];
-            inputRays[i]->instID = ray.instID[slotID];
-          }
-        }
-      }
-    }
-
-    // =====================================================================================================
-    // =====================================================================================================
-    // =====================================================================================================
-
-    template<int N, int Nx, int K, int types, bool robust, typename PrimitiveIntersector>
-    __forceinline void BVHNIntersectorStream<N, Nx, K, types, robust, PrimitiveIntersector>::intersectCoherentSOA(BVH* __restrict__ bvh, RayK<K>** inputRays, size_t numOctantRays, IntersectContext* context)
-    {
-      __aligned(64) StackItemMaskCoherent stack[stackSizeSingle];  //!< stack of nodes
-
-      RayK<K>** __restrict__ inputPackets = (RayK<K>**)inputRays;
-      assert(numOctantRays <= MAX_RAYS);
-
-      __aligned(64) Packet packet[MAX_RAYS/K];
-      __aligned(64) Frusta frusta;
-
-      const size_t m_active = initPacketsAndFrusta(inputPackets, numOctantRays, packet, frusta);
+      bool commonOctant = true;
+      const size_t m_active = initPacketsAndFrustum((RayK<K>**)inputPackets, numOctantRays, packets, frustum, commonOctant);
       if (unlikely(m_active == 0)) return;
 
-      stack[0].mask    = m_active;
-      stack[0].parent  = 0;
-      stack[0].child   = bvh->root;
-      stack[0].childID = (unsigned int)-1;
-      //stack[0].dist    = (unsigned int)-1;
+      /* case of non-common origin */
+      if (unlikely(!commonOctant))
+      {
+        const size_t numPackets = (numOctantRays+K-1)/K; 
+        for (size_t i = 0; i < numPackets; i++)
+          This->intersect(inputPackets[i]->tnear() <= inputPackets[i]->tfar, *inputPackets[i], context);
+        return;
+      }
+
+      stack[0].mask   = m_active;
+      stack[0].parent = 0;
+      stack[0].child  = bvh->root;
 
       ///////////////////////////////////////////////////////////////////////////////////
       ///////////////////////////////////////////////////////////////////////////////////
       ///////////////////////////////////////////////////////////////////////////////////
-
-      const NearFarPreCompute pc(frusta.min_rdir);
 
       StackItemMaskCoherent* stackPtr = stack + 1;
 
@@ -159,98 +102,116 @@ namespace embree
         NodeRef cur = NodeRef(stackPtr->child);
         size_t m_trav_active = stackPtr->mask;
         assert(m_trav_active);
-
-        /* non-root and leaf => full culling test for all rays */
-        if (unlikely(stackPtr->parent != 0 && cur.isLeaf()))
-        {
-          NodeRef parent = NodeRef(stackPtr->parent);
-          const AlignedNode* __restrict__ const node = parent.alignedNode();
-          const size_t b = stackPtr->childID;
-          char *ptr = (char*)&node->lower_x + b*sizeof(float);
-          assert(cur == node->child(b));
-
-          const vfloat<K> minX = vfloat<K>(*(const float*)((const char*)ptr + pc.nearX));
-          const vfloat<K> minY = vfloat<K>(*(const float*)((const char*)ptr + pc.nearY));
-          const vfloat<K> minZ = vfloat<K>(*(const float*)((const char*)ptr + pc.nearZ));
-          const vfloat<K> maxX = vfloat<K>(*(const float*)((const char*)ptr + pc.farX));
-          const vfloat<K> maxY = vfloat<K>(*(const float*)((const char*)ptr + pc.farY));
-          const vfloat<K> maxZ = vfloat<K>(*(const float*)((const char*)ptr + pc.farZ));
-
-          m_trav_active = intersectAlignedNodePacket(packet, minX, minY, minZ, maxX, maxY, maxZ, m_trav_active);
-          if (m_trav_active == 0) goto pop;
-        }
+        NodeRef parent = stackPtr->parent;
 
         while (1)
         {
           if (unlikely(cur.isLeaf())) break;
           const AlignedNode* __restrict__ const node = cur.alignedNode();
+          parent = cur;
 
           __aligned(64) size_t maskK[N];
-          for (size_t i = 0; i < N; i++) maskK[i] = m_trav_active;
+          for (size_t i = 0; i < N; i++)
+            maskK[i] = m_trav_active;
           vfloat<Nx> dist;
-          const size_t m_node_hit = traverseCoherentStream(m_trav_active, packet, node, pc, frusta, maskK, dist);
+          const size_t m_node_hit = traverseCoherentStream(m_trav_active, packets, node, frustum, maskK, dist);
           if (unlikely(m_node_hit == 0)) goto pop;
 
           BVHNNodeTraverserStreamHitCoherent<N, Nx, types>::traverseClosestHit(cur, m_trav_active, vbool<Nx>((int)m_node_hit), dist, (size_t*)maskK, stackPtr);
           assert(m_trav_active);
         }
 
+        /* non-root and leaf => full culling test for all rays */
+        if (unlikely(parent != 0 && cur.isLeaf()))
+        {
+          const AlignedNode* __restrict__ const node = parent.alignedNode();
+          size_t boxID = 0xff;
+          for (size_t i = 0; i < N; i++)
+            if (node->child(i) == cur) { boxID = i; break; }
+          assert(boxID < N);
+          assert(cur == node->child(boxID));
+          m_trav_active = intersectAlignedNodePacket(m_trav_active, packets, node, boxID, frustum.nf);
+        }
+
         /*! this is a leaf node */
         assert(cur != BVH::emptyNode);
         STAT3(normal.trav_leaves, 1, 1, 1);
-        size_t num; Primitive* prim = (Primitive*)cur.leaf(num);
+        size_t num; PrimitiveK<K>* prim = (PrimitiveK<K>*)cur.leaf(num);
 
         size_t bits = m_trav_active;
 
         /*! intersect stream of rays with all primitives */
         size_t lazy_node = 0;
 #if defined(__SSE4_2__)
-        STAT_USER(1,(__popcnt(bits)+K-1)/K*4);
+        STAT_USER(1,(popcnt(bits)+K-1)/K*4);
 #endif
-        do
+        while(bits)
         {
-          size_t i = __bsf(bits) / K;
+          size_t i = bsf(bits) / K;
           const size_t m_isec = ((((size_t)1 << K)-1) << (i*K));
           assert(m_isec & bits);
           bits &= ~m_isec;
 
-          vbool<K> m_valid = (inputPackets[i]->tnear <= inputPackets[i]->tfar);
-          PrimitiveIntersector::intersectK(m_valid, *inputPackets[i], context, prim, num, lazy_node);
-          Packet &p = packet[i];
-          p.max_dist = min(p.max_dist, inputPackets[i]->tfar);
-        } while(bits);
+          TravRayKStream<K, robust>& p = packets[i];
+          vbool<K> m_valid = p.tnear <= p.tfar;
+          PrimitiveIntersectorK<K>::intersectK(m_valid, This, *inputPackets[i], context, prim, num, lazy_node);
+          p.tfar = min(p.tfar, inputPackets[i]->tfar);
+        };
 
       } // traversal + intersection
     }
 
-    template<int N, int Nx, int K, int types, bool robust, typename PrimitiveIntersector>
-    __forceinline void BVHNIntersectorStream<N, Nx, K, types, robust, PrimitiveIntersector>::occludedCoherentSOA(BVH* __restrict__ bvh, RayK<K>** inputRays, size_t numOctantRays, IntersectContext* context)
+    template<int N, int Nx, int types, bool robust, typename PrimitiveIntersector>
+    __forceinline void BVHNIntersectorStream<N, Nx, types, robust, PrimitiveIntersector>::occluded(Accel::Intersectors* __restrict__ This,
+                                                                                                   RayN** inputPackets,
+                                                                                                   size_t numOctantRays,
+                                                                                                   IntersectContext* context)
     {
-      __aligned(64) StackItemMaskCoherent stack[stackSizeSingle];  //!< stack of nodes
+      if (unlikely(context->isCoherent()))
+        occludedCoherent(This, (RayK<VSIZEL>**)inputPackets, numOctantRays, context);
+      else
+        occludedIncoherent(This, (RayK<VSIZEX>**)inputPackets, numOctantRays, context);
+    }
 
-      RayK<K>** __restrict__ inputPackets = (RayK<K>**)inputRays;
-      assert(numOctantRays <= MAX_RAYS);
+    template<int N, int Nx, int types, bool robust, typename PrimitiveIntersector>
+    template<int K>
+    __noinline void BVHNIntersectorStream<N, Nx, types, robust, PrimitiveIntersector>::occludedCoherent(Accel::Intersectors* __restrict__ This,
+                                                                                                        RayK<K>** inputPackets,
+                                                                                                        size_t numOctantRays,
+                                                                                                        IntersectContext* context)
+    {
+      assert(context->isCoherent());
+
+      BVH* __restrict__ bvh = (BVH*)This->ptr;
+      __aligned(64) StackItemMaskCoherent stack[stackSizeSingle];  // stack of nodes
+      assert(numOctantRays <= MAX_INTERNAL_STREAM_SIZE);
 
       /* inactive rays should have been filtered out before */
-      __aligned(64) Packet packet[MAX_RAYS/K];
-      __aligned(64) Frusta frusta;
+      __aligned(64) TravRayKStream<K, robust> packets[MAX_INTERNAL_STREAM_SIZE/K];
+      __aligned(64) Frustum<robust> frustum;
 
-      size_t m_active = initPacketsAndFrusta(inputPackets, numOctantRays, packet, frusta);
+      bool commonOctant = true;
+      size_t m_active = initPacketsAndFrustum(inputPackets, numOctantRays, packets, frustum, commonOctant);
 
       /* valid rays */
       if (unlikely(m_active == 0)) return;
 
-      stack[0].mask    = m_active;
-      stack[0].parent  = 0;
-      stack[0].child   = bvh->root;
-      stack[0].childID = (unsigned int)-1;
-      //stack[0].dist    = (unsigned int)-1;
+      /* case of non-common origin */
+      if (unlikely(!commonOctant))
+      {
+        const size_t numPackets = (numOctantRays+K-1)/K; 
+        for (size_t i = 0; i < numPackets; i++)
+          This->occluded(inputPackets[i]->tnear() <= inputPackets[i]->tfar, *inputPackets[i], context);
+        return;
+      }
+
+      stack[0].mask   = m_active;
+      stack[0].parent = 0;
+      stack[0].child  = bvh->root;
 
       ///////////////////////////////////////////////////////////////////////////////////
       ///////////////////////////////////////////////////////////////////////////////////
       ///////////////////////////////////////////////////////////////////////////////////
-
-      const NearFarPreCompute pc(frusta.min_rdir);
 
       StackItemMaskCoherent* stackPtr = stack + 1;
 
@@ -264,323 +225,190 @@ namespace embree
         NodeRef cur = NodeRef(stackPtr->child);
         size_t m_trav_active = stackPtr->mask & m_active;
         if (unlikely(!m_trav_active)) continue;
-
         assert(m_trav_active);
-
-        /* non-root and leaf => full culling test for all rays */
-        if (unlikely(stackPtr->parent != 0 && cur.isLeaf()))
-        {
-          NodeRef parent = NodeRef(stackPtr->parent);
-          const AlignedNode* __restrict__ const node = parent.alignedNode();
-          const size_t b   = stackPtr->childID;
-          char *ptr = (char*)&node->lower_x + b*sizeof(float);
-          assert(cur == node->child(b));
-
-          const vfloat<K> minX = vfloat<K>(*(const float*)((const char*)ptr + pc.nearX));
-          const vfloat<K> minY = vfloat<K>(*(const float*)((const char*)ptr + pc.nearY));
-          const vfloat<K> minZ = vfloat<K>(*(const float*)((const char*)ptr + pc.nearZ));
-          const vfloat<K> maxX = vfloat<K>(*(const float*)((const char*)ptr + pc.farX));
-          const vfloat<K> maxY = vfloat<K>(*(const float*)((const char*)ptr + pc.farY));
-          const vfloat<K> maxZ = vfloat<K>(*(const float*)((const char*)ptr + pc.farZ));
-
-          m_trav_active = intersectAlignedNodePacket(packet, minX, minY, minZ, maxX, maxY, maxZ, m_trav_active);
-
-          if (m_trav_active == 0) goto pop;
-        }
+        NodeRef parent = stackPtr->parent;
 
         while (1)
         {
           if (unlikely(cur.isLeaf())) break;
           const AlignedNode* __restrict__ const node = cur.alignedNode();
+          parent = cur;
 
           __aligned(64) size_t maskK[N];
-          for (size_t i = 0; i < N; i++) maskK[i] = m_trav_active;
+          for (size_t i = 0; i < N; i++)
+            maskK[i] = m_trav_active;
 
           vfloat<Nx> dist;
-          const size_t m_node_hit = traverseCoherentStream(m_trav_active, packet, node, pc, frusta, maskK, dist);
+          const size_t m_node_hit = traverseCoherentStream(m_trav_active, packets, node, frustum, maskK, dist);
           if (unlikely(m_node_hit == 0)) goto pop;
 
           BVHNNodeTraverserStreamHitCoherent<N, Nx, types>::traverseAnyHit(cur, m_trav_active, vbool<Nx>((int)m_node_hit), (size_t*)maskK, stackPtr);
           assert(m_trav_active);
         }
 
+        /* non-root and leaf => full culling test for all rays */
+        if (unlikely(parent != 0 && cur.isLeaf()))
+        {
+          const AlignedNode* __restrict__ const node = parent.alignedNode();
+          size_t boxID = 0xff;
+          for (size_t i = 0; i < N; i++)
+            if (node->child(i) == cur) { boxID = i; break; }
+          assert(boxID < N);
+          assert(cur == node->child(boxID));
+          m_trav_active = intersectAlignedNodePacket(m_trav_active, packets, node, boxID, frustum.nf);
+        }
+
         /*! this is a leaf node */
         assert(cur != BVH::emptyNode);
         STAT3(normal.trav_leaves, 1, 1, 1);
-        size_t num; Primitive* prim = (Primitive*)cur.leaf(num);
+        size_t num; PrimitiveK<K>* prim = (PrimitiveK<K>*)cur.leaf(num);
 
         size_t bits = m_trav_active & m_active;
         /*! intersect stream of rays with all primitives */
         size_t lazy_node = 0;
 #if defined(__SSE4_2__)
-        STAT_USER(1,(__popcnt(bits)+K-1)/K*4);
+        STAT_USER(1,(popcnt(bits)+K-1)/K*4);
 #endif
-        while(bits)
+        while (bits)
         {
-          size_t i = __bsf(bits) / K;
+          size_t i = bsf(bits) / K;
           const size_t m_isec = ((((size_t)1 << K)-1) << (i*K));
           assert(m_isec & bits);
           bits &= ~m_isec;
-
-          vbool<K> m_valid = (inputPackets[i]->tnear <= inputPackets[i]->tfar);
-          vbool<K> m_hit = PrimitiveIntersector::occludedK(m_valid, *inputPackets[i], context, prim, num, lazy_node);
-          inputPackets[i]->geomID = select(m_hit, vint<K>(zero), inputPackets[i]->geomID);
+          TravRayKStream<K, robust>& p = packets[i];
+          vbool<K> m_valid = p.tnear <= p.tfar;
+          vbool<K> m_hit = PrimitiveIntersectorK<K>::occludedK(m_valid, This, *inputPackets[i], context, prim, num, lazy_node);
+          inputPackets[i]->tfar = select(m_hit & m_valid, vfloat<K>(neg_inf), inputPackets[i]->tfar);
           m_active &= ~((size_t)movemask(m_hit) << (i*K));
         }
 
       } // traversal + intersection
     }
 
-    // =====================================================================================================
-    // =====================================================================================================
-    // =====================================================================================================
 
-    template<int N, int Nx, int K, int types, bool robust, typename PrimitiveIntersector>
-    void BVHNIntersectorStream<N, Nx, K, types, robust, PrimitiveIntersector>::intersectCoherent(BVH* __restrict__ bvh, Ray** inputRays, size_t numTotalRays, IntersectContext* context)
+    template<int N, int Nx, int types, bool robust, typename PrimitiveIntersector>
+    template<int K>
+    __forceinline void BVHNIntersectorStream<N, Nx, types, robust, PrimitiveIntersector>::occludedIncoherent(Accel::Intersectors* __restrict__ This,
+                                                                                                             RayK<K>** inputPackets,
+                                                                                                             size_t numOctantRays,
+                                                                                                             IntersectContext* context)
     {
-      if (likely(context->flags == IntersectContext::INPUT_RAY_DATA_AOS))
+      assert(!context->isCoherent());
+      assert(types & BVH_FLAG_ALIGNED_NODE);
+
+      __aligned(64) TravRayKStream<K,robust> packet[MAX_INTERNAL_STREAM_SIZE/K];
+
+      assert(numOctantRays <= 32);
+      const size_t numPackets = (numOctantRays+K-1)/K;
+      size_t m_active = 0;
+      for (size_t i = 0; i < numPackets; i++)
       {
-        /* AOS to SOA conversion */
-        RayK<K> rayK[MAX_RAYS / K];
-        RayK<K>* rayK_ptr[MAX_RAYS / K];
-        for (size_t i = 0; i < MAX_RAYS / K; i++) rayK_ptr[i] = &rayK[i];
-        AOStoSOA(rayK, inputRays, numTotalRays);
-        /* stream tracer as fast path */
-        BVHNIntersectorStream<N, Nx, K, types, robust, PrimitiveIntersector>::intersectCoherentSOA(bvh, (RayK<K>**)rayK_ptr, numTotalRays, context);
-        /* SOA to AOS conversion */
-        SOAtoAOS<K, false>(inputRays, rayK, numTotalRays);
+        const vfloat<K> tnear = inputPackets[i]->tnear();
+        const vfloat<K> tfar  = inputPackets[i]->tfar;
+        vbool<K> m_valid = (tnear <= tfar) & (tnear >= 0.0f);
+        m_active |= (size_t)movemask(m_valid) << (K*i);
+        const Vec3vf<K>& org = inputPackets[i]->org;
+        const Vec3vf<K>& dir = inputPackets[i]->dir;
+        vfloat<K> packet_min_dist = max(tnear, 0.0f);
+        vfloat<K> packet_max_dist = select(m_valid, tfar, neg_inf);
+        new (&packet[i]) TravRayKStream<K,robust>(org, dir, packet_min_dist, packet_max_dist);
       }
-      else
+
+      BVH* __restrict__ bvh = (BVH*)This->ptr;
+
+      StackItemMaskT<NodeRef> stack[stackSizeSingle]; // stack of nodes
+      StackItemMaskT<NodeRef>* stackPtr = stack + 1;  // current stack pointer
+      stack[0].ptr = bvh->root;
+      stack[0].mask = m_active;
+
+      size_t terminated = ~m_active;
+
+      /* near/far offsets based on first ray */
+      const NearFarPrecalculations nf(Vec3fa(packet[0].rdir.x[0], packet[0].rdir.y[0], packet[0].rdir.z[0]), N);
+
+      while (1) pop:
       {
-        assert(context->getInputSOAWidth() == K);
-        /* stream tracer as fast path */
-        BVHNIntersectorStream<N, Nx, K, types, robust, PrimitiveIntersector>::intersectCoherentSOA(bvh, (RayK<K>**)inputRays, numTotalRays, context);
-      }
-    }
+        if (unlikely(stackPtr == stack)) break;
+        STAT3(shadow.trav_stack_pop,1,1,1);
+        stackPtr--;
+        NodeRef cur = NodeRef(stackPtr->ptr);
+        size_t cur_mask = stackPtr->mask & (~terminated);
+        if (unlikely(cur_mask == 0)) continue;
 
-    template<int N, int Nx, int K, int types, bool robust, typename PrimitiveIntersector>
-    void BVHNIntersectorStream<N, Nx, K, types, robust, PrimitiveIntersector>::occludedCoherent(BVH* __restrict__ bvh, Ray **inputRays, size_t numTotalRays, IntersectContext* context)
-    {
-      if (likely(context->flags == IntersectContext::INPUT_RAY_DATA_AOS))
-      {
-        /* AOS to SOA conversion */
-        RayK<K> rayK[MAX_RAYS / K];
-        RayK<K>* rayK_ptr[MAX_RAYS / K];
-        for (size_t i = 0; i < MAX_RAYS / K; i++) rayK_ptr[i] = &rayK[i];
-        AOStoSOA(rayK, inputRays, numTotalRays);
-        /* stream tracer as fast path */
-        BVHNIntersectorStream<N, Nx, K, types, robust, PrimitiveIntersector>::occludedCoherentSOA(bvh, (RayK<K>**)rayK_ptr, numTotalRays, context);
-        /* SOA to AOS conversion */
-        SOAtoAOS<K, true>(inputRays, rayK, numTotalRays);
-      }
-      else
-      {
-        assert(context->getInputSOAWidth() == K);
-        BVHNIntersectorStream<N, Nx, K, types, robust, PrimitiveIntersector>::occludedCoherentSOA(bvh, (RayK<K>**)inputRays, numTotalRays, context);
-      }
-    }
+        while (true)
+        {
+          /*! stop if we found a leaf node */
+          if (unlikely(cur.isLeaf())) break;
+          const AlignedNode* __restrict__ const node = cur.alignedNode();
 
-    // =====================================================================================================
-    // =====================================================================================================
-    // =====================================================================================================
+          const vint<Nx> vmask = traverseIncoherentStream(cur_mask, packet, node, nf, shiftTable);
 
-    template<int N, int Nx, int K, int types, bool robust, typename PrimitiveIntersector>
-    void BVHNIntersectorStream<N, Nx, K, types, robust, PrimitiveIntersector>::intersect(BVH* __restrict__ bvh, Ray** inputRays, size_t numTotalRays, IntersectContext* context)
-    {
-#if ENABLE_COHERENT_STREAM_PATH == 1
-      if (unlikely(PrimitiveIntersector::validIntersectorK && !robust && isCoherent(context->user->flags)))
-      {
-        intersectCoherent(bvh, inputRays, numTotalRays, context);
-        return;
-      }
-#endif
-      assert(context->flags == IntersectContext::INPUT_RAY_DATA_AOS);
+          size_t mask = movemask(vmask != vint<Nx>(zero));
+          if (unlikely(mask == 0)) goto pop;
 
-      __aligned(64) RayCtx ray_ctx[MAX_RAYS_PER_OCTANT];
-      __aligned(64) Precalculations pre[MAX_RAYS_PER_OCTANT];
-      __aligned(64) StackItemMask stack[stackSizeSingle];  //!< stack of nodes
+          __aligned(64) unsigned int child_mask[Nx];
+          vint<Nx>::storeu(child_mask, vmask); // this explicit store here causes much better code generation
+          
+          /*! one child is hit, continue with that child */
+          size_t r = bscf(mask);
+          assert(r < N);
+          cur = node->child(r);         
+          cur.prefetch(types);
+          cur_mask = child_mask[r];
 
-      for (size_t r = 0; r < numTotalRays; r += MAX_RAYS_PER_OCTANT)
-      {
-        Ray** __restrict__ rays = inputRays + r;
-        const size_t numOctantRays = (r + MAX_RAYS_PER_OCTANT >= numTotalRays) ? numTotalRays-r : MAX_RAYS_PER_OCTANT;
+          /* simple in order sequence */
+          assert(cur != BVH::emptyNode);
+          if (likely(mask == 0)) continue;
+          stackPtr->ptr  = cur;
+          stackPtr->mask = cur_mask;
+          stackPtr++;
 
-        /* inactive rays should have been filtered out before */
-        size_t m_active = numOctantRays == 8*sizeof(size_t) ? (size_t)-1 : (((size_t)1 << numOctantRays))-1;
+          for (; ;)
+          {
+            r = bscf(mask);
+            assert(r < N);
 
-        if (m_active == 0) return;
+            cur = node->child(r);          
+            cur.prefetch(types);
+            cur_mask = child_mask[r];            
+            assert(cur != BVH::emptyNode);
+            if (likely(mask == 0)) break;
+            stackPtr->ptr  = cur;
+            stackPtr->mask = cur_mask;
+            stackPtr++;
+          }
+        }
+        
+        /*! this is a leaf node */
+        assert(cur != BVH::emptyNode);
+        STAT3(shadow.trav_leaves,1,1,1);
+        size_t num; PrimitiveK<K>* prim = (PrimitiveK<K>*)cur.leaf(num);
 
-        /* do per ray precalculations */
-        for (size_t i = 0; i < numOctantRays; i++) {
-          new (&ray_ctx[i]) RayCtx(rays[i]);
-          new (&pre[i]) Precalculations(*rays[i], bvh);
+        size_t bits = cur_mask;
+        size_t lazy_node = 0;
+
+        for (; bits != 0;)
+        {
+          const size_t rayID = bscf(bits);
+
+          RayK<K> &ray = *inputPackets[rayID / K];
+          const size_t k = rayID % K;
+          if (PrimitiveIntersectorK<K>::occluded(This, ray, k, context, prim, num, lazy_node))
+          {
+            ray.tfar[k] = neg_inf;
+            terminated |= (size_t)1 << rayID;
+          }
+
+          /* lazy node */
+          if (unlikely(lazy_node))
+          {
+            stackPtr->ptr = lazy_node;
+            stackPtr->mask = cur_mask;
+            stackPtr++;
+          }
         }
 
-        stack[0].ptr  = BVH::invalidNode;
-        stack[0].mask = (size_t)-1;
-        stack[1].ptr  = bvh->root;
-        stack[1].mask = m_active;
-
-        ///////////////////////////////////////////////////////////////////////////////////
-        ///////////////////////////////////////////////////////////////////////////////////
-        ///////////////////////////////////////////////////////////////////////////////////
-
-        const NearFarPreCompute pc(ray_ctx[0].rdir);
-
-        StackItemMask* stackPtr = stack + 2;
-
-        while (1) pop:
-        {
-          /*! pop next node */
-          STAT3(normal.trav_stack_pop,1,1,1);
-          stackPtr--;
-          NodeRef cur = NodeRef(stackPtr->ptr);
-          size_t m_trav_active = stackPtr->mask;
-          assert(m_trav_active);
-
-          const vfloat<Nx> inf(pos_inf);
-
-          while (1)
-          {
-            if (unlikely(cur.isLeaf())) break;
-            const AlignedNode* __restrict__ const node = cur.alignedNode();
-            assert(m_trav_active);
-
-#if defined(__AVX512F__)
-            /* AVX512 path for up to 64 rays */
-            vllong<Nxd> maskK(zero);
-            vfloat<Nx> dist(inf);
-            const vbool<Nx> vmask = traversalLoop<true>(m_trav_active,node,pc,ray_ctx,dist,maskK);
-            if (unlikely(none(vmask))) goto pop;
-            BVHNNodeTraverserStreamHit<N, Nx, types>::traverseClosestHit(cur, m_trav_active, vmask, dist, (size_t*)&maskK, stackPtr);
-#else
-            /* AVX path for up to 32 rays */
-            vint<Nx> maskK(zero);
-            vfloat<Nx> dist(inf);
-            const vbool<Nx> vmask = traversalLoop<true>(m_trav_active,node,pc,ray_ctx,dist,maskK);
-            if (unlikely(none(vmask))) goto pop;
-            BVHNNodeTraverserStreamHit<N, Nx, types>::traverseClosestHit(cur, m_trav_active, vmask, dist, (unsigned int*)&maskK, stackPtr);
-            assert(m_trav_active);
-#endif
-          }
-
-          /* current ray stream is done? */
-          if (unlikely(cur == BVH::invalidNode))
-            break;
-
-          /*! this is a leaf node */
-          assert(cur != BVH::emptyNode);
-          STAT3(normal.trav_leaves, 1, 1, 1);
-          size_t num; Primitive* prim = (Primitive*)cur.leaf(num);
-
-          size_t bits = m_trav_active;
-
-          /*! intersect stream of rays with all primitives */
-          size_t lazy_node = 0;
-          size_t valid_isec MAYBE_UNUSED = PrimitiveIntersector::intersect(pre, bits, rays, context, prim, num, lazy_node);
-
-          /* update tfar in ray context on successful hit */
-          size_t isec_bits = valid_isec;
-          while(isec_bits)
-          {
-            const size_t i = __bscf(isec_bits);
-            ray_ctx[i].update(rays[i]);
-          }
-        } // traversal + intersection
-      }
-    }
-
-
-    template<int N, int Nx, int K, int types, bool robust, typename PrimitiveIntersector>
-    void BVHNIntersectorStream<N, Nx, K, types, robust, PrimitiveIntersector>::occluded(BVH* __restrict__ bvh, Ray **inputRays, size_t numTotalRays, IntersectContext* context)
-    {
-#if ENABLE_COHERENT_STREAM_PATH == 1
-      if (unlikely(PrimitiveIntersector::validIntersectorK && !robust && isCoherent(context->user->flags)))
-      {
-        occludedCoherent(bvh, inputRays, numTotalRays, context);
-        return;
-      }
-#endif
-      assert(context->flags == IntersectContext::INPUT_RAY_DATA_AOS);
-
-      __aligned(64) RayCtx ray_ctx[MAX_RAYS_PER_OCTANT];
-      __aligned(64) Precalculations pre[MAX_RAYS_PER_OCTANT];
-      __aligned(64) StackItemMask stack[stackSizeSingle];  //!< stack of nodes
-
-      for (size_t r = 0; r < numTotalRays; r += MAX_RAYS_PER_OCTANT)
-      {
-        Ray** rays = inputRays + r;
-        const size_t numOctantRays = (r + MAX_RAYS_PER_OCTANT >= numTotalRays) ? numTotalRays-r : MAX_RAYS_PER_OCTANT;
-        size_t m_active = numOctantRays == 8*sizeof(size_t) ? (size_t)-1 : (((size_t)1 << numOctantRays))-1;
-        if (unlikely(m_active == 0)) continue;
-
-        /* do per ray precalculations */
-        for (size_t i = 0; i < numOctantRays; i++) {
-          new (&ray_ctx[i]) RayCtx(rays[i]);
-          new (&pre[i]) Precalculations(*rays[i], bvh);
-        }
-
-        stack[0].ptr  = BVH::invalidNode;
-        stack[0].mask = (size_t)-1;
-        stack[1].ptr  = bvh->root;
-        stack[1].mask = m_active;
-
-        StackItemMask* stackPtr = stack + 2;
-
-        const NearFarPreCompute pc(ray_ctx[0].rdir);
-
-        while (1) pop:
-        {
-          /*! pop next node */
-          STAT3(shadow.trav_stack_pop,1,1,1);
-          stackPtr--;
-          NodeRef cur = NodeRef(stackPtr->ptr);
-          assert(stackPtr->mask);
-          size_t m_trav_active = stackPtr->mask & m_active;
-          if (unlikely(m_trav_active == 0 && cur != BVH::invalidNode)) continue;
-
-          const vfloat<Nx> inf(pos_inf);
-
-          while (1)
-          {
-            if (likely(cur.isLeaf())) break;
-            assert(m_trav_active);
-
-            const AlignedNode* __restrict__ const node = cur.alignedNode();
-
-#if defined(__AVX512F__)
-            /* AVX512 path for up to 64 rays */
-            vllong<Nxd> maskK(zero);
-            vfloat<Nx> dist(inf);
-            const vbool<Nx> vmask = traversalLoop<false>(m_trav_active,node,pc,ray_ctx,dist,maskK);
-            if (unlikely(none(vmask))) goto pop;
-            BVHNNodeTraverserStreamHit<N, Nx, types>::traverseAnyHit(cur, m_trav_active, vmask, (size_t*)&maskK, stackPtr);
-#else
-            /* AVX path for up to 32 rays */
-            vint<Nx> maskK(zero);
-            vfloat<Nx> dist(inf);
-            const vbool<Nx> vmask = traversalLoop<false>(m_trav_active,node,pc,ray_ctx,dist,maskK);
-            if (unlikely(none(vmask))) goto pop;
-            BVHNNodeTraverserStreamHit<N, Nx, types>::traverseAnyHit(cur, m_trav_active, vmask, (unsigned int*)&maskK, stackPtr);
-#endif
-          }
-
-          /* current ray stream is done? */
-          if (unlikely(cur == BVH::invalidNode))
-            break;
-
-          /*! this is a leaf node */
-          assert(cur != BVH::emptyNode);
-          STAT3(shadow.trav_leaves, 1, 1, 1);
-          size_t num; Primitive* prim = (Primitive*)cur.leaf(num);
-
-          size_t lazy_node = 0;
-          size_t bits = m_trav_active & m_active;
-
-          assert(bits);
-          m_active = m_active & ~PrimitiveIntersector::occluded(pre, bits, rays, context, prim, num, lazy_node);
-          if (unlikely(m_active == 0)) break;
-        } // traversal + intersection
+        if (unlikely(terminated == (size_t)-1)) break;
       }
     }
 
@@ -588,48 +416,116 @@ namespace embree
     /// ArrayIntersectorKStream Definitions
     ////////////////////////////////////////////////////////////////////////////////
 
-    typedef ArrayIntersectorKStream<VSIZEX,
-                                    TriangleMIntersector1Moeller<SIMD_MODE(4) COMMA true >,
-                                    TriangleMIntersectorKMoeller<4 COMMA VSIZEX COMMA VSIZEX COMMA true > > Triangle4IntersectorStreamMoeller;
+    template<bool filter>
+    struct Triangle4IntersectorStreamMoeller {
+      template<int K> using Type = ArrayIntersectorKStream<K,TriangleMIntersectorKMoeller<SIMD_MODE(4) COMMA K COMMA true>>;
+    };
 
-    typedef ArrayIntersectorKStream<VSIZEX,
-                                    TriangleMIntersector1Moeller<SIMD_MODE(4) COMMA false >,
-                                    TriangleMIntersectorKMoeller<4 COMMA VSIZEX COMMA VSIZEX COMMA false > > Triangle4IntersectorStreamMoellerNoFilter;
+    template<bool filter>
+    struct Triangle4vIntersectorStreamPluecker {
+      template<int K> using Type = ArrayIntersectorKStream<K,TriangleMvIntersectorKPluecker<SIMD_MODE(4) COMMA K COMMA true>>;
+    };
 
-    typedef ArrayIntersectorKStream<VSIZEX,
-                                    TriangleMvIntersector1Pluecker<SIMD_MODE(4) COMMA true >,
-                                    TriangleMvIntersectorKPluecker<4 COMMA VSIZEX COMMA VSIZEX COMMA true > > Triangle4vIntersectorStreamPluecker;
+    template<bool filter>
+    struct Triangle4iIntersectorStreamMoeller {
+      template<int K> using Type = ArrayIntersectorKStream<K,TriangleMiIntersectorKMoeller<SIMD_MODE(4) COMMA K COMMA true>>;
+    };
 
-    typedef ArrayIntersectorKStream<VSIZEX,
-                                    TriangleMiIntersector1Moeller<SIMD_MODE(4) COMMA true >,
-                                    TriangleMiIntersectorKMoeller<4 COMMA VSIZEX COMMA VSIZEX COMMA true > > Triangle4iIntersectorStreamMoeller;
+    template<bool filter>
+    struct Triangle4iIntersectorStreamPluecker {
+      template<int K> using Type = ArrayIntersectorKStream<K,TriangleMiIntersectorKPluecker<SIMD_MODE(4) COMMA K COMMA true>>;
+    };
 
-    typedef ArrayIntersectorKStream<VSIZEX,
-                                    TriangleMiIntersector1Pluecker<SIMD_MODE(4) COMMA true >,
-                                    TriangleMiIntersectorKPluecker<4 COMMA VSIZEX COMMA VSIZEX COMMA true > > Triangle4iIntersectorStreamPluecker;
+    template<bool filter>
+    struct Quad4vIntersectorStreamMoeller {
+      template<int K> using Type = ArrayIntersectorKStream<K,QuadMvIntersectorKMoeller<4 COMMA K COMMA true>>;
+    };
 
-    typedef ArrayIntersectorKStream<VSIZEX,
-                                    QuadMvIntersector1Moeller<4 COMMA true >,
-                                    QuadMvIntersectorKMoeller<4 COMMA VSIZEX COMMA true > > Quad4vIntersectorStreamMoeller;
+    template<bool filter>
+    struct Quad4iIntersectorStreamMoeller {
+      template<int K> using Type = ArrayIntersectorKStream<K,QuadMiIntersectorKMoeller<4 COMMA K COMMA true>>;
+    };
 
-    typedef ArrayIntersectorKStream<VSIZEX,
-                                    QuadMvIntersector1Moeller<4 COMMA false >,
-                                    QuadMvIntersectorKMoeller<4 COMMA VSIZEX COMMA false > > Quad4vIntersectorStreamMoellerNoFilter;
+    template<bool filter>
+    struct Quad4vIntersectorStreamPluecker {
+      template<int K> using Type = ArrayIntersectorKStream<K,QuadMvIntersectorKPluecker<4 COMMA K COMMA true>>;
+    };
 
-    typedef ArrayIntersectorKStream<VSIZEX,
-                                    QuadMiIntersector1Moeller<4 COMMA true >,
-                                    QuadMiIntersectorKMoeller<4 COMMA VSIZEX COMMA true > > Quad4iIntersectorStreamMoeller;
+    template<bool filter>
+    struct Quad4iIntersectorStreamPluecker {
+      template<int K> using Type = ArrayIntersectorKStream<K,QuadMiIntersectorKPluecker<4 COMMA K COMMA true>>;
+    };
 
-    typedef ArrayIntersectorKStream<VSIZEX,
-                                    QuadMvIntersector1Pluecker<4 COMMA true >,
-                                    QuadMvIntersectorKPluecker<4 COMMA VSIZEX COMMA true > > Quad4vIntersectorStreamPluecker;
+    struct ObjectIntersectorStream {
+      template<int K> using Type = ArrayIntersectorKStream<K,ObjectIntersectorK<K COMMA false>>;
+    };
 
-    typedef ArrayIntersectorKStream<VSIZEX,
-                                    QuadMiIntersector1Pluecker<4 COMMA true >,
-                                    QuadMiIntersectorKPluecker<4 COMMA VSIZEX COMMA true > > Quad4iIntersectorStreamPluecker;
+    struct InstanceIntersectorStream {
+      template<int K> using Type = ArrayIntersectorKStream<K,InstanceIntersectorK<K>>;
+    };
 
-    typedef ArrayIntersectorKStream<VSIZEX,
-                                    ObjectIntersector1<false>,
-                                    ObjectIntersectorK<VSIZEX COMMA false > > ObjectIntersectorStream;
+    // =====================================================================================================
+    // =====================================================================================================
+    // =====================================================================================================
+
+    template<int N, int Nx>
+    void BVHNIntersectorStreamPacketFallback<N, Nx>::intersect(Accel::Intersectors* __restrict__ This,
+                                                               RayHitN** inputRays,
+                                                               size_t numTotalRays,
+                                                               IntersectContext* context)
+    {
+      if (unlikely(context->isCoherent()))
+        intersectK(This, (RayHitK<VSIZEL>**)inputRays, numTotalRays, context);
+      else
+        intersectK(This, (RayHitK<VSIZEX>**)inputRays, numTotalRays, context);
+    }
+
+    template<int N, int Nx>
+    void BVHNIntersectorStreamPacketFallback<N, Nx>::occluded(Accel::Intersectors* __restrict__ This,
+                                                              RayN** inputRays,
+                                                              size_t numTotalRays,
+                                                              IntersectContext* context)
+    {
+      if (unlikely(context->isCoherent()))
+        occludedK(This, (RayK<VSIZEL>**)inputRays, numTotalRays, context);
+      else
+        occludedK(This, (RayK<VSIZEX>**)inputRays, numTotalRays, context);
+    }
+
+    template<int N, int Nx>
+    template<int K>
+    __noinline void BVHNIntersectorStreamPacketFallback<N, Nx>::intersectK(Accel::Intersectors* __restrict__ This,
+                                                                              RayHitK<K>** inputRays,
+                                                                              size_t numTotalRays,
+                                                                              IntersectContext* context)
+    {
+      /* fallback to packets */
+      for (size_t i = 0; i < numTotalRays; i += K)
+      {
+        const vint<K> vi = vint<K>(int(i)) + vint<K>(step);
+        vbool<K> valid = vi < vint<K>(int(numTotalRays));
+        RayHitK<K>& ray = *(inputRays[i / K]);
+        valid &= ray.tnear() <= ray.tfar;
+        This->intersect(valid, ray, context);
+      }
+    }
+
+    template<int N, int Nx>
+    template<int K>
+    __noinline void BVHNIntersectorStreamPacketFallback<N, Nx>::occludedK(Accel::Intersectors* __restrict__ This,
+                                                                             RayK<K>** inputRays,
+                                                                             size_t numTotalRays,
+                                                                             IntersectContext* context)
+    {
+      /* fallback to packets */
+      for (size_t i = 0; i < numTotalRays; i += K)
+      {
+        const vint<K> vi = vint<K>(int(i)) + vint<K>(step);
+        vbool<K> valid = vi < vint<K>(int(numTotalRays));
+        RayK<K>& ray = *(inputRays[i / K]);
+        valid &= ray.tnear() <= ray.tfar;
+        This->occluded(valid, ray, context);
+      }
+    }
   }
 }

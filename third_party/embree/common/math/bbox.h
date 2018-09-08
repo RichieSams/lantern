@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2017 Intel Corporation                                    //
+// Copyright 2009-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -198,6 +198,7 @@ namespace embree
   /*! default template instantiations */
   typedef BBox<float> BBox1f;
   typedef BBox<Vec2f> BBox2f;
+  typedef BBox<Vec2fa> BBox2fa;
   typedef BBox<Vec3f> BBox3f;
   typedef BBox<Vec3fa> BBox3fa;
 }

@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2017 Intel Corporation                                    //
+// Copyright 2009-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -25,34 +25,25 @@ namespace embree
 
   struct IntersectContext
   {
-    enum {
-      INPUT_RAY_DATA_AOS   = 0,
-      INPUT_RAY_DATA_SOA4  = 4,
-      INPUT_RAY_DATA_SOA8  = 8,
-      INPUT_RAY_DATA_SOA16 = 16
-    };
-
   public:
-    __forceinline IntersectContext(Scene* scene, const RTCIntersectContext* user_context)
-      : scene(scene), user(user_context), flags(INPUT_RAY_DATA_AOS), geomID_to_instID(nullptr) {}
+    __forceinline IntersectContext(Scene* scene, RTCIntersectContext* user_context)
+      : scene(scene), user(user_context), instID(user_context->instID[0]) {}
 
+    __forceinline bool hasContextFilter() const {
+      return user->filter != nullptr;
+    }
+
+    __forceinline bool isCoherent() const {
+      return embree::isCoherent(user->flags);
+    }
+
+    __forceinline bool isIncoherent() const {
+      return embree::isIncoherent(user->flags);
+    }
+    
   public:
     Scene* scene;
-    const RTCIntersectContext* user;
-    size_t flags;
-    const unsigned* geomID_to_instID; // required for xfm node handling
-    unsigned instID; // required for xfm node handling
-    unsigned geomID; // required for xfm node handling
-
-    __forceinline void setInputSOA(size_t width)
-    {
-      assert(width == 4 || width == 8 || width == 16);
-      flags = width;
-    }
-
-    __forceinline size_t getInputSOAWidth()
-    {
-      return flags;
-    }
+    RTCIntersectContext* user;
+    unsigned int instID;
   };
 }

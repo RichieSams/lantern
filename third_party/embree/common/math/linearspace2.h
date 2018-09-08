@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2017 Intel Corporation                                    //
+// Copyright 2009-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -58,10 +58,10 @@ namespace embree
     __forceinline const LinearSpace2 transposed() const { return LinearSpace2(vx.x,vx.y,vy.x,vy.y); }
 
     /*! returns first row of matrix */
-    __forceinline const Vector row0() const { return Vector(vx.x,vy.x); }
+    __forceinline Vector row0() const { return Vector(vx.x,vy.x); }
 
     /*! returns second row of matrix */
-    __forceinline const Vector row1() const { return Vector(vx.y,vy.y); }
+    __forceinline Vector row1() const { return Vector(vx.y,vy.y); }
 
     ////////////////////////////////////////////////////////////////////////////////
     /// Constants
@@ -157,4 +157,5 @@ namespace embree
 
   /*! Shortcuts for common linear spaces. */
   typedef LinearSpace2<Vec2f> LinearSpace2f;
+  typedef LinearSpace2<Vec2fa> LinearSpace2fa;
 }

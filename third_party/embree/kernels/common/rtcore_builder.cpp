@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2017 Intel Corporation                                    //
+// Copyright 2009-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -15,9 +15,9 @@
 // ======================================================================== //
 
 #ifdef _WIN32
-#  define RTCORE_API extern "C" __declspec(dllexport)
+#  define RTC_API extern "C" __declspec(dllexport)
 #else
-#  define RTCORE_API extern "C" __attribute__ ((visibility ("default")))
+#  define RTC_API extern "C" __attribute__ ((visibility ("default")))
 #endif
 
 #include "default.h"
@@ -33,49 +33,59 @@ namespace embree
 { 
   namespace isa // FIXME: support more ISAs for builders
   {
-    struct BVH
+    struct BVH : public RefCount
     {
       BVH (Device* device)
-        : device(device), isStatic(false), allocator(device,true), morton_src(device,0), morton_tmp(device,0) {}
+        : device(device), allocator(device,true), morton_src(device,0), morton_tmp(device,0)
+      {
+        device->refInc();
+      }
+
+      ~BVH() {
+        device->refDec();
+      }
 
     public:
       Device* device;
-      bool isStatic;
       FastAllocator allocator;
       mvector<BVHBuilderMorton::BuildPrim> morton_src;
       mvector<BVHBuilderMorton::BuildPrim> morton_tmp;
     };
 
-    RTCORE_API RTCBVH rtcNewBVH(RTCDevice device)
+    RTC_API RTCBVH rtcNewBVH(RTCDevice device)
     {
-      RTCORE_CATCH_BEGIN;
-      RTCORE_TRACE(rtcNewAllocator);
-      RTCORE_VERIFY_HANDLE(device);
-      return (RTCBVH) new BVH((Device*)device);
-      RTCORE_CATCH_END((Device*)device);
+      RTC_CATCH_BEGIN;
+      RTC_TRACE(rtcNewAllocator);
+      RTC_VERIFY_HANDLE(device);
+      BVH* bvh = new BVH((Device*)device);
+      return (RTCBVH) bvh->refInc();
+      RTC_CATCH_END((Device*)device);
       return nullptr;
     }
 
-    void* rtcBuildBVHMorton(BVH* bvh,
-                            const RTCBuildSettings& settings,
-                            RTCBuildPrimitive* prims_i,
-                            size_t numPrimitives,
-                            RTCCreateNodeFunc createNode,
-                            RTCSetNodeChildrenFunc setNodeChildren,
-                            RTCSetNodeBoundsFunc setNodeBounds,
-                            RTCCreateLeafFunc createLeaf,
-                            RTCBuildProgressFunc buildProgress,
-                            void* userPtr)
+    void* rtcBuildBVHMorton(const RTCBuildArguments* arguments)
     {
+      BVH* bvh = (BVH*) arguments->bvh;
+      RTCBuildPrimitive* prims_i =  arguments->primitives;
+      size_t primitiveCount = arguments->primitiveCount;
+      RTCCreateNodeFunction createNode = arguments->createNode;
+      RTCSetNodeChildrenFunction setNodeChildren = arguments->setNodeChildren;
+      RTCSetNodeBoundsFunction setNodeBounds = arguments->setNodeBounds;
+      RTCCreateLeafFunction createLeaf = arguments->createLeaf;
+      RTCProgressMonitorFunction buildProgress = arguments->buildProgress;
+      void* userPtr = arguments->userPtr;
+        
+      std::atomic<size_t> progress(0);
+      
       /* initialize temporary arrays for morton builder */
       PrimRef* prims = (PrimRef*) prims_i;
       mvector<BVHBuilderMorton::BuildPrim>& morton_src = bvh->morton_src;
       mvector<BVHBuilderMorton::BuildPrim>& morton_tmp = bvh->morton_tmp;
-      morton_src.resize(numPrimitives);
-      morton_tmp.resize(numPrimitives);
+      morton_src.resize(primitiveCount);
+      morton_tmp.resize(primitiveCount);
 
       /* compute centroid bounds */
-      const BBox3fa centBounds = parallel_reduce ( size_t(0), numPrimitives, BBox3fa(empty), [&](const range<size_t>& r) -> BBox3fa {
+      const BBox3fa centBounds = parallel_reduce ( size_t(0), primitiveCount, BBox3fa(empty), [&](const range<size_t>& r) -> BBox3fa {
 
           BBox3fa bounds(empty);
           for (size_t i=r.begin(); i<r.end(); i++) 
@@ -85,7 +95,7 @@ namespace embree
       
       /* compute morton codes */
       BVHBuilderMorton::MortonCodeMapping mapping(centBounds);
-      parallel_for ( size_t(0), numPrimitives, [&](const range<size_t>& r) {
+      parallel_for ( size_t(0), primitiveCount, [&](const range<size_t>& r) {
           BVHBuilderMorton::MortonCodeGenerator generator(mapping,&morton_src[r.begin()]);
           for (size_t i=r.begin(); i<r.end(); i++) {
             generator(prims[i].bounds(),(unsigned) i);
@@ -102,7 +112,7 @@ namespace embree
         
         /* lambda function that allocates BVH nodes */
         [&] ( const FastAllocator::CachedAllocator& alloc, size_t N ) -> void* {
-          return createNode((RTCThreadLocalAllocator)&alloc,N,userPtr);
+          return createNode((RTCThreadLocalAllocator)&alloc, (unsigned int)N,userPtr);
         },
         
         /* lambda function that sets bounds */
@@ -116,8 +126,8 @@ namespace embree
             childptrs[i] = children[i].first;
             cbounds[i] = (const RTCBounds*)&children[i].second;
           }
-          setNodeBounds(node,cbounds,N,userPtr);
-          setNodeChildren(node,childptrs,N,userPtr);
+          setNodeBounds(node,cbounds,(unsigned int)N,userPtr);
+          setNodeChildren(node,childptrs, (unsigned int)N,userPtr);
           return std::make_pair(node,bounds);
         },
         
@@ -136,28 +146,34 @@ namespace embree
         },
         
         /* progress monitor function */
-        [&] (size_t dn) { 
-          if (buildProgress) buildProgress(dn,userPtr);
+        [&] (size_t dn) {
+          if (!buildProgress) return true;
+          const size_t n = progress.fetch_add(dn)+dn;
+          const double f = std::min(1.0,double(n)/double(primitiveCount));
+          return buildProgress(userPtr,f);
         },
         
-        morton_src.data(),morton_tmp.data(),numPrimitives,
-        settings);
+        morton_src.data(),morton_tmp.data(),primitiveCount,
+        *arguments);
 
       bvh->allocator.cleanup();
       return root.first;
     }
 
-    void* rtcBuildBVHBinnedSAH(BVH* bvh,
-                               const RTCBuildSettings& settings,
-                               RTCBuildPrimitive* prims,
-                               size_t numPrimitives,
-                               RTCCreateNodeFunc createNode,
-                               RTCSetNodeChildrenFunc setNodeChildren,
-                               RTCSetNodeBoundsFunc setNodeBounds,
-                               RTCCreateLeafFunc createLeaf,
-                               RTCBuildProgressFunc buildProgress,
-                               void* userPtr)
+    void* rtcBuildBVHBinnedSAH(const RTCBuildArguments* arguments)
     {
+      BVH* bvh = (BVH*) arguments->bvh;
+      RTCBuildPrimitive* prims =  arguments->primitives;
+      size_t primitiveCount = arguments->primitiveCount;
+      RTCCreateNodeFunction createNode = arguments->createNode;
+      RTCSetNodeChildrenFunction setNodeChildren = arguments->setNodeChildren;
+      RTCSetNodeBoundsFunction setNodeBounds = arguments->setNodeBounds;
+      RTCCreateLeafFunction createLeaf = arguments->createLeaf;
+      RTCProgressMonitorFunction buildProgress = arguments->buildProgress;
+      void* userPtr = arguments->userPtr;
+      
+      std::atomic<size_t> progress(0);
+  
       /* calculate priminfo */
       auto computeBounds = [&](const range<size_t>& r) -> CentGeomBBox3fa
         {
@@ -167,9 +183,9 @@ namespace embree
           return bounds;
         };
       const CentGeomBBox3fa bounds = 
-        parallel_reduce(size_t(0),numPrimitives,size_t(1024),size_t(1024),CentGeomBBox3fa(empty), computeBounds, CentGeomBBox3fa::merge2);
+        parallel_reduce(size_t(0),primitiveCount,size_t(1024),size_t(1024),CentGeomBBox3fa(empty), computeBounds, CentGeomBBox3fa::merge2);
 
-      const PrimInfo pinfo(0,numPrimitives,bounds.geomBounds,bounds.centBounds);
+      const PrimInfo pinfo(0,primitiveCount,bounds);
       
       /* build BVH */
       void* root = BVHBuilderBinnedSAH::build<void*>(
@@ -182,47 +198,53 @@ namespace embree
         /* lambda function that creates BVH nodes */
         [&](BVHBuilderBinnedSAH::BuildRecord* children, const size_t N, const FastAllocator::CachedAllocator& alloc) -> void*
         {
-          void* node = createNode((RTCThreadLocalAllocator)&alloc,N,userPtr);
+          void* node = createNode((RTCThreadLocalAllocator)&alloc, (unsigned int)N,userPtr);
           const RTCBounds* cbounds[GeneralBVHBuilder::MAX_BRANCHING_FACTOR];
           for (size_t i=0; i<N; i++) cbounds[i] = (const RTCBounds*) &children[i].prims.geomBounds;
-          setNodeBounds(node,cbounds,N,userPtr);
+          setNodeBounds(node,cbounds, (unsigned int)N,userPtr);
           return node;
         },
 
         /* lambda function that updates BVH nodes */
         [&](const BVHBuilderBinnedSAH::BuildRecord& precord, const BVHBuilderBinnedSAH::BuildRecord* crecords, void* node, void** children, const size_t N) -> void* {
-          setNodeChildren(node,children,N,userPtr);
+          setNodeChildren(node,children, (unsigned int)N,userPtr);
           return node;
         },
         
         /* lambda function that creates BVH leaves */
-        [&](const range<size_t>& range, const FastAllocator::CachedAllocator& alloc) -> void* {
-          return createLeaf((RTCThreadLocalAllocator)&alloc,prims+range.begin(),range.size(),userPtr);
+        [&](const PrimRef* prims, const range<size_t>& range, const FastAllocator::CachedAllocator& alloc) -> void* {
+          return createLeaf((RTCThreadLocalAllocator)&alloc,(RTCBuildPrimitive*)(prims+range.begin()),range.size(),userPtr);
         },
         
         /* progress monitor function */
-        [&] (size_t dn) { 
-          if (buildProgress) buildProgress(dn,userPtr);
+        [&] (size_t dn) {
+          if (!buildProgress) return true;
+          const size_t n = progress.fetch_add(dn)+dn;
+          const double f = std::min(1.0,double(n)/double(primitiveCount));
+          return buildProgress(userPtr,f);
         },
         
-        (PrimRef*)prims,pinfo,settings);
+        (PrimRef*)prims,pinfo,*arguments);
         
       bvh->allocator.cleanup();
       return root;
     }
 
-     void* rtcBuildBVHSpatialSAH(BVH* bvh,
-                                 const RTCBuildSettings& settings,
-                                 RTCBuildPrimitive* prims,
-                                 size_t numPrimitives,
-                                 RTCCreateNodeFunc createNode,
-                                 RTCSetNodeChildrenFunc setNodeChildren,
-                                 RTCSetNodeBoundsFunc setNodeBounds,
-                                 RTCCreateLeafFunc createLeaf,
-                                 RTCSplitPrimitiveFunc splitPrimitive,
-                                 RTCBuildProgressFunc buildProgress,
-                                 void* userPtr)
+    void* rtcBuildBVHSpatialSAH(const RTCBuildArguments* arguments)
     {
+      BVH* bvh = (BVH*) arguments->bvh;
+      RTCBuildPrimitive* prims =  arguments->primitives;
+      size_t primitiveCount = arguments->primitiveCount;
+      RTCCreateNodeFunction createNode = arguments->createNode;
+      RTCSetNodeChildrenFunction setNodeChildren = arguments->setNodeChildren;
+      RTCSetNodeBoundsFunction setNodeBounds = arguments->setNodeBounds;
+      RTCCreateLeafFunction createLeaf = arguments->createLeaf;
+      RTCSplitPrimitiveFunction splitPrimitive = arguments->splitPrimitive;
+      RTCProgressMonitorFunction buildProgress = arguments->buildProgress;
+      void* userPtr = arguments->userPtr;
+      
+      std::atomic<size_t> progress(0);
+  
       /* calculate priminfo */
       auto computeBounds = [&](const range<size_t>& r) -> CentGeomBBox3fa
         {
@@ -232,20 +254,20 @@ namespace embree
           return bounds;
         };
       const CentGeomBBox3fa bounds = 
-        parallel_reduce(size_t(0),numPrimitives,size_t(1024),size_t(1024),CentGeomBBox3fa(empty), computeBounds, CentGeomBBox3fa::merge2);
+        parallel_reduce(size_t(0),primitiveCount,size_t(1024),size_t(1024),CentGeomBBox3fa(empty), computeBounds, CentGeomBBox3fa::merge2);
 
-      const PrimInfo pinfo(0,numPrimitives,bounds.geomBounds,bounds.centBounds);
+      const PrimInfo pinfo(0,primitiveCount,bounds);
 
       /* function that splits a build primitive */
       struct Splitter
       {
-        Splitter (RTCSplitPrimitiveFunc splitPrimitive, unsigned geomID, unsigned primID, void* userPtr)
+        Splitter (RTCSplitPrimitiveFunction splitPrimitive, unsigned geomID, unsigned primID, void* userPtr)
           : splitPrimitive(splitPrimitive), geomID(geomID), primID(primID), userPtr(userPtr) {}
         
         __forceinline void operator() (PrimRef& prim, const size_t dim, const float pos, PrimRef& left_o, PrimRef& right_o) const 
         {
           prim.geomIDref() &= BVHBuilderBinnedFastSpatialSAH::GEOMID_MASK;
-          splitPrimitive((RTCBuildPrimitive&)prim,(unsigned)dim,pos,(RTCBounds&)left_o,(RTCBounds&)right_o,userPtr);
+          splitPrimitive((RTCBuildPrimitive*)&prim,(unsigned)dim,pos,(RTCBounds*)&left_o,(RTCBounds*)&right_o,userPtr);
           left_o.geomIDref()  = geomID; left_o.primIDref()  = primID;
           right_o.geomIDref() = geomID; right_o.primIDref() = primID;
         }
@@ -253,10 +275,10 @@ namespace embree
         __forceinline void operator() (const BBox3fa& box, const size_t dim, const float pos, BBox3fa& left_o, BBox3fa& right_o) const 
         {
           PrimRef prim(box,geomID & BVHBuilderBinnedFastSpatialSAH::GEOMID_MASK,primID);
-          splitPrimitive((RTCBuildPrimitive&)prim,(unsigned)dim,pos,(RTCBounds&)left_o,(RTCBounds&)right_o,userPtr);
+          splitPrimitive((RTCBuildPrimitive*)&prim,(unsigned)dim,pos,(RTCBounds*)&left_o,(RTCBounds*)&right_o,userPtr);
         }
    
-        RTCSplitPrimitiveFunc splitPrimitive;
+        RTCSplitPrimitiveFunction splitPrimitive;
         unsigned geomID;
         unsigned primID;
         void* userPtr;
@@ -273,22 +295,22 @@ namespace embree
         /* lambda function that creates BVH nodes */
         [&] (BVHBuilderBinnedFastSpatialSAH::BuildRecord* children, const size_t N, const FastAllocator::CachedAllocator& alloc) -> void*
         {
-          void* node = createNode((RTCThreadLocalAllocator)&alloc,N,userPtr);
+          void* node = createNode((RTCThreadLocalAllocator)&alloc, (unsigned int)N,userPtr);
           const RTCBounds* cbounds[GeneralBVHBuilder::MAX_BRANCHING_FACTOR];
           for (size_t i=0; i<N; i++) cbounds[i] = (const RTCBounds*) &children[i].prims.geomBounds;
-          setNodeBounds(node,cbounds,N,userPtr);
+          setNodeBounds(node,cbounds, (unsigned int)N,userPtr);
           return node;
         },
 
         /* lambda function that updates BVH nodes */
         [&] (const BVHBuilderBinnedFastSpatialSAH::BuildRecord& precord, const BVHBuilderBinnedFastSpatialSAH::BuildRecord* crecords, void* node, void** children, const size_t N) -> void* {
-          setNodeChildren(node,children,N,userPtr);
+          setNodeChildren(node,children, (unsigned int)N,userPtr);
           return node;
         },
         
         /* lambda function that creates BVH leaves */
-        [&] (const range<size_t>& range, const FastAllocator::CachedAllocator& alloc) -> void* {
-          return createLeaf((RTCThreadLocalAllocator)&alloc,prims+range.begin(),range.size(),userPtr);
+        [&] (const PrimRef* prims, const range<size_t>& range, const FastAllocator::CachedAllocator& alloc) -> void* {
+          return createLeaf((RTCThreadLocalAllocator)&alloc,(RTCBuildPrimitive*)(prims+range.begin()),range.size(),userPtr);
         },
         
         /* returns the splitter */
@@ -297,96 +319,106 @@ namespace embree
         },
 
         /* progress monitor function */
-        [&] (size_t dn) { 
-          if (buildProgress) buildProgress(dn,userPtr);
+        [&] (size_t dn) {
+          if (!buildProgress) return true;
+          const size_t n = progress.fetch_add(dn)+dn;
+          const double f = std::min(1.0,double(n)/double(primitiveCount));
+          return buildProgress(userPtr,f);
         },
         
         (PrimRef*)prims,
-        pinfo.size()+settings.extraSpace,
-        pinfo,settings);
+        arguments->primitiveArrayCapacity,
+        pinfo,*arguments);
         
       bvh->allocator.cleanup();
       return root;
     }
 
-    RTCORE_API void* rtcBuildBVH(RTCBVH hbvh,
-                                 const RTCBuildSettings& settings,
-                                 RTCBuildPrimitive* prims,
-                                 size_t numPrimitives,
-                                 RTCCreateNodeFunc createNode,
-                                 RTCSetNodeChildrenFunc setNodeChildren,
-                                 RTCSetNodeBoundsFunc setNodeBounds,
-                                 RTCCreateLeafFunc createLeaf,
-                                 RTCSplitPrimitiveFunc splitPrimitive,
-                                 RTCBuildProgressFunc buildProgress,
-                                 void* userPtr)
+    RTC_API void* rtcBuildBVH(const RTCBuildArguments* arguments)
     {
-      BVH* bvh = (BVH*) hbvh;
-      RTCORE_CATCH_BEGIN;
-      RTCORE_TRACE(rtcBuildBVH);
-      RTCORE_VERIFY_HANDLE(hbvh);
-      RTCORE_VERIFY_HANDLE(createNode);
-      RTCORE_VERIFY_HANDLE(setNodeChildren);
-      RTCORE_VERIFY_HANDLE(setNodeBounds);
-      RTCORE_VERIFY_HANDLE(createLeaf);
+      BVH* bvh = (BVH*) arguments->bvh;
+      RTC_CATCH_BEGIN;
+      RTC_TRACE(rtcBuildBVH);
+      RTC_VERIFY_HANDLE(bvh);
+      RTC_VERIFY_HANDLE(arguments);
+      RTC_VERIFY_HANDLE(arguments->createNode);
+      RTC_VERIFY_HANDLE(arguments->setNodeChildren);
+      RTC_VERIFY_HANDLE(arguments->setNodeBounds);
+      RTC_VERIFY_HANDLE(arguments->createLeaf);
 
-      /* if we made this BVH static, we can not re-build it anymore  */
-      if (bvh->isStatic)
-        throw_RTCError(RTC_INVALID_OPERATION,"static BVH cannot get rebuild");
+      if (arguments->primitiveArrayCapacity < arguments->primitiveCount)
+        throw_RTCError(RTC_ERROR_INVALID_ARGUMENT,"primitiveArrayCapacity must be greater or equal to primitiveCount")
 
       /* initialize the allocator */
-      bvh->allocator.init_estimate(numPrimitives*sizeof(BBox3fa));
+      bvh->allocator.init_estimate(arguments->primitiveCount*sizeof(BBox3fa));
       bvh->allocator.reset();
 
       /* switch between differnet builders based on quality level */
-      if (settings.quality == RTC_BUILD_QUALITY_LOW)
-        return rtcBuildBVHMorton   (bvh,settings,prims,numPrimitives,createNode,setNodeChildren,setNodeBounds,createLeaf,buildProgress,userPtr);
-      else if (settings.quality == RTC_BUILD_QUALITY_NORMAL)
-        return rtcBuildBVHBinnedSAH(bvh,settings,prims,numPrimitives,createNode,setNodeChildren,setNodeBounds,createLeaf,buildProgress,userPtr);
-      else if (settings.quality == RTC_BUILD_QUALITY_HIGH) {
-        if (splitPrimitive == nullptr || settings.extraSpace == 0)
-          return rtcBuildBVHBinnedSAH(bvh,settings,prims,numPrimitives,createNode,setNodeChildren,setNodeBounds,createLeaf,buildProgress,userPtr);
+      if (arguments->buildQuality == RTC_BUILD_QUALITY_LOW)
+        return rtcBuildBVHMorton(arguments);
+      else if (arguments->buildQuality == RTC_BUILD_QUALITY_MEDIUM)
+        return rtcBuildBVHBinnedSAH(arguments);
+      else if (arguments->buildQuality == RTC_BUILD_QUALITY_HIGH) {
+        if (arguments->splitPrimitive == nullptr || arguments->primitiveArrayCapacity <= arguments->primitiveCount)
+          return rtcBuildBVHBinnedSAH(arguments);
         else
-          return rtcBuildBVHSpatialSAH(bvh,settings,prims,numPrimitives,createNode,setNodeChildren,setNodeBounds,createLeaf,splitPrimitive,buildProgress,userPtr);  
+          return rtcBuildBVHSpatialSAH(arguments);
       }
       else
-        throw_RTCError(RTC_INVALID_OPERATION,"invalid build quality");
+        throw_RTCError(RTC_ERROR_INVALID_OPERATION,"invalid build quality");
 
-      RTCORE_CATCH_END(bvh->device);
+      /* if we are in dynamic mode, then do not clear temporary data */
+      if (!(arguments->buildFlags & RTC_BUILD_FLAG_DYNAMIC))
+      {
+        bvh->morton_src.clear();
+        bvh->morton_tmp.clear();
+      }
+
+      RTC_CATCH_END(bvh->device);
       return nullptr;
     }
 
-    RTCORE_API void* rtcThreadLocalAlloc(RTCThreadLocalAllocator localAllocator, size_t bytes, size_t align)
+    RTC_API void* rtcThreadLocalAlloc(RTCThreadLocalAllocator localAllocator, size_t bytes, size_t align)
     {
       FastAllocator::CachedAllocator* alloc = (FastAllocator::CachedAllocator*) localAllocator;
-      RTCORE_CATCH_BEGIN;
-      RTCORE_TRACE(rtcThreadLocalAlloc);
+      RTC_CATCH_BEGIN;
+      RTC_TRACE(rtcThreadLocalAlloc);
       return alloc->malloc0(bytes,align);
-      RTCORE_CATCH_END(alloc->alloc->getDevice());
+      RTC_CATCH_END(alloc->alloc->getDevice());
       return nullptr;
     }
 
-    RTCORE_API void rtcMakeStaticBVH(RTCBVH hbvh)
+    RTC_API void rtcMakeStaticBVH(RTCBVH hbvh)
     {
       BVH* bvh = (BVH*) hbvh;
-      RTCORE_CATCH_BEGIN;
-      RTCORE_TRACE(rtcStaticBVH);
-      RTCORE_VERIFY_HANDLE(hbvh);
+      RTC_CATCH_BEGIN;
+      RTC_TRACE(rtcStaticBVH);
+      RTC_VERIFY_HANDLE(hbvh);
       bvh->morton_src.clear();
       bvh->morton_tmp.clear();
-      bvh->isStatic = true;
-      RTCORE_CATCH_END(bvh->device);
+      RTC_CATCH_END(bvh->device);
     }
 
-    RTCORE_API void rtcDeleteBVH(RTCBVH hbvh)
+    RTC_API void rtcRetainBVH(RTCBVH hbvh)
     {
       BVH* bvh = (BVH*) hbvh;
       Device* device = bvh ? bvh->device : nullptr;
-      RTCORE_CATCH_BEGIN;
-      RTCORE_TRACE(rtcDeleteAllocator);
-      RTCORE_VERIFY_HANDLE(hbvh);
-      delete bvh;
-      RTCORE_CATCH_END(device);
+      RTC_CATCH_BEGIN;
+      RTC_TRACE(rtcRetainBVH);
+      RTC_VERIFY_HANDLE(hbvh);
+      bvh->refInc();
+      RTC_CATCH_END(device);
+    }
+    
+    RTC_API void rtcReleaseBVH(RTCBVH hbvh)
+    {
+      BVH* bvh = (BVH*) hbvh;
+      Device* device = bvh ? bvh->device : nullptr;
+      RTC_CATCH_BEGIN;
+      RTC_TRACE(rtcReleaseBVH);
+      RTC_VERIFY_HANDLE(hbvh);
+      bvh->refDec();
+      RTC_CATCH_END(device);
     }
   }
 }

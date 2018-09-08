@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2017 Intel Corporation                                    //
+// Copyright 2009-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -19,53 +19,9 @@
 
 namespace embree
 {
-  AccelSet::AccelSet (Scene* scene, RTCGeometryFlags gflags, size_t numItems, size_t numTimeSteps) 
-    : Geometry(scene,Geometry::USER_GEOMETRY,numItems,numTimeSteps,gflags), boundsFunc(nullptr), boundsFunc2(nullptr), boundsFunc3(nullptr), boundsFuncUserPtr(nullptr)
-  {
-    intersectors.ptr = nullptr; 
-    enabling();
-  }
+  AccelSet::AccelSet (Device* device, Geometry::GType gtype, size_t numItems, size_t numTimeSteps) 
+    : Geometry(device,gtype,(unsigned int)numItems,(unsigned int)numTimeSteps), boundsFunc(nullptr) {}
 
-  void AccelSet::enabling () {
-    if (numTimeSteps == 1) scene->world.numUserGeometries += numPrimitives;
-    else                   scene->worldMB.numUserGeometries += numPrimitives;
-  }
-  
-  void AccelSet::disabling() { 
-    if (numTimeSteps == 1) scene->world.numUserGeometries -= numPrimitives;
-    else                   scene->worldMB.numUserGeometries -= numPrimitives;
-  }
-
-  AccelSet::Intersector1::Intersector1 (ErrorFunc error) 
-    : intersect((IntersectFunc)error), occluded((OccludedFunc)error), name(nullptr) {}
-  
-  AccelSet::Intersector1::Intersector1 (IntersectFunc intersect, OccludedFunc occluded, const char* name)
-    : intersect(intersect), occluded(occluded), name(name) {}
-  
-  AccelSet::Intersector4::Intersector4 (ErrorFunc error) 
-    : intersect((void*)error), occluded((void*)error), name(nullptr), ispc(false) {}
-  
-  AccelSet::Intersector4::Intersector4 (void* intersect, void* occluded, const char* name, bool ispc)
-    : intersect(intersect), occluded(occluded), name(name), ispc(ispc) {}
-  
-  AccelSet::Intersector8::Intersector8 (ErrorFunc error) 
-    : intersect((void*)error), occluded((void*)error), name(nullptr), ispc(false) {}
-  
-  AccelSet::Intersector8::Intersector8 (void* intersect, void* occluded, const char* name, bool ispc)
-    : intersect(intersect), occluded(occluded), name(name), ispc(ispc) {}
-  
-  AccelSet::Intersector16::Intersector16 (ErrorFunc error) 
-    : intersect((void*)error), occluded((void*)error), name(nullptr), ispc(false) {}
-  
-  AccelSet::Intersector16::Intersector16 (void* intersect, void* occluded, const char* name, bool ispc)
-    : intersect(intersect), occluded(occluded), name(name), ispc(ispc) {}
-
-  AccelSet::Intersector1M::Intersector1M (ErrorFunc error) 
-    : intersect((IntersectFunc1M)error), occluded((OccludedFunc1M)error), name(nullptr) {}
-  
-  AccelSet::Intersector1M::Intersector1M (IntersectFunc1M intersect, OccludedFunc1M occluded, const char* name)
-    : intersect(intersect), occluded(occluded), name(name) {}
-  
   AccelSet::IntersectorN::IntersectorN (ErrorFunc error) 
     : intersect((IntersectFuncN)error), occluded((OccludedFuncN)error), name(nullptr) {}
   

@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2017 Intel Corporation                                    //
+// Copyright 2009-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -18,11 +18,10 @@
 
 #include "../common/ray.h"
 #include "../common/scene_subdiv_mesh.h"
-#include "filter.h"
 #include "../bvh/bvh.h"
 #include "../subdiv/tessellation.h"
 #include "../subdiv/tessellation_cache.h"
-#include "subdivpatch1cached.h"
+#include "subdivpatch1.h"
 
 namespace embree
 {
@@ -252,8 +251,8 @@ namespace embree
         typedef typename vfloat::Int vint;
         const vint iu  = asInt(uv) & 0xffff;
         const vint iv  = srl(asInt(uv),16);
-	const vfloat u = (vfloat)iu * vfloat(1.0f/0xFFFF);
-	const vfloat v = (vfloat)iv * vfloat(1.0f/0xFFFF);
+	const vfloat u = (vfloat)iu * vfloat(8.0f/0x10000);
+	const vfloat v = (vfloat)iv * vfloat(8.0f/0x10000);
 	return Vec2<vfloat>(u,v);
       }
       

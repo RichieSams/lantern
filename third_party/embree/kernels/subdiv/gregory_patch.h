@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2017 Intel Corporation                                    //
+// Copyright 2009-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -566,7 +566,7 @@ namespace embree
       const Vertex_t tangentV = deCasteljau_tangent(vv, row0, row1, row2, row3);
       
       /* normal = tangentU x tangentV */
-      const Vertex_t n = cross(tangentV,tangentU);
+      const Vertex_t n = cross(tangentU,tangentV);
       
       return n;     
     }
@@ -826,7 +826,7 @@ namespace embree
       const Vec3<T> tangentV = deCasteljau_tangent(vv, row0, row1, row2, row3);
       
       /* normal = tangentU x tangentV */
-      const Vec3<T> n = cross(tangentV,tangentU);
+      const Vec3<T> n = cross(tangentU,tangentV);
       return n;
     }
 

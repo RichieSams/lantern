@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2017 Intel Corporation                                    //
+// Copyright 2009-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -24,8 +24,10 @@ namespace embree
   {
     struct Type : public PrimitiveType 
     {
-      Type ();
-      size_t size(const char* This) const;
+      const char* name() const;
+      size_t sizeActive(const char* This) const;
+      size_t sizeTotal(const char* This) const;
+      size_t getBytes(const char* This) const;
     };
     static Type type;
 
@@ -34,7 +36,7 @@ namespace embree
     /* primitive supports multiple time segments */
     static const bool singleTimeSegment = false;
 
-    /* Returns maximal number of stored primitives */
+    /* Returns maximum number of stored primitives */
     static __forceinline size_t max_size() { return 1; }
 
     /* Returns required number of primitive blocks for N primitives */
@@ -89,7 +91,7 @@ namespace embree
     }
 
   private:
-    unsigned _geomID;  //!< geometry ID
-    unsigned _primID;  //!< primitive ID
+    unsigned int _geomID;  //!< geometry ID
+    unsigned int _primID;  //!< primitive ID
   };
 }

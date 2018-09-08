@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2017 Intel Corporation                                    //
+// Copyright 2009-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -23,25 +23,69 @@ namespace embree
   /*! User geometry with user defined intersection functions */
   struct UserGeometry : public AccelSet
   {
+    /*! type of this geometry */
+    static const Geometry::GTypeMask geom_type = Geometry::MTY_USER_GEOMETRY;
+
   public:
-    UserGeometry (Scene* scene, RTCGeometryFlags gflags, size_t items, size_t numTimeSteps); 
-    virtual void setUserData (void* ptr);
+    UserGeometry (Device* device, unsigned int items = 0, unsigned int numTimeSteps = 1);
+    virtual void enabling ();
+    virtual void disabling();
     virtual void setMask (unsigned mask);
-    virtual void setBoundsFunction (RTCBoundsFunc bounds);
-    virtual void setBoundsFunction2 (RTCBoundsFunc2 bounds, void* userPtr);
-    virtual void setBoundsFunction3 (RTCBoundsFunc3 bounds, void* userPtr);
-    virtual void setIntersectFunction (RTCIntersectFunc intersect, bool ispc);
-    virtual void setIntersectFunction4 (RTCIntersectFunc4 intersect4, bool ispc);
-    virtual void setIntersectFunction8 (RTCIntersectFunc8 intersect8, bool ispc);
-    virtual void setIntersectFunction16 (RTCIntersectFunc16 intersect16, bool ispc);
-    virtual void setIntersectFunction1Mp (RTCIntersectFunc1Mp intersect);
-    virtual void setIntersectFunctionN (RTCIntersectFuncN intersect);
-    virtual void setOccludedFunction (RTCOccludedFunc occluded, bool ispc);
-    virtual void setOccludedFunction4 (RTCOccludedFunc4 occluded4, bool ispc);
-    virtual void setOccludedFunction8 (RTCOccludedFunc8 occluded8, bool ispc);
-    virtual void setOccludedFunction16 (RTCOccludedFunc16 occluded16, bool ispc);
-    virtual void setOccludedFunction1Mp (RTCOccludedFunc1Mp occluded);
-    virtual void setOccludedFunctionN (RTCOccludedFuncN occluded);
+    virtual void setBoundsFunction (RTCBoundsFunction bounds, void* userPtr);
+    virtual void setIntersectFunctionN (RTCIntersectFunctionN intersect);
+    virtual void setOccludedFunctionN (RTCOccludedFunctionN occluded);
     virtual void build() {}
   };
+
+  namespace isa
+  {
+    struct UserGeometryISA : public UserGeometry
+    {
+      UserGeometryISA (Device* device)
+        : UserGeometry(device) {}
+
+      PrimInfo createPrimRefArray(mvector<PrimRef>& prims, const range<size_t>& r, size_t k) const
+      {
+        PrimInfo pinfo(empty);
+        for (size_t j=r.begin(); j<r.end(); j++)
+        {
+          BBox3fa bounds = empty;
+          if (!buildBounds(j,&bounds)) continue;
+          const PrimRef prim(bounds,geomID,unsigned(j));
+          pinfo.add_center2(prim);
+          prims[k++] = prim;
+        }
+        return pinfo;
+      }
+
+      PrimInfo createPrimRefArrayMB(mvector<PrimRef>& prims, size_t itime, const range<size_t>& r, size_t k) const
+      {
+        PrimInfo pinfo(empty);
+        for (size_t j=r.begin(); j<r.end(); j++)
+        {
+          BBox3fa bounds = empty;
+          if (!buildBounds(j,itime,bounds)) continue;
+          const PrimRef prim(bounds,geomID,unsigned(j));
+          pinfo.add_center2(prim);
+          prims[k++] = prim;
+        }
+        return pinfo;
+      }
+      
+      PrimInfoMB createPrimRefMBArray(mvector<PrimRefMB>& prims, const BBox1f& t0t1, const range<size_t>& r, size_t k) const
+      {
+        PrimInfoMB pinfo(empty);
+        for (size_t j=r.begin(); j<r.end(); j++)
+        {
+          if (!valid(j, getTimeSegmentRange(t0t1, fnumTimeSegments))) continue;
+          const PrimRefMB prim(linearBounds(j,t0t1),this->numTimeSegments(),this->numTimeSegments(),this->geomID,unsigned(j));
+          pinfo.add_primref(prim);
+          prims[k++] = prim;
+        }
+        return pinfo;
+      }
+    };
+  }
+  
+  DECLARE_ISA_FUNCTION(UserGeometry*, createUserGeometry, Device*);
 }

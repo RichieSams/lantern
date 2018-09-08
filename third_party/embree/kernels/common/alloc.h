@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2017 Intel Corporation                                    //
+// Copyright 2009-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -25,14 +25,15 @@ namespace embree
 {
   class FastAllocator
   {
-    /*! maximal supported alignment */
+    /*! maximum supported alignment */
     static const size_t maxAlignment = 64;
 
-    /*! maximal allocation size */
+    /*! maximum allocation size */
 
     /* default settings */
     //static const size_t defaultBlockSize = 4096;
 #define maxAllocationSize size_t(2*1024*1024-maxAlignment)
+
     static const size_t MAX_THREAD_USED_BLOCK_SLOTS = 8;
 
   public:
@@ -307,7 +308,11 @@ namespace embree
     }
 
     static const size_t threadLocalAllocOverhead = 20; //! 20 means 5% parallel allocation overhead through unfilled thread local blocks
-    static const size_t mainAllocOverheadStatic = 20;  //! 20 means 5% allocation overhead through unfilled main alloc blocks
+#if defined(__AVX512ER__) // KNL
+    static const size_t mainAllocOverheadStatic  = 15;  //! 15 means 7.5% allocation overhead through unfilled main alloc blocks
+#else
+    static const size_t mainAllocOverheadStatic  = 20;  //! 20 means 5% allocation overhead through unfilled main alloc blocks
+#endif
     static const size_t mainAllocOverheadDynamic = 8;  //! 20 means 12.5% allocation overhead through unfilled main alloc blocks
 
     /* calculates a single threaded threshold for the builders such
@@ -353,9 +358,11 @@ namespace embree
        * increase the number of allocation slots by still guaranteeing
        * the mainAllocationOverhead */
       slotMask = 0x0;
+
       if (MAX_THREAD_USED_BLOCK_SLOTS >= 2 && bytesEstimated > 2*mainAllocOverhead*growSize) slotMask = 0x1;
       if (MAX_THREAD_USED_BLOCK_SLOTS >= 4 && bytesEstimated > 4*mainAllocOverhead*growSize) slotMask = 0x3;
       if (MAX_THREAD_USED_BLOCK_SLOTS >= 8 && bytesEstimated > 8*mainAllocOverhead*growSize) slotMask = 0x7;
+      if (MAX_THREAD_USED_BLOCK_SLOTS >= 8 && bytesEstimated > 16*mainAllocOverhead*growSize) { growSize *= 2; } /* if the overhead is tiny, double the growSize */
 
       /* set the thread local alloc block size */
       size_t defaultBlockSizeSwitch = PAGE_SIZE+maxAlignment;
@@ -386,7 +393,6 @@ namespace embree
       if (device->alloc_num_main_slots >= 8 ) slotMask = 0x7;
       if (device->alloc_thread_block_size != 0) defaultBlockSize = device->alloc_thread_block_size;
       if (device->alloc_single_thread_alloc != -1) use_single_mode = device->alloc_single_thread_alloc;
-
     }
 
     /*! initializes the allocator */
@@ -496,7 +502,7 @@ namespace embree
 
         /* throw error if allocation is too large */
         if (bytes > maxAllocationSize)
-          throw_RTCError(RTC_UNKNOWN_ERROR,"allocation is too large");
+          throw_RTCError(RTC_ERROR_UNKNOWN,"allocation is too large");
 
         /* parallel block creation in case of no freeBlocks, avoids single global mutex */
         if (likely(freeBlocks.load() == nullptr))
@@ -765,6 +771,7 @@ namespace embree
         }
         else
           assert(false);
+
         return NULL;
       }
 

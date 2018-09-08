@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2017 Intel Corporation                                    //
+// Copyright 2009-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -27,6 +27,7 @@ namespace embree
   /*! Base class for the acceleration structure data. */
   class AccelData : public RefCount 
   {
+    ALIGNED_CLASS_(16);
   public:
     enum Type { TY_UNKNOWN = 0, TY_ACCELN = 1, TY_ACCEL_INSTANCE = 2, TY_BVH4 = 3, TY_BVH8 = 4 };
 
@@ -58,67 +59,69 @@ namespace embree
   /*! Base class for all intersectable and buildable acceleration structures. */
   class Accel : public AccelData
   {
-    ALIGNED_CLASS;
+     ALIGNED_CLASS_(16);
   public:
 
+    struct Intersectors;
+
     /*! Type of intersect function pointer for single rays. */
-    typedef void (*IntersectFunc)(void* ptr,           /*!< pointer to user data */
-                                  RTCRay& ray,         /*!< ray to intersect */
+    typedef void (*IntersectFunc)(Intersectors* This,  /*!< this pointer to accel */
+                                  RTCRayHit& ray,      /*!< ray to intersect */
                                   IntersectContext* context);
     
     /*! Type of intersect function pointer for ray packets of size 4. */
     typedef void (*IntersectFunc4)(const void* valid,  /*!< pointer to valid mask */
-                                   void* ptr,          /*!< pointer to user data */
-                                   RTCRay4& ray,       /*!< ray packet to intersect */
+                                   Intersectors* This, /*!< this pointer to accel */
+                                   RTCRayHit4& ray,    /*!< ray packet to intersect */
                                    IntersectContext* context);
     
     /*! Type of intersect function pointer for ray packets of size 8. */
     typedef void (*IntersectFunc8)(const void* valid,  /*!< pointer to valid mask */
-                                   void* ptr,          /*!< pointer to user data */
-                                   RTCRay8& ray,       /*!< ray packet to intersect */
+                                   Intersectors* This, /*!< this pointer to accel */
+                                   RTCRayHit8& ray,    /*!< ray packet to intersect */
                                    IntersectContext* context);
     
     /*! Type of intersect function pointer for ray packets of size 16. */
-    typedef void (*IntersectFunc16)(const void* valid, /*!< pointer to valid mask */
-                                    void* ptr,         /*!< pointer to user data */
-                                    RTCRay16& ray,      /*!< ray packet to intersect */
+    typedef void (*IntersectFunc16)(const void* valid,  /*!< pointer to valid mask */
+                                    Intersectors* This, /*!< this pointer to accel */
+                                    RTCRayHit16& ray,   /*!< ray packet to intersect */
                                     IntersectContext* context);
 
     /*! Type of intersect function pointer for ray packets of size N. */
-    typedef void (*IntersectFuncN)(void* ptr,           /*!< pointer to user data */
-                                   RTCRay** ray,        /*!< ray stream to intersect */
-                                   const size_t N,      /*!< number of rays in stream */
-                                   IntersectContext* context   /*!< layout flags */);
+    typedef void (*IntersectFuncN)(Intersectors* This, /*!< this pointer to accel */
+                                   RTCRayHitN** ray,   /*!< ray stream to intersect */
+                                   const size_t N,     /*!< number of rays in stream */
+                                   IntersectContext* context /*!< layout flags */);
     
     
     /*! Type of occlusion function pointer for single rays. */
-    typedef void (*OccludedFunc) (void* ptr,           /*!< pointer to user data */ 
-                                  RTCRay& ray,         /*!< ray to test occlusion */
+    typedef void (*OccludedFunc) (Intersectors* This, /*!< this pointer to accel */
+                                  RTCRay& ray,        /*!< ray to test occlusion */
                                   IntersectContext* context);
     
     /*! Type of occlusion function pointer for ray packets of size 4. */
-    typedef void (*OccludedFunc4) (const void* valid,  /*! pointer to valid mask */
-                                   void* ptr,          /*!< pointer to user data */
-                                   RTCRay4& ray,       /*!< Ray packet to test occlusion. */
+    typedef void (*OccludedFunc4) (const void* valid,  /*!< pointer to valid mask */
+                                   Intersectors* This, /*!< this pointer to accel */
+                                   RTCRay4& ray,       /*!< ray packet to test occlusion. */
                                    IntersectContext* context);
     
     /*! Type of occlusion function pointer for ray packets of size 8. */
-    typedef void (*OccludedFunc8) (const void* valid,  /*! pointer to valid mask */
-                                   void* ptr,          /*!< pointer to user data */
-                                   RTCRay8& ray,       /*!< Ray packet to test occlusion. */
+    typedef void (*OccludedFunc8) (const void* valid,  /*!< pointer to valid mask */
+                                   Intersectors* This, /*!< this pointer to accel */
+                                   RTCRay8& ray,       /*!< ray packet to test occlusion. */
                                    IntersectContext* context);
     
     /*! Type of occlusion function pointer for ray packets of size 16. */
-    typedef void (*OccludedFunc16) (const void* valid, /*! pointer to valid mask */
-                                    void* ptr,         /*!< pointer to user data */
-                                    RTCRay16& ray,     /*!< Ray packet to test occlusion. */
+    typedef void (*OccludedFunc16) (const void* valid,  /*!< pointer to valid mask */
+                                    Intersectors* This, /*!< this pointer to accel */
+                                    RTCRay16& ray,      /*!< ray packet to test occlusion. */
                                     IntersectContext* context);
 
     /*! Type of intersect function pointer for ray packets of size N. */
-    typedef void (*OccludedFuncN)(void* ptr,           /*!< pointer to user data */
-                                  RTCRay** ray,        /*!< ray stream to intersect */
-                                  const size_t N,      /*!< number of rays in stream */
-                                  IntersectContext* context   /*!< layout flags */);
+    typedef void (*OccludedFuncN)(Intersectors* This, /*!< this pointer to accel */
+                                  RTCRayN** ray,      /*!< ray stream to test occlusion */
+                                  const size_t N,     /*!< number of rays in stream */
+                                  IntersectContext* context /*!< layout flags */);
     typedef void (*ErrorFunc) ();
 
     struct Intersector1
@@ -209,10 +212,10 @@ namespace embree
     struct Intersectors 
     {
       Intersectors() 
-        : ptr(nullptr) {}
+        : ptr(nullptr), leafIntersector(nullptr), intersector1(nullptr), intersector4(nullptr), intersector8(nullptr), intersector16(nullptr), intersectorN(nullptr) {}
 
       Intersectors (ErrorFunc error) 
-      : ptr(nullptr), intersector1(error), intersector4(error), intersector8(error), intersector16(error), intersectorN(error) {}
+      : ptr(nullptr), leafIntersector(nullptr), intersector1(error), intersector4(error), intersector8(error), intersector16(error), intersectorN(error) {}
 
       void print(size_t ident) 
       {
@@ -238,28 +241,158 @@ namespace embree
         }        
       }
 
-      void select(bool filter4, bool filter8, bool filter16, bool filterN)
+      void select(bool filter)
       {
 	if (intersector4_filter) {
-	  if (filter4) intersector4 = intersector4_filter;
-	  else         intersector4 = intersector4_nofilter;
+	  if (filter) intersector4 = intersector4_filter;
+	  else        intersector4 = intersector4_nofilter;
 	}
 	if (intersector8_filter) {
-	  if (filter8) intersector8 = intersector8_filter;
-	  else         intersector8 = intersector8_nofilter;
+	  if (filter) intersector8 = intersector8_filter;
+	  else        intersector8 = intersector8_nofilter;
 	}
 	if (intersector16_filter) {
-	  if (filter16) intersector16 = intersector16_filter;
-	  else          intersector16 = intersector16_nofilter;
+	  if (filter) intersector16 = intersector16_filter;
+	  else         intersector16 = intersector16_nofilter;
 	}
 	if (intersectorN_filter) {
-	  if (filterN) intersectorN = intersectorN_filter;
-	  else         intersectorN = intersectorN_nofilter;
+	  if (filter) intersectorN = intersectorN_filter;
+	  else        intersectorN = intersectorN_nofilter;
 	}        
       }
 
+      /*! Intersects a single ray with the scene. */
+      __forceinline void intersect (RTCRayHit& ray, IntersectContext* context) {
+        assert(intersector1.intersect);
+        intersector1.intersect(this,ray,context);
+      }
+      
+      /*! Intersects a packet of 4 rays with the scene. */
+      __forceinline void intersect4 (const void* valid, RTCRayHit4& ray, IntersectContext* context) {
+        assert(intersector4.intersect);
+        intersector4.intersect(valid,this,ray,context);
+      }
+      
+      /*! Intersects a packet of 8 rays with the scene. */
+      __forceinline void intersect8 (const void* valid, RTCRayHit8& ray, IntersectContext* context) {
+        assert(intersector8.intersect);
+        intersector8.intersect(valid,this,ray,context);
+      }
+      
+      /*! Intersects a packet of 16 rays with the scene. */
+      __forceinline void intersect16 (const void* valid, RTCRayHit16& ray, IntersectContext* context) {
+        assert(intersector16.intersect);
+        intersector16.intersect(valid,this,ray,context);
+      }
+      
+      /*! Intersects a stream of N rays in SOA layout with the scene. */
+      __forceinline void intersectN (RTCRayHitN** rayN, const size_t N, IntersectContext* context)
+      {
+        assert(intersectorN.intersect);
+        intersectorN.intersect(this,rayN,N,context);
+      }
+      
+#if defined(__SSE__)
+      __forceinline void intersect(const vbool4& valid, RayHitK<4>& ray, IntersectContext* context) {
+        const vint<4> mask = valid.mask32();
+        intersect4(&mask,(RTCRayHit4&)ray,context);
+      }
+#endif
+#if defined(__AVX__)
+      __forceinline void intersect(const vbool8& valid, RayHitK<8>& ray, IntersectContext* context) {
+        const vint<8> mask = valid.mask32();
+        intersect8(&mask,(RTCRayHit8&)ray,context);
+      }
+#endif
+#if defined(__AVX512F__)
+      __forceinline void intersect(const vbool16& valid, RayHitK<16>& ray, IntersectContext* context) {
+        const vint<16> mask = valid.mask32();
+        intersect16(&mask,(RTCRayHit16&)ray,context);
+      }
+#endif
+      
+      template<int K>
+      __forceinline void intersectN (RayHitK<K>** rayN, const size_t N, IntersectContext* context)
+      {
+        intersectN((RTCRayHitN**)rayN,N,context);
+      }
+
+      /*! Tests if single ray is occluded by the scene. */
+      __forceinline void occluded (RTCRay& ray, IntersectContext* context) {
+        assert(intersector1.occluded);
+        intersector1.occluded(this,ray,context);
+      }
+      
+      /*! Tests if a packet of 4 rays is occluded by the scene. */
+      __forceinline void occluded4 (const void* valid, RTCRay4& ray, IntersectContext* context) {
+        assert(intersector4.occluded);
+        intersector4.occluded(valid,this,ray,context);
+      }
+      
+      /*! Tests if a packet of 8 rays is occluded by the scene. */
+      __forceinline void occluded8 (const void* valid, RTCRay8& ray, IntersectContext* context) {
+        assert(intersector8.occluded);
+        intersector8.occluded(valid,this,ray,context);
+      }
+      
+      /*! Tests if a packet of 16 rays is occluded by the scene. */
+      __forceinline void occluded16 (const void* valid, RTCRay16& ray, IntersectContext* context) {
+        assert(intersector16.occluded);
+        intersector16.occluded(valid,this,ray,context);
+      }
+      
+      /*! Tests if a stream of N rays in SOA layout is occluded by the scene. */
+      __forceinline void occludedN (RTCRayN** rayN, const size_t N, IntersectContext* context)
+      {
+        assert(intersectorN.occluded);
+        intersectorN.occluded(this,rayN,N,context);
+      }
+      
+#if defined(__SSE__)
+      __forceinline void occluded(const vbool4& valid, RayK<4>& ray, IntersectContext* context) {
+        const vint<4> mask = valid.mask32();
+        occluded4(&mask,(RTCRay4&)ray,context);
+      }
+#endif
+#if defined(__AVX__)
+      __forceinline void occluded(const vbool8& valid, RayK<8>& ray, IntersectContext* context) {
+        const vint<8> mask = valid.mask32();
+        occluded8(&mask,(RTCRay8&)ray,context);
+      }
+#endif
+#if defined(__AVX512F__)
+      __forceinline void occluded(const vbool16& valid, RayK<16>& ray, IntersectContext* context) {
+        const vint<16> mask = valid.mask32();
+        occluded16(&mask,(RTCRay16&)ray,context);
+      }
+#endif
+
+      template<int K>
+      __forceinline void occludedN (RayK<K>** rayN, const size_t N, IntersectContext* context)
+      {
+        occludedN((RTCRayN**)rayN,N,context);
+      }
+
+      /*! Tests if single ray is occluded by the scene. */
+      __forceinline void intersect(RTCRay& ray, IntersectContext* context) {
+        occluded(ray, context);
+      }
+
+      /*! Tests if a packet of K rays is occluded by the scene. */
+      template<int K>
+      __forceinline void intersect(const vbool<K>& valid, RayK<K>& ray, IntersectContext* context) {
+        occluded(valid, ray, context);
+      }
+
+      /*! Tests if a packet of N rays in SOA layout is occluded by the scene. */
+      template<int K>
+      __forceinline void intersectN(RayK<K>** rayN, const size_t N, IntersectContext* context) {
+        occludedN(rayN, N, context);
+      }
+      
     public:
       AccelData* ptr;
+      void* leafIntersector;
       Intersector1 intersector1;
       Intersector4 intersector4;
       Intersector4 intersector4_filter;
@@ -293,144 +426,6 @@ namespace embree
     
     /*! build acceleration structure */
     virtual void build () = 0;
-
-    /*! Intersects a single ray with the scene. */
-    __forceinline void intersect (RTCRay& ray, IntersectContext* context) {
-      assert(intersectors.intersector1.intersect);
-      intersectors.intersector1.intersect(intersectors.ptr,ray,context);
-    }
-
-    /*! Intersects a packet of 4 rays with the scene. */
-    __forceinline void intersect4 (const void* valid, RTCRay4& ray, IntersectContext* context) {
-      assert(intersectors.intersector4.intersect);
-      intersectors.intersector4.intersect(valid,intersectors.ptr,ray,context);
-    }
-
-    /*! Intersects a packet of 8 rays with the scene. */
-    __forceinline void intersect8 (const void* valid, RTCRay8& ray, IntersectContext* context) {
-      assert(intersectors.intersector8.intersect);
-      intersectors.intersector8.intersect(valid,intersectors.ptr,ray,context);
-    }
-
-    /*! Intersects a packet of 16 rays with the scene. */
-    __forceinline void intersect16 (const void* valid, RTCRay16& ray, IntersectContext* context) {
-      assert(intersectors.intersector16.intersect);
-      intersectors.intersector16.intersect(valid,intersectors.ptr,ray,context);
-    }
-
-    /*! Intersects a packet of N rays in SOA layout with the scene. */
-    __forceinline void intersectN (RTCRay **rayN, const size_t N, IntersectContext* context) 
-    {
-      //assert(intersectors.intersectorN.intersect);      
-      if (intersectors.intersectorN.intersect)
-        intersectors.intersectorN.intersect(intersectors.ptr,rayN,N,context);
-      else
-      {
-        if (likely(context->flags == IntersectContext::INPUT_RAY_DATA_AOS))
-          for (size_t i=0; i<N; i++)
-            intersect(*rayN[i],context);
-        else
-        {
-          assert(context->getInputSOAWidth() == VSIZEX);
-          const size_t numPackets = (N+VSIZEX-1)/VSIZEX;
-          for (size_t i=0; i<numPackets; i++)
-          {
-            RayK<VSIZEX> &ray = *(RayK<VSIZEX>*)rayN[i];
-            vbool<VSIZEX> valid = ray.tnear < ray.tfar;
-            intersect(valid,ray,context);
-          }      
-        }
-      }
-    }
-
-#if defined(__SSE__)
-    __forceinline void intersect(const vbool4& valid, RayK<4>& ray, IntersectContext* context) {
-      const vint<4> mask = valid.mask32();
-      intersect4(&mask,(RTCRay4&)ray,context);
-    }
-#endif
-#if defined(__AVX__)
-    __forceinline void intersect(const vbool8& valid, RayK<8>& ray, IntersectContext* context) {
-      const vint<8> mask = valid.mask32();
-      intersect8(&mask,(RTCRay8&)ray,context);
-    }
-#endif
-#if defined(__AVX512F__)
-    __forceinline void intersect(const vbool16& valid, RayK<16>& ray, IntersectContext* context) {
-      const vint<16> mask = valid.mask32();
-      intersect16(&mask,(RTCRay16&)ray,context);
-    }
-#endif
-
-
-    /*! Tests if single ray is occluded by the scene. */
-    __forceinline void occluded (RTCRay& ray, IntersectContext* context) {
-      assert(intersectors.intersector1.occluded);
-      intersectors.intersector1.occluded(intersectors.ptr,ray,context);
-    }
-    
-    /*! Tests if a packet of 4 rays is occluded by the scene. */
-    __forceinline void occluded4 (const void* valid, RTCRay4& ray, IntersectContext* context) {
-      assert(intersectors.intersector4.occluded);
-      intersectors.intersector4.occluded(valid,intersectors.ptr,ray,context);
-    }
-
-    /*! Tests if a packet of 8 rays is occluded by the scene. */
-    __forceinline void occluded8 (const void* valid, RTCRay8& ray, IntersectContext* context) {
-      assert(intersectors.intersector8.occluded);
-      intersectors.intersector8.occluded(valid,intersectors.ptr,ray,context);
-    }
-
-    /*! Tests if a packet of 16 rays is occluded by the scene. */
-    __forceinline void occluded16 (const void* valid, RTCRay16& ray, IntersectContext* context) {
-      assert(intersectors.intersector16.occluded);
-      intersectors.intersector16.occluded(valid,intersectors.ptr,ray,context);
-    }
-
-
-    /*! Tests if a packet of N rays in SOA layout is occluded by the scene. */
-    __forceinline void occludedN (RTCRay** rayN, const size_t N, IntersectContext* context) 
-    {
-      //assert(intersectors.intersectorN.occluded);
-      if (intersectors.intersectorN.occluded)
-        intersectors.intersectorN.occluded(intersectors.ptr,rayN,N,context);
-      else
-      {
-        if (likely(context->flags == IntersectContext::INPUT_RAY_DATA_AOS))
-          for (size_t i=0;i<N;i++)
-            occluded(*rayN[i],context);
-        else
-        {
-          assert(context->getInputSOAWidth() == VSIZEX);
-          const size_t numPackets = (N+VSIZEX-1)/VSIZEX;
-          for (size_t i=0; i<numPackets; i++)
-          {
-            RayK<VSIZEX> &ray = *(RayK<VSIZEX>*)rayN[i];
-            vbool<VSIZEX> valid = ray.tnear < ray.tfar;
-            occluded(valid,ray,context);
-          }      
-        }
-      }
-    }
-
-#if defined(__SSE__)
-    __forceinline void occluded(const vbool4& valid, RayK<4>& ray, IntersectContext* context) {
-      const vint<4> mask = valid.mask32();
-      occluded4(&mask,(RTCRay4&)ray,context);
-    }
-#endif
-#if defined(__AVX__)
-    __forceinline void occluded(const vbool8& valid, RayK<8>& ray, IntersectContext* context) {
-      const vint<8> mask = valid.mask32();
-      occluded8(&mask,(RTCRay8&)ray,context);
-    }
-#endif
-#if defined(__AVX512F__)
-    __forceinline void occluded(const vbool16& valid, RayK<16>& ray, IntersectContext* context) {
-      const vint<16> mask = valid.mask32();
-      occluded16(&mask,(RTCRay16&)ray,context);
-    }
-#endif
 
   public:
     Intersectors intersectors;
@@ -472,27 +467,41 @@ namespace embree
   }
 
   /* ray stream filter interface */
-  typedef void (*filterAOS_func)(Scene *scene, RTCRay*  _rayN, const size_t N, const size_t stride, IntersectContext* context, const bool intersect);
-  typedef void (*filterAOP_func)(Scene *scene, RTCRay** _rayN, const size_t N, IntersectContext* context, const bool intersect);
-  typedef void (*filterSOA_func)(Scene *scene, char* rayN, const size_t N, const size_t streams, const size_t stream_offset, IntersectContext* context, const bool intersect);
-  typedef void (*filterSOP_func)(Scene *scene, const RTCRayNp& rayN, const size_t N, IntersectContext* context, const bool intersect);
+  typedef void (*intersectStreamAOS_func)(Scene* scene, RTCRayHit*  _rayN, const size_t N, const size_t stride, IntersectContext* context);
+  typedef void (*intersectStreamAOP_func)(Scene* scene, RTCRayHit** _rayN, const size_t N, IntersectContext* context);
+  typedef void (*intersectStreamSOA_func)(Scene* scene, char* rayN, const size_t N, const size_t streams, const size_t stream_offset, IntersectContext* context);
+  typedef void (*intersectStreamSOP_func)(Scene* scene, const RTCRayHitNp* rayN, const size_t N, IntersectContext* context);
+
+  typedef void (*occludedStreamAOS_func)(Scene* scene, RTCRay*  _rayN, const size_t N, const size_t stride, IntersectContext* context);
+  typedef void (*occludedStreamAOP_func)(Scene* scene, RTCRay** _rayN, const size_t N, IntersectContext* context);
+  typedef void (*occludedStreamSOA_func)(Scene* scene, char* rayN, const size_t N, const size_t streams, const size_t stream_offset, IntersectContext* context);
+  typedef void (*occludedStreamSOP_func)(Scene* scene, const RTCRayNp* rayN, const size_t N, IntersectContext* context);
 
   struct RayStreamFilterFuncs
   {
     RayStreamFilterFuncs()
-    : filterAOS(nullptr), filterSOA(nullptr), filterSOP(nullptr) {}
+    : intersectAOS(nullptr), intersectAOP(nullptr), intersectSOA(nullptr), intersectSOP(nullptr),
+      occludedAOS(nullptr),  occludedAOP(nullptr),  occludedSOA(nullptr),  occludedSOP(nullptr) {}
 
     RayStreamFilterFuncs(void (*ptr) ())
-    : filterAOS((filterAOS_func) ptr), filterSOA((filterSOA_func) ptr), filterSOP((filterSOP_func) ptr) {}
+    : intersectAOS((intersectStreamAOS_func) ptr), intersectAOP((intersectStreamAOP_func) ptr), intersectSOA((intersectStreamSOA_func) ptr), intersectSOP((intersectStreamSOP_func) ptr),
+      occludedAOS((occludedStreamAOS_func) ptr),   occludedAOP((occludedStreamAOP_func) ptr),   occludedSOA((occludedStreamSOA_func) ptr),   occludedSOP((occludedStreamSOP_func) ptr) {}
 
-    RayStreamFilterFuncs(filterAOS_func aos, filterAOP_func aop, filterSOA_func soa, filterSOP_func sop)
-    : filterAOS(aos), filterAOP(aop), filterSOA(soa), filterSOP(sop) {}
+    RayStreamFilterFuncs(intersectStreamAOS_func intersectAOS, intersectStreamAOP_func intersectAOP, intersectStreamSOA_func intersectSOA, intersectStreamSOP_func intersectSOP,
+                         occludedStreamAOS_func  occludedAOS,  occludedStreamAOP_func  occludedAOP,  occludedStreamSOA_func  occludedSOA,  occludedStreamSOP_func  occludedSOP)
+    : intersectAOS(intersectAOS), intersectAOP(intersectAOP), intersectSOA(intersectSOA), intersectSOP(intersectSOP),
+      occludedAOS(occludedAOS),   occludedAOP(occludedAOP),   occludedSOA(occludedSOA),   occludedSOP(occludedSOP) {}
 
   public:
-    filterAOS_func filterAOS;
-    filterAOP_func filterAOP;
-    filterSOA_func filterSOA;
-    filterSOP_func filterSOP;
+    intersectStreamAOS_func intersectAOS;
+    intersectStreamAOP_func intersectAOP;
+    intersectStreamSOA_func intersectSOA;
+    intersectStreamSOP_func intersectSOP;
+
+    occludedStreamAOS_func occludedAOS;
+    occludedStreamAOP_func occludedAOP;
+    occludedStreamSOA_func occludedSOA;
+    occludedStreamSOP_func occludedSOP;
   }; 
 
   typedef RayStreamFilterFuncs (*RayStreamFilterFuncsType)();

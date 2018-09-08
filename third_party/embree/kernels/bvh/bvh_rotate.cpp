@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2017 Intel Corporation                                    //
+// Copyright 2009-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -72,7 +72,7 @@ namespace embree
 	float cost03 = halfArea3f(merge(child2c0,child2c1,child2c2,child1_0));
 	vfloat4 cost0 = vfloat4(cost00,cost01,cost02,cost03);
 	vfloat4 min0 = vreduce_min(cost0);
-	int pos0 = (int)__bsf(movemask(min0 == cost0));
+	int pos0 = (int)bsf(movemask(min0 == cost0));
 	
 	/*! put child1_1 at each child2 position */
 	float cost10 = halfArea3f(merge(child1_1,child2c1,child2c2,child2c3));
@@ -81,7 +81,7 @@ namespace embree
 	float cost13 = halfArea3f(merge(child2c0,child2c1,child2c2,child1_1));
 	vfloat4 cost1 = vfloat4(cost10,cost11,cost12,cost13);
 	vfloat4 min1 = vreduce_min(cost1);
-	int pos1 = (int)__bsf(movemask(min1 == cost1));
+	int pos1 = (int)bsf(movemask(min1 == cost1));
 	
 	/*! put child1_2 at each child2 position */
 	float cost20 = halfArea3f(merge(child1_2,child2c1,child2c2,child2c3));
@@ -90,7 +90,7 @@ namespace embree
 	float cost23 = halfArea3f(merge(child2c0,child2c1,child2c2,child1_2));
 	vfloat4 cost2 = vfloat4(cost20,cost21,cost22,cost23);
 	vfloat4 min2 = vreduce_min(cost2);
-	int pos2 = (int)__bsf(movemask(min2 == cost2));
+	int pos2 = (int)bsf(movemask(min2 == cost2));
 	
 	/*! put child1_3 at each child2 position */
 	float cost30 = halfArea3f(merge(child1_3,child2c1,child2c2,child2c3));
@@ -99,14 +99,14 @@ namespace embree
 	float cost33 = halfArea3f(merge(child2c0,child2c1,child2c2,child1_3));
 	vfloat4 cost3 = vfloat4(cost30,cost31,cost32,cost33);
 	vfloat4 min3 = vreduce_min(cost3);
-	int pos3 = (int)__bsf(movemask(min3 == cost3));
+	int pos3 = (int)bsf(movemask(min3 == cost3));
 	
 	/*! find best other child */
 	vfloat4 area0123 = vfloat4(extract<0>(min0),extract<0>(min1),extract<0>(min2),extract<0>(min3)) - vfloat4(childArea[c2]);
 	int pos[4] = { pos0,pos1,pos2,pos3 };
 	const size_t mbd = BVH4::maxBuildDepth;
 	vbool4 valid = vint4(int(depth+1))+cdepth <= vint4(mbd); // only select swaps that fulfill depth constraints
-	valid &= vint4(c2) != vint4(step);
+	valid &= vint4(int(c2)) != vint4(step);
 	if (none(valid)) continue;
 	size_t c1 = select_min(valid,area0123);
 	float area = area0123[c1]; 

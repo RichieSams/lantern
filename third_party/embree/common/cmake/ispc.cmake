@@ -1,5 +1,5 @@
 ## ======================================================================== ##
-## Copyright 2009-2017 Intel Corporation                                    ##
+## Copyright 2009-2018 Intel Corporation                                    ##
 ##                                                                          ##
 ## Licensed under the Apache License, Version 2.0 (the "License");          ##
 ## you may not use this file except in compliance with the License.         ##
@@ -59,11 +59,11 @@ ENDIF()
 
 # check ISPC version
 EXECUTE_PROCESS(COMMAND ${EMBREE_ISPC_EXECUTABLE} --version OUTPUT_VARIABLE ISPC_OUTPUT)
-STRING(REGEX MATCH " ([0-9]+[.][0-9]+[.][0-9]+)(dev|knl)? " DUMMY "${ISPC_OUTPUT}")
+STRING(REGEX MATCH "([0-9]+[.][0-9]+[.][0-9]+)" DUMMY "${ISPC_OUTPUT}")
 SET(ISPC_VERSION ${CMAKE_MATCH_1})
 
 IF (ISPC_VERSION VERSION_LESS ISPC_VERSION_REQUIRED)
-  MESSAGE(FATAL_ERROR "Need at least version ${ISPC_VERSION_REQUIRED} of Intel SPMD Compiler (ISPC).")
+  MESSAGE(FATAL_ERROR "ISPC ${ISPC_VERSION} is too old. You need at least ISPC ${ISPC_VERSION_REQUIRED}.")
 ENDIF()
 
 GET_FILENAME_COMPONENT(ISPC_DIR ${EMBREE_ISPC_EXECUTABLE} PATH)
@@ -93,7 +93,7 @@ MACRO (ISPC_COMPILE)
   IF (WIN32 OR "${CMAKE_BUILD_TYPE}" STREQUAL "Release")
     SET(ISPC_OPT_FLAGS -O3)
   ELSE()
-    SET(ISPC_OPT_FLAGS -O2 -g)
+    SET(ISPC_OPT_FLAGS -O2)
   ENDIF()
 
   IF (WIN32)

@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2017 Intel Corporation                                    //
+// Copyright 2009-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -19,60 +19,91 @@
 
 namespace embree
 {
-  DECLARE_SYMBOL2(RTCBoundsFunc3,InstanceBoundsFunc);
-  DECLARE_SYMBOL2(AccelSet::Intersector1,InstanceIntersector1);
-  DECLARE_SYMBOL2(AccelSet::Intersector4,InstanceIntersector4);
-  DECLARE_SYMBOL2(AccelSet::Intersector8,InstanceIntersector8);
-  DECLARE_SYMBOL2(AccelSet::Intersector16,InstanceIntersector16);
-  DECLARE_SYMBOL2(AccelSet::Intersector1M,InstanceIntersector1M);
+#if defined(EMBREE_LOWEST_ISA)
 
-  InstanceFactory::InstanceFactory(int features)
+  Instance::Instance (Device* device, Accel* object, unsigned int numTimeSteps) 
+    : Geometry(device,Geometry::GTY_INSTANCE,1,numTimeSteps), object(object), local2world(nullptr)
   {
-    SELECT_SYMBOL_DEFAULT_AVX_AVX2(features,InstanceBoundsFunc);
-    SELECT_SYMBOL_DEFAULT_AVX_AVX2_AVX512KNL_AVX512SKX(features,InstanceIntersector1);
-#if defined (EMBREE_RAY_PACKETS)
-    SELECT_SYMBOL_DEFAULT_AVX_AVX2_AVX512KNL_AVX512SKX(features,InstanceIntersector4);
-    SELECT_SYMBOL_INIT_AVX_AVX2_AVX512KNL_AVX512SKX(features,InstanceIntersector8);
-    SELECT_SYMBOL_INIT_AVX512KNL_AVX512SKX(features,InstanceIntersector16);
-    SELECT_SYMBOL_DEFAULT_AVX_AVX2_AVX512KNL_AVX512SKX(features,InstanceIntersector1M);
-#endif
+    if (object) object->refInc();
+    world2local0 = one;
+    local2world = (AffineSpace3fa*) alignedMalloc(numTimeSteps*sizeof(AffineSpace3fa),16);
+    for (size_t i = 0; i < numTimeSteps; i++)
+      local2world[i] = one;
   }
 
-  Instance::Instance (Scene* scene, Scene* object, size_t numTimeSteps) 
-    : AccelSet(scene,RTC_GEOMETRY_STATIC,1,numTimeSteps), object(object)
+  Instance::~Instance()
   {
-    world2local0 = one;
-    for (size_t i=0; i<numTimeSteps; i++) local2world[i] = one;
-    intersectors.ptr = this;
-    boundsFunc3 = scene->device->instance_factory->InstanceBoundsFunc();
-    boundsFuncUserPtr = nullptr;
-    intersectors.intersector1 = scene->device->instance_factory->InstanceIntersector1();
-#if defined (EMBREE_RAY_PACKETS)
-    intersectors.intersector4 = scene->device->instance_factory->InstanceIntersector4(); 
-    intersectors.intersector8 = scene->device->instance_factory->InstanceIntersector8(); 
-    intersectors.intersector16 = scene->device->instance_factory->InstanceIntersector16();
-    intersectors.intersector1M = scene->device->instance_factory->InstanceIntersector1M();
-#endif
+    alignedFree(local2world);
+    if (object) object->refDec();
+  }
+
+  void Instance::enabling () {
+    if (numTimeSteps == 1) scene->world.numInstances += numPrimitives;
+    else                   scene->worldMB.numInstances += numPrimitives;
   }
   
-  void Instance::setTransform(const AffineSpace3fa& xfm, size_t timeStep)
+  void Instance::disabling() { 
+    if (numTimeSteps == 1) scene->world.numInstances -= numPrimitives;
+    else                   scene->worldMB.numInstances -= numPrimitives;
+  }
+  
+  void Instance::setNumTimeSteps (unsigned int numTimeSteps_in)
   {
-    if (scene->isStatic() && scene->isBuild())
-      throw_RTCError(RTC_INVALID_OPERATION,"static scenes cannot get modified");
+    if (numTimeSteps_in == numTimeSteps)
+      return;
+    
+    AffineSpace3fa* local2world2 = (AffineSpace3fa*) alignedMalloc(numTimeSteps_in*sizeof(AffineSpace3fa),16);
+     
+    for (size_t i = 0; i < min(numTimeSteps, numTimeSteps_in); i++)
+      local2world2[i] = local2world[i];
 
-    if (timeStep >= numTimeSteps)
-      throw_RTCError(RTC_INVALID_OPERATION,"invalid timestep");
-
-    local2world[timeStep] = xfm;
-    if (timeStep == 0) world2local0 = rcp(xfm);
+    for (size_t i = numTimeSteps; i < numTimeSteps_in; i++)
+      local2world2[i] = one;
+        
+    alignedFree(local2world);
+    local2world = local2world2;
+    
+    Geometry::setNumTimeSteps(numTimeSteps_in);
   }
 
+  void Instance::setInstancedScene(const Ref<Scene>& scene)
+  {
+    if (object) object->refDec();
+    object = scene.ptr;
+    if (object) object->refInc();
+    Geometry::update();
+  }
+  
+  void Instance::setTransform(const AffineSpace3fa& xfm, unsigned int timeStep)
+  {
+    if (timeStep >= numTimeSteps)
+      throw_RTCError(RTC_ERROR_INVALID_OPERATION,"invalid timestep");
+
+    local2world[timeStep] = xfm;
+    if (timeStep == 0)
+      world2local0 = rcp(xfm);
+  }
+
+  AffineSpace3fa Instance::getTransform(float time)
+  {
+    if (likely(numTimeSteps <= 1))
+      return getWorld2Local();
+    else
+      return getWorld2Local(time);
+  }
+  
   void Instance::setMask (unsigned mask) 
   {
-    if (scene->isStatic() && scene->isBuild())
-      throw_RTCError(RTC_INVALID_OPERATION,"static scenes cannot get modified");
-
     this->mask = mask; 
     Geometry::update();
+  }
+  
+#endif
+
+  namespace isa
+  {
+    Instance* createInstance(Device* device) {
+      return new InstanceISA(device);
+    }
   }
 }

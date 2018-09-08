@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2017 Intel Corporation                                    //
+// Copyright 2009-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -43,7 +43,6 @@ namespace embree
     if (stat.statAlignedNodesMB.numNodes  ) stream << "  alignedNodesMB   : "  << stat.statAlignedNodesMB.toString(bvh,totalSAH,totalBytes) << std::endl;
     if (stat.statAlignedNodesMB4D.numNodes) stream << "  alignedNodesMB4D : "  << stat.statAlignedNodesMB4D.toString(bvh,totalSAH,totalBytes) << std::endl;
     if (stat.statUnalignedNodesMB.numNodes) stream << "  unalignedNodesMB : "  << stat.statUnalignedNodesMB.toString(bvh,totalSAH,totalBytes) << std::endl;
-    if (stat.statTransformNodes.numNodes  ) stream << "  transformNodes   : "  << stat.statTransformNodes.toString(bvh,totalSAH,totalBytes) << std::endl;
     if (stat.statQuantizedNodes.numNodes  ) stream << "  quantizedNodes   : "  << stat.statQuantizedNodes.toString(bvh,totalSAH,totalBytes) << std::endl;
     if (true)                               stream << "  leaves           : "  << stat.statLeaf.toString(bvh,totalSAH,totalBytes) << std::endl;
     if (true)                               stream << "    histogram      : "  << stat.statLeaf.histToString() << std::endl;
@@ -128,16 +127,6 @@ namespace embree
       s.statUnalignedNodesMB.nodeSAH += dt*A;
       s.depth++;
     }
-    else if (node.isTransformNode())
-    {
-#if 0
-      TransformNode* n = node.transformNode();
-      s = s + statistics(n->child,0.0f,t0t1); 
-#endif
-      s.statTransformNodes.numNodes++;
-      s.statTransformNodes.nodeSAH += dt*A;
-      s.depth++;
-    }
     else if (node.isQuantizedNode())
     {
       QuantizedNode* n = node.quantizedNode();
@@ -157,8 +146,13 @@ namespace embree
       size_t num; const char* tri = node.leaf(num);
       if (num)
       {
-        for (size_t i=0; i<num; i++) {
-          s.statLeaf.numPrims += bvh->primTy.size(tri+i*bvh->primTy.bytes);
+        for (size_t i=0; i<num; i++)
+        {
+          const size_t bytes = bvh->primTy->getBytes(tri);
+          s.statLeaf.numPrimsActive += bvh->primTy->sizeActive(tri);
+          s.statLeaf.numPrimsTotal += bvh->primTy->sizeTotal(tri);
+          s.statLeaf.numBytes += bytes;
+          tri+=bytes;
         }
         s.statLeaf.numLeaves++;
         s.statLeaf.numPrimBlocks += num;

@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2017 Intel Corporation                                    //
+// Copyright 2009-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -32,11 +32,11 @@ namespace embree
 {
   struct TaskScheduler : public RefCount
   {
-    ALIGNED_STRUCT;
+    ALIGNED_STRUCT_(64);
     friend class Device;
 
-    static const size_t TASK_STACK_SIZE = 2*1024;           //!< task structure stack
-    static const size_t CLOSURE_STACK_SIZE = 256*1024;    //!< stack for task closures
+    static const size_t TASK_STACK_SIZE = 4*1024;           //!< task structure stack
+    static const size_t CLOSURE_STACK_SIZE = 512*1024;    //!< stack for task closures
 
     struct Thread;
 
@@ -107,7 +107,9 @@ namespace embree
       }
 
       /*! run this task */
-      __dllexport void run(Thread& thread);
+      dll_export void run(Thread& thread);
+
+      void run_internal(Thread& thread);
 
     public:
       std::atomic<int> state;            //!< state this task is in
@@ -124,27 +126,33 @@ namespace embree
       TaskQueue ()
       : left(0), right(0), stackPtr(0) {}
 
-      __forceinline void* alloc(size_t bytes, size_t align = 64) {
-        stackPtr += bytes + ((align - stackPtr) & (align-1));
-        assert(stackPtr <= CLOSURE_STACK_SIZE);
+      __forceinline void* alloc(size_t bytes, size_t align = 64)
+      {
+        size_t ofs = bytes + ((align - stackPtr) & (align-1));
+        if (stackPtr + ofs > CLOSURE_STACK_SIZE)
+          throw std::runtime_error("closure stack overflow");
+        stackPtr += ofs;
         return &stack[stackPtr-bytes];
       }
 
       template<typename Closure>
       __forceinline void push_right(Thread& thread, const size_t size, const Closure& closure)
       {
-        assert(right < TASK_STACK_SIZE);
+        if (right >= TASK_STACK_SIZE)
+          throw std::runtime_error("task stack overflow");
 
 	/* allocate new task on right side of stack */
         size_t oldStackPtr = stackPtr;
         TaskFunction* func = new (alloc(sizeof(ClosureTaskFunction<Closure>))) ClosureTaskFunction<Closure>(closure);
-        new (&tasks[right++]) Task(func,thread.task,oldStackPtr,size);
+        new (&tasks[right]) Task(func,thread.task,oldStackPtr,size);
+        right++;
 
 	/* also move left pointer */
 	if (left >= right-1) left = right-1;
       }
 
-      __dllexport bool execute_local(Thread& thread, Task* parent);
+      dll_export bool execute_local(Thread& thread, Task* parent);
+      bool execute_local_internal(Thread& thread, Task* parent);
       bool steal(Thread& thread);
       size_t getTaskSizeAtLeft();
 
@@ -165,7 +173,7 @@ namespace embree
     /*! thread local structure for each thread */
     struct Thread
     {
-      ALIGNED_STRUCT;
+      ALIGNED_STRUCT_(64);
 
       Thread (size_t threadIndex, const Ref<TaskScheduler>& scheduler)
       : threadIndex(threadIndex), task(nullptr), scheduler(scheduler) {}
@@ -187,16 +195,16 @@ namespace embree
       ~ThreadPool ();
 
       /*! starts the threads */
-      __dllexport void startThreads();
+      dll_export void startThreads();
 
       /*! sets number of threads to use */
       void setNumThreads(size_t numThreads, bool startThreads = false);
 
       /*! adds a task scheduler object for scheduling */
-      __dllexport void add(const Ref<TaskScheduler>& scheduler);
+      dll_export void add(const Ref<TaskScheduler>& scheduler);
 
       /*! remove the task scheduler object again */
-      __dllexport void remove(const Ref<TaskScheduler>& scheduler);
+      dll_export void remove(const Ref<TaskScheduler>& scheduler);
 
       /*! returns number of threads of the thread pool */
       size_t size() const { return numThreads; }
@@ -231,7 +239,7 @@ namespace embree
     void reset();
 
     /*! let a worker thread allocate a thread index */
-    __dllexport ssize_t allocThreadIndex();
+    dll_export ssize_t allocThreadIndex();
 
     /*! wait for some number of threads available (threadCount includes main thread) */
     void wait_for_threads(size_t threadCount);
@@ -307,7 +315,7 @@ namespace embree
     template<typename Index, typename Closure>
     static void spawn(const Index begin, const Index end, const Index blockSize, const Closure& closure)
     {
-      spawn(end-begin, [=,&closure]()
+      spawn(end-begin, [=]()
         {
 	  if (end-begin <= blockSize) {
 	    return closure(range<Index>(begin,end));
@@ -320,36 +328,36 @@ namespace embree
     }
 
     /* work on spawned subtasks and wait until all have finished */
-    __dllexport static bool wait();
+    dll_export static bool wait();
 
     /* returns the ID of the current thread */
-    __dllexport static size_t threadID();
+    dll_export static size_t threadID();
 
     /* returns the index (0..threadCount-1) of the current thread */
-    __dllexport static size_t threadIndex();
+    dll_export static size_t threadIndex();
 
     /* returns the total number of threads */
-    __dllexport static size_t threadCount();
+    dll_export static size_t threadCount();
 
   private:
 
     /* returns the thread local task list of this worker thread */
-    __dllexport static Thread* thread();
+    dll_export static Thread* thread();
 
     /* sets the thread local task list of this worker thread */
-    __dllexport static Thread* swapThread(Thread* thread);
+    dll_export static Thread* swapThread(Thread* thread);
 
     /*! returns the taskscheduler object to be used by the master thread */
-    __dllexport static TaskScheduler* instance();
+    dll_export static TaskScheduler* instance();
 
     /*! starts the threads */
-    __dllexport static void startThreads();
+    dll_export static void startThreads();
 
     /*! adds a task scheduler object for scheduling */
-    __dllexport static void addScheduler(const Ref<TaskScheduler>& scheduler);
+    dll_export static void addScheduler(const Ref<TaskScheduler>& scheduler);
 
     /*! remove the task scheduler object again */
-    __dllexport static void removeScheduler(const Ref<TaskScheduler>& scheduler);
+    dll_export static void removeScheduler(const Ref<TaskScheduler>& scheduler);
 
   private:
     std::vector<atomic<Thread*>> threadLocal;

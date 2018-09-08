@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2017 Intel Corporation                                    //
+// Copyright 2009-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -16,22 +16,79 @@
 
 #pragma once
 
-#include "../common/scene_instance.h"
+#include "instance.h"
 #include "../common/ray.h"
 
 namespace embree
 {
   namespace isa
   {
-    template<int K>
-    struct FastInstanceIntersectorK
+    struct InstanceIntersector1
     {
-      static void intersect(vint<K>* valid, const Instance* instance, RayK<K>& ray, size_t item);
-      static void occluded (vint<K>* valid, const Instance* instance, RayK<K>& ray, size_t item);
+      typedef InstancePrimitive Primitive;
+
+      struct Precalculations {
+        __forceinline Precalculations (const Ray& ray, const void *ptr) {}
+      };
+      
+      static void intersect(const Precalculations& pre, RayHit& ray, IntersectContext* context, const Primitive& prim);
+      static bool occluded(const Precalculations& pre, Ray& ray, IntersectContext* context, const Primitive& prim);
     };
 
-    typedef FastInstanceIntersectorK<4>  FastInstanceIntersector4;
-    typedef FastInstanceIntersectorK<8>  FastInstanceIntersector8;
-    typedef FastInstanceIntersectorK<16> FastInstanceIntersector16;
+    struct InstanceIntersector1MB
+    {
+      typedef InstancePrimitive Primitive;
+
+      struct Precalculations {
+        __forceinline Precalculations (const Ray& ray, const void *ptr) {}
+      };
+      
+      static void intersect(const Precalculations& pre, RayHit& ray, IntersectContext* context, const Primitive& prim);
+      static bool occluded(const Precalculations& pre, Ray& ray, IntersectContext* context, const Primitive& prim);
+    };
+
+    template<int K>
+      struct InstanceIntersectorK
+    {
+      typedef InstancePrimitive Primitive;
+      
+      struct Precalculations {
+        __forceinline Precalculations (const vbool<K>& valid, const RayK<K>& ray) {}
+      };
+      
+      static void intersect(const vbool<K>& valid_i, const Precalculations& pre, RayHitK<K>& ray, IntersectContext* context, const Primitive& prim);
+      static vbool<K> occluded(const vbool<K>& valid_i, const Precalculations& pre, RayK<K>& ray, IntersectContext* context, const Primitive& prim);
+
+      static __forceinline void intersect(Precalculations& pre, RayHitK<K>& ray, size_t k, IntersectContext* context, const Primitive& prim) {
+        intersect(vbool<K>(1<<int(k)),pre,ray,context,prim);
+      }
+      
+      static __forceinline bool occluded(Precalculations& pre, RayK<K>& ray, size_t k, IntersectContext* context, const Primitive& prim) {
+        occluded(vbool<K>(1<<int(k)),pre,ray,context,prim);
+        return ray.tfar[k] < 0.0f; 
+      }
+    };
+
+    template<int K>
+      struct InstanceIntersectorKMB
+    {
+      typedef InstancePrimitive Primitive;
+      
+      struct Precalculations {
+        __forceinline Precalculations (const vbool<K>& valid, const RayK<K>& ray) {}
+      };
+      
+      static void intersect(const vbool<K>& valid_i, const Precalculations& pre, RayHitK<K>& ray, IntersectContext* context, const Primitive& prim);
+      static vbool<K> occluded(const vbool<K>& valid_i, const Precalculations& pre, RayK<K>& ray, IntersectContext* context, const Primitive& prim);
+
+      static __forceinline void intersect(Precalculations& pre, RayHitK<K>& ray, size_t k, IntersectContext* context, const Primitive& prim) {
+        intersect(vbool<K>(1<<int(k)),pre,ray,context,prim);
+      }
+      
+      static __forceinline bool occluded(Precalculations& pre, RayK<K>& ray, size_t k, IntersectContext* context, const Primitive& prim) {
+        occluded(vbool<K>(1<<int(k)),pre,ray,context,prim);
+        return ray.tfar[k] < 0.0f; 
+      }
+    };
   }
 }

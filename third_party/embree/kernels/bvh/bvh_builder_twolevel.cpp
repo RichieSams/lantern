@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2017 Intel Corporation                                    //
+// Copyright 2009-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -39,10 +39,7 @@ namespace embree
       : bvh(bvh), objects(bvh->objects), scene(scene), createMeshAccel(createMeshAccel), refs(scene->device,0), prims(scene->device,0), singleThreadThreshold(singleThreadThreshold) {}
     
     template<int N, typename Mesh>
-    BVHNBuilderTwoLevel<N,Mesh>::~BVHNBuilderTwoLevel ()
-    {
-      for (size_t i=0; i<builders.size(); i++) 
-	delete builders[i];
+    BVHNBuilderTwoLevel<N,Mesh>::~BVHNBuilderTwoLevel () {
     }
 
     // ===========================================================================
@@ -57,7 +54,7 @@ namespace embree
       if (num < objects.size()) {
         parallel_for(num, objects.size(), [&] (const range<size_t>& r) {
             for (size_t i=r.begin(); i<r.end(); i++) {
-              delete builders[i]; builders[i] = nullptr;
+              builders[i].clear();
               delete objects[i]; objects[i] = nullptr;
             }
           });
@@ -94,16 +91,24 @@ namespace embree
         {
           Mesh* mesh = scene->getSafe<Mesh>(objectID);
           
-          /* verify if meshes got deleted properly */
-          if (mesh == nullptr || mesh->numTimeSteps != 1) {
-            assert(objectID < objects.size () && objects[objectID] == nullptr);
-            assert(objectID < builders.size() && builders[objectID] == nullptr);
+          /* ignore meshes we do not support */
+          if (mesh == nullptr || mesh->numTimeSteps != 1)
             continue;
-          }
           
           /* create BVH and builder for new meshes */
-          if (objects[objectID] == nullptr)
-            createMeshAccel(mesh,(AccelData*&)objects[objectID],builders[objectID]);
+          if (objects[objectID] == nullptr) {
+            Builder* builder = nullptr;
+            createMeshAccel(mesh,(AccelData*&)objects[objectID],builder);
+            builders[objectID] = BuilderState(builder,mesh->quality);
+          }
+
+          /* re-create when build quality changed */
+          else if (mesh->quality != builders[objectID].quality) {
+            Builder* builder = nullptr;
+            delete objects[objectID]; 
+            createMeshAccel(mesh,(AccelData*&)objects[objectID],builder);
+            builders[objectID] = BuilderState(builder,mesh->quality);
+          }
         }
       });
 
@@ -118,7 +123,7 @@ namespace embree
             continue;
         
           BVH*     object  = objects [objectID]; assert(object);
-          Builder* builder = builders[objectID]; assert(builder);
+          Ref<Builder>& builder = builders[objectID].builder; assert(builder);
           
           /* build object if it got modified */
           if (mesh->isModified())
@@ -128,7 +133,7 @@ namespace embree
           if (!object->getBounds().empty())
           {
 #if ENABLE_DIRECT_SAH_MERGE_BUILDER
-            refs[nextRef++] = BVHNBuilderTwoLevel::BuildRef(object->getBounds(),object->root,objectID,mesh->size());
+            refs[nextRef++] = BVHNBuilderTwoLevel::BuildRef(object->getBounds(),object->root,(unsigned int)objectID,(unsigned int)mesh->size());
 #else
             refs[nextRef++] = BVHNBuilderTwoLevel::BuildRef(object->getBounds(),object->root);
 #endif
@@ -179,7 +184,7 @@ namespace embree
 
               PrimInfo pinfo(empty);
               for (size_t i=r.begin(); i<r.end(); i++) {
-                pinfo.add(refs[i].bounds(),refs[i].bounds().center2());
+                pinfo.add_center2(refs[i]);
               }
               return pinfo;
             }, [] (const PrimInfo& a, const PrimInfo& b) { return PrimInfo::merge(a,b); });
@@ -207,7 +212,7 @@ namespace embree
             GeneralBVHBuilder::Settings settings;
             settings.branchingFactor = N;
             settings.maxDepth = BVH::maxBuildDepthLeaf;
-            settings.logBlockSize = __bsr(N);
+            settings.logBlockSize = bsr(N);
             settings.minLeafSize = 1;
             settings.maxLeafSize = 1;
             settings.travCost = 1.0f;
@@ -222,7 +227,7 @@ namespace embree
               typename BVH::AlignedNode::Create2(),
               typename BVH::AlignedNode::Set2(),
               
-              [&] (const range<size_t>& range, const FastAllocator::CachedAllocator& alloc) -> NodeRef  {
+              [&] (const BuildRef* refs, const range<size_t>& range, const FastAllocator::CachedAllocator& alloc) -> NodeRef  {
                 assert(range.size() == 1);
                 return (NodeRef) refs[range.begin()].node;
               },
@@ -237,7 +242,7 @@ namespace embree
               typename BVH::AlignedNode::Create2(),
               typename BVH::AlignedNode::Set2(),
               
-              [&] (const range<size_t>& range, const FastAllocator::CachedAllocator& alloc) -> NodeRef {
+              [&] (const PrimRef* pims, const range<size_t>& range, const FastAllocator::CachedAllocator& alloc) -> NodeRef {
                 assert(range.size() == 1);
                 return (NodeRef) prims[range.begin()].ID();
               },
@@ -269,7 +274,7 @@ namespace embree
     void BVHNBuilderTwoLevel<N,Mesh>::deleteGeometry(size_t geomID)
     {
       if (geomID >= objects.size()) return;
-      delete builders[geomID]; builders[geomID] = nullptr;
+      builders[geomID].clear();
       delete objects [geomID]; objects [geomID] = nullptr;
     }
 
@@ -280,7 +285,7 @@ namespace embree
         if (objects[i]) objects[i]->clear();
 
       for (size_t i=0; i<builders.size(); i++) 
-	if (builders[i]) builders[i]->clear();
+	if (builders[i].builder) builders[i].builder->clear();
 
       refs.clear();
     }
@@ -325,47 +330,41 @@ namespace embree
       }
     }
 
-#if defined(EMBREE_GEOMETRY_LINES)    
-    Builder* BVH4BuilderTwoLevelLineSegmentsSAH (void* bvh, Scene* scene, const createLineSegmentsAccelTy createMeshAccel) {
-      return new BVHNBuilderTwoLevel<4,LineSegments>((BVH4*)bvh,scene,createMeshAccel);
-    }
-#endif
-
-#if defined(EMBREE_GEOMETRY_TRIANGLES)
+#if defined(EMBREE_GEOMETRY_TRIANGLE)
     Builder* BVH4BuilderTwoLevelTriangleMeshSAH (void* bvh, Scene* scene, const createTriangleMeshAccelTy createMeshAccel) {
       return new BVHNBuilderTwoLevel<4,TriangleMesh>((BVH4*)bvh,scene,createMeshAccel);
     }
 #endif
 
-#if defined(EMBREE_GEOMETRY_QUADS)
+#if defined(EMBREE_GEOMETRY_QUAD)
     Builder* BVH4BuilderTwoLevelQuadMeshSAH (void* bvh, Scene* scene, const createQuadMeshAccelTy createMeshAccel) {
     return new BVHNBuilderTwoLevel<4,QuadMesh>((BVH4*)bvh,scene,createMeshAccel);
     }
 #endif
 
 #if defined(EMBREE_GEOMETRY_USER)
-    Builder* BVH4BuilderTwoLevelVirtualSAH (void* bvh, Scene* scene, const createAccelSetAccelTy createMeshAccel) {
-    return new BVHNBuilderTwoLevel<4,AccelSet>((BVH4*)bvh,scene,createMeshAccel);
+    Builder* BVH4BuilderTwoLevelVirtualSAH (void* bvh, Scene* scene, const createUserGeometryAccelTy createMeshAccel) {
+    return new BVHNBuilderTwoLevel<4,UserGeometry>((BVH4*)bvh,scene,createMeshAccel);
     }
 #endif
 
 
 #if defined(__AVX__)
-#if defined(EMBREE_GEOMETRY_TRIANGLES)
+#if defined(EMBREE_GEOMETRY_TRIANGLE)
     Builder* BVH8BuilderTwoLevelTriangleMeshSAH (void* bvh, Scene* scene, const createTriangleMeshAccelTy createMeshAccel) {
       return new BVHNBuilderTwoLevel<8,TriangleMesh>((BVH8*)bvh,scene,createMeshAccel);
     }
 #endif
 
-#if defined(EMBREE_GEOMETRY_QUADS)
+#if defined(EMBREE_GEOMETRY_QUAD)
     Builder* BVH8BuilderTwoLevelQuadMeshSAH (void* bvh, Scene* scene, const createQuadMeshAccelTy createMeshAccel) {
       return new BVHNBuilderTwoLevel<8,QuadMesh>((BVH8*)bvh,scene,createMeshAccel);
     }
 #endif
 
 #if defined(EMBREE_GEOMETRY_USER)
-    Builder* BVH8BuilderTwoLevelVirtualSAH (void* bvh, Scene* scene, const createAccelSetAccelTy createMeshAccel) {
-      return new BVHNBuilderTwoLevel<8,AccelSet>((BVH8*)bvh,scene,createMeshAccel);
+    Builder* BVH8BuilderTwoLevelVirtualSAH (void* bvh, Scene* scene, const createUserGeometryAccelTy createMeshAccel) {
+      return new BVHNBuilderTwoLevel<8,UserGeometry>((BVH8*)bvh,scene,createMeshAccel);
     }
 #endif
 #endif

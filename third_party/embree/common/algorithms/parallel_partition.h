@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2017 Intel Corporation                                    //
+// Copyright 2009-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -17,7 +17,7 @@
 #pragma once
 
 #include "parallel_for.h"
-#include "../common/math/range.h"
+#include "../math/range.h"
 
 namespace embree
 {
@@ -64,7 +64,7 @@ namespace embree
   template<typename T, typename V, typename Vi, typename IsLeft, typename Reduction_T, typename Reduction_V>
     class __aligned(64) parallel_partition_task
   {
-    ALIGNED_CLASS;
+    ALIGNED_CLASS_(64);
   private:
 
     static const size_t MAX_TASKS = 512;

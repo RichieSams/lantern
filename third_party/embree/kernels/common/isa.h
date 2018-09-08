@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2017 Intel Corporation                                    //
+// Copyright 2009-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -16,6 +16,9 @@
 
 #pragma once
 
+#include "../../common/sys/platform.h"
+#include "../../common/sys/sysinfo.h"
+
 namespace embree
 {
 #define DEFINE_SYMBOL2(type,name)               \
@@ -29,8 +32,8 @@ namespace embree
   namespace avx2      { extern type name(); }                           \
   namespace avx512knl { extern type name(); }                           \
   namespace avx512skx { extern type name(); }                           \
-  void name##_error2() { throw_RTCError(RTC_UNKNOWN_ERROR,"internal error in ISA selection for " TOSTRING(name)); } \
-  type name##_error() { return type(name##_error2); }                 \
+  void name##_error2() { throw_RTCError(RTC_ERROR_UNKNOWN,"internal error in ISA selection for " TOSTRING(name)); } \
+  type name##_error() { return type(name##_error2); }                   \
   type name##_zero() { return type(nullptr); }
 
 #define DECLARE_ISA_FUNCTION(type,symbol,args)                            \
@@ -40,7 +43,7 @@ namespace embree
   namespace avx2      { extern type symbol(args); }                       \
   namespace avx512knl { extern type symbol(args); }                       \
   namespace avx512skx { extern type symbol(args); }                     \
-  inline void symbol##_error() { throw_RTCError(RTC_UNSUPPORTED_CPU,"function " TOSTRING(symbol) " not supported by your CPU"); } \
+  inline type symbol##_error(args) { throw_RTCError(RTC_ERROR_UNSUPPORTED_CPU,"function " TOSTRING(symbol) " not supported by your CPU"); } \
   typedef type (*symbol##Ty)(args);                                       \
   
 #define DEFINE_ISA_FUNCTION(type,symbol,args)   \
@@ -69,12 +72,17 @@ namespace embree
 #define SELECT_SYMBOL_SSE42(features,intersector)
 #endif
 
-#if defined(EMBREE_TARGET_AVX)
+#if defined(EMBREE_TARGET_AVX) || defined(__AVX__)
 #if !defined(EMBREE_TARGET_SIMD8)
 #define EMBREE_TARGET_SIMD8
 #endif
-#define SELECT_SYMBOL_AVX(features,intersector) \
+#if defined(__AVX__) // if default ISA is >= AVX we treat AVX target as default target
+#define SELECT_SYMBOL_AVX(features,intersector)                 \
+  if ((features & ISA) == ISA) intersector = isa::intersector;
+#else
+#define SELECT_SYMBOL_AVX(features,intersector)                 \
   if ((features & AVX) == AVX) intersector = avx::intersector;
+#endif
 #else
 #define SELECT_SYMBOL_AVX(features,intersector)
 #endif

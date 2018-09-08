@@ -1,5 +1,5 @@
 ## ======================================================================== ##
-## Copyright 2009-2017 Intel Corporation                                    ##
+## Copyright 2009-2018 Intel Corporation                                    ##
 ##                                                                          ##
 ## Licensed under the Apache License, Version 2.0 (the "License");          ##
 ## you may not use this file except in compliance with the License.         ##
@@ -18,6 +18,11 @@ ADD_LIBRARY(lexers STATIC
  stringstream.cpp
  tokenstream.cpp
 )
-
-TARGET_LINK_LIBRARIES(lexers sys)
+TARGET_LINK_LIBRARIES(lexers sys math)
 SET_PROPERTY(TARGET lexers PROPERTY FOLDER common)
+SET_PROPERTY(TARGET lexers APPEND PROPERTY COMPILE_FLAGS " ${FLAGS_LOWEST}")
+
+IF (EMBREE_STATIC_LIB)
+  INSTALL(TARGETS lexers ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT devel)
+  SIGN_TARGET(lexers)
+ENDIF()

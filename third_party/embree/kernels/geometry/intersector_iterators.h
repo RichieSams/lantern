@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2017 Intel Corporation                                    //
+// Copyright 2009-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -18,187 +18,158 @@
 
 #include "../common/scene.h"
 #include "../common/ray.h"
+#include "../bvh/node_intersector1.h"
+#include "../bvh/node_intersector_packet.h"
 
 namespace embree
 {
   namespace isa
   {
     template<typename Intersector>
-      struct ArrayIntersector1
+    struct ArrayIntersector1
+    {
+      typedef typename Intersector::Primitive Primitive;
+      typedef typename Intersector::Precalculations Precalculations;
+
+      template<int N, int Nx, bool robust>
+      static __forceinline void intersect(const Accel::Intersectors* This, Precalculations& pre, RayHit& ray, IntersectContext* context, const Primitive* prim, size_t num, const TravRay<N,Nx,robust> &tray, size_t& lazy_node)
       {
-        typedef typename Intersector::Primitive Primitive;
-        typedef typename Intersector::Precalculations Precalculations;
+        for (size_t i=0; i<num; i++)
+          Intersector::intersect(pre,ray,context,prim[i]);
+      }
 
-        static const bool validIntersectorK = false; // FIXME: why do we need this
-
-        static __forceinline void intersect(Precalculations& pre, Ray& ray, IntersectContext* context, const Primitive* prim, size_t num, size_t& lazy_node)
-        {
-          for (size_t i=0; i<num; i++)
-            Intersector::intersect(pre,ray,context,prim[i]);
+      template<int N, int Nx, bool robust>
+      static __forceinline bool occluded(const Accel::Intersectors* This, Precalculations& pre, Ray& ray, IntersectContext* context, const Primitive* prim, size_t num, const TravRay<N,Nx,robust> &tray, size_t& lazy_node)
+      {
+        for (size_t i=0; i<num; i++) {
+          if (Intersector::occluded(pre,ray,context,prim[i]))
+            return true;
         }
-        
-        static __forceinline bool occluded(Precalculations& pre, Ray& ray, IntersectContext* context, const Primitive* prim, size_t num, size_t& lazy_node) 
-        {
-          for (size_t i=0; i<num; i++) {
-            if (Intersector::occluded(pre,ray,context,prim[i]))
-              return true;
-          }
-          return false;
-        }
+        return false;
+      }
 
-        static __forceinline size_t intersect(Precalculations* pre, size_t valid, Ray** rays, IntersectContext* context,  const Primitive* prim, size_t num, size_t& lazy_node)
-        {
-          size_t valid_isec = 0;
-          do {
-            const size_t i = __bscf(valid);
-            const float old_far = rays[i]->tfar;
-            intersect(pre[i],*rays[i],context,prim,num,lazy_node);
-            valid_isec |= (rays[i]->tfar < old_far) ? ((size_t)1 << i) : 0;            
-          } while(unlikely(valid));
-          return valid_isec;
-        }
+      template<int K>
+      static __forceinline void intersectK(const vbool<K>& valid, /* PrecalculationsK& pre, */ RayHitK<K>& ray, IntersectContext* context, const Primitive* prim, size_t num, size_t& lazy_node)
+      {
+      }
 
-        static __forceinline size_t occluded(Precalculations* pre, size_t valid, Ray** rays, IntersectContext* context, const Primitive* prim, size_t num, size_t& lazy_node) 
-        {
-          size_t hit = 0;
-          do {
-            const size_t i = __bscf(valid);            
-            if (occluded(pre[i],*rays[i],context,prim,num,lazy_node))
-            {
-              hit |= (size_t)1 << i;
-              rays[i]->geomID = 0;
-            }
-          } while(valid);
-
-          return hit;
-        }
-
-
-        template<int K>
-        static __forceinline void intersectK(const vbool<K>& valid, /* PrecalculationsK& pre, */ RayK<K>& ray, IntersectContext* context, const Primitive* prim, size_t num, size_t& lazy_node)
-        {
-        }
-
-        template<int K>        
-        static __forceinline vbool<K> occludedK(const vbool<K>& valid, /* PrecalculationsK& pre, */ RayK<K>& ray, IntersectContext* context, const Primitive* prim, size_t num, size_t& lazy_node)
-        {
-          return valid;
-        }
-      };
+      template<int K>
+      static __forceinline vbool<K> occludedK(const vbool<K>& valid, /* PrecalculationsK& pre, */ RayK<K>& ray, IntersectContext* context, const Primitive* prim, size_t num, size_t& lazy_node)
+      {
+        return valid;
+      }
+    };
 
     template<int K, typename Intersector>
-      struct ArrayIntersectorK_1 
+    struct ArrayIntersectorK_1
+    {
+      typedef typename Intersector::Primitive Primitive;
+      typedef typename Intersector::Precalculations Precalculations;
+
+      template<bool robust>
+      static __forceinline void intersect(const vbool<K>& valid, const Accel::Intersectors* This, Precalculations& pre, RayHitK<K>& ray, IntersectContext* context, const Primitive* prim, size_t num, const TravRayK<K, robust> &tray, size_t& lazy_node)
       {
-        typedef typename Intersector::Primitive Primitive;
-        typedef typename Intersector::Precalculations Precalculations;
-        
-        static __forceinline void intersect(const vbool<K>& valid, Precalculations& pre, RayK<K>& ray, IntersectContext* context, const Primitive* prim, size_t num, size_t& lazy_node)
-        {
-          for (size_t i=0; i<num; i++) {
-            Intersector::intersect(valid,pre,ray,context,prim[i]);
-          }
+        for (size_t i=0; i<num; i++) {
+          Intersector::intersect(valid,pre,ray,context,prim[i]);
         }
-        
-        static __forceinline vbool<K> occluded(const vbool<K>& valid, Precalculations& pre, RayK<K>& ray, IntersectContext* context, const Primitive* prim, size_t num, size_t& lazy_node) 
-        {
-          vbool<K> valid0 = valid;
-          for (size_t i=0; i<num; i++) {
-            valid0 &= !Intersector::occluded(valid0,pre,ray,context,prim[i]);
-            if (none(valid0)) break;
-          }
-          return !valid0;
+      }
+
+      template<bool robust>
+      static __forceinline vbool<K> occluded(const vbool<K>& valid, const Accel::Intersectors* This, Precalculations& pre, RayK<K>& ray, IntersectContext* context, const Primitive* prim, size_t num, const TravRayK<K, robust> &tray, size_t& lazy_node)
+      {
+        vbool<K> valid0 = valid;
+        for (size_t i=0; i<num; i++) {
+          valid0 &= !Intersector::occluded(valid0,pre,ray,context,prim[i]);
+          if (none(valid0)) break;
         }
-        
-        static __forceinline void intersect(Precalculations& pre, RayK<K>& ray, size_t k, IntersectContext* context, const Primitive* prim, size_t num, size_t& lazy_node)
-        {
-          for (size_t i=0; i<num; i++) {
-            Intersector::intersect(pre,ray,k,context,prim[i]);
-          }
+        return !valid0;
+      }
+
+      template<int N, int Nx, bool robust>
+      static __forceinline void intersect(const Accel::Intersectors* This, Precalculations& pre, RayHitK<K>& ray, size_t k, IntersectContext* context, const Primitive* prim, size_t num, const TravRay<N,Nx,robust> &tray, size_t& lazy_node)
+      {
+        for (size_t i=0; i<num; i++) {
+          Intersector::intersect(pre,ray,k,context,prim[i]);
         }
-        
-        static __forceinline bool occluded(Precalculations& pre, RayK<K>& ray, size_t k, IntersectContext* context, const Primitive* prim, size_t num, size_t& lazy_node) 
-        {
-          for (size_t i=0; i<num; i++) {
-            if (Intersector::occluded(pre,ray,k,context,prim[i]))
-              return true;
-          }
-          return false;
+      }
+
+      template<int N, int Nx, bool robust>
+      static __forceinline bool occluded(const Accel::Intersectors* This, Precalculations& pre, RayK<K>& ray, size_t k, IntersectContext* context, const Primitive* prim, size_t num, const TravRay<N,Nx,robust> &tray, size_t& lazy_node)
+      {
+        for (size_t i=0; i<num; i++) {
+          if (Intersector::occluded(pre,ray,k,context,prim[i]))
+            return true;
         }
-      };
+        return false;
+      }
+    };
 
     // =============================================================================================
 
-    template<int K, typename Intersector1, typename IntersectorK>
-      struct ArrayIntersectorKStream 
+    template<int K, typename IntersectorK>
+    struct ArrayIntersectorKStream
+    {
+      typedef typename IntersectorK::Primitive PrimitiveK;
+      typedef typename IntersectorK::Precalculations PrecalculationsK;
+
+      static __forceinline void intersectK(const vbool<K>& valid, const Accel::Intersectors* This, /* PrecalculationsK& pre, */ RayHitK<K>& ray, IntersectContext* context, const PrimitiveK* prim, size_t num, size_t& lazy_node)
       {
-        typedef typename Intersector1::Primitive Primitive;
-        typedef typename Intersector1::Precalculations Precalculations;
-        typedef typename IntersectorK::Primitive PrimitiveK;
-        typedef typename IntersectorK::Precalculations PrecalculationsK;
+        PrecalculationsK pre(valid,ray); // FIXME: might cause trouble
 
-        static const bool validIntersectorK = true;
-        
-        static __forceinline void intersectK(const vbool<K>& valid, /* PrecalculationsK& pre, */ RayK<K>& ray, IntersectContext* context, const PrimitiveK* prim, size_t num, size_t& lazy_node)
-        {
-          PrecalculationsK pre(valid,ray); // FIXME: might cause trouble
+        for (size_t i=0; i<num; i++) {
+          IntersectorK::intersect(valid,pre,ray,context,prim[i]);
+        }
+      }
 
-          for (size_t i=0; i<num; i++) {
-            IntersectorK::intersect(valid,pre,ray,context,prim[i]);
-          }
+      static __forceinline vbool<K> occludedK(const vbool<K>& valid, const Accel::Intersectors* This, /* PrecalculationsK& pre, */ RayK<K>& ray, IntersectContext* context, const PrimitiveK* prim, size_t num, size_t& lazy_node)
+      {
+        PrecalculationsK pre(valid,ray); // FIXME: might cause trouble
+        vbool<K> valid0 = valid;
+        for (size_t i=0; i<num; i++) {
+          valid0 &= !IntersectorK::occluded(valid0,pre,ray,context,prim[i]);
+          if (none(valid0)) break;
         }
-        
-        static __forceinline vbool<K> occludedK(const vbool<K>& valid, /* PrecalculationsK& pre, */ RayK<K>& ray, IntersectContext* context, const PrimitiveK* prim, size_t num, size_t& lazy_node)
-        {
-          PrecalculationsK pre(valid,ray); // FIXME: might cause trouble
-          vbool<K> valid0 = valid;
-          for (size_t i=0; i<num; i++) {
-            valid0 &= !IntersectorK::occluded(valid0,pre,ray,context,prim[i]);
-            if (none(valid0)) break;
-          }
-          return !valid0;
-        }
+        return !valid0;
+      }
 
-        static __forceinline void intersect(Precalculations& pre, Ray& ray, IntersectContext* context, const Primitive* prim, size_t num, size_t& lazy_node)
-        {
-          for (size_t i=0; i<num; i++)
-            Intersector1::intersect(pre,ray,context,prim[i]);
+      static __forceinline void intersect(const Accel::Intersectors* This, RayHitK<K>& ray, size_t k, IntersectContext* context, const PrimitiveK* prim, size_t num, size_t& lazy_node)
+      {
+        PrecalculationsK pre(ray.tnear() <= ray.tfar,ray); // FIXME: might cause trouble
+        for (size_t i=0; i<num; i++) {
+          IntersectorK::intersect(pre,ray,k,context,prim[i]);
         }
-        
-        static __forceinline bool occluded(Precalculations& pre, Ray& ray, IntersectContext* context, const Primitive* prim, size_t num, size_t& lazy_node) 
-        {
-          for (size_t i=0; i<num; i++) {
-            if (Intersector1::occluded(pre,ray,context,prim[i]))
-              return true;
-          }
-          return false;
-        }
+      }
 
-        static __forceinline size_t intersect(Precalculations* pre, size_t valid, Ray** rays, IntersectContext* context,  const Primitive* prim, size_t num, size_t& lazy_node)
-        {
-          size_t valid_isec = 0;
-          do {
-            const size_t i = __bscf(valid);
-            const float old_far = rays[i]->tfar;
-            intersect(pre[i],*rays[i],context,prim,num,lazy_node);
-            valid_isec |= (rays[i]->tfar < old_far) ? ((size_t)1 << i) : 0;            
-          } while(unlikely(valid));
-          return valid_isec;
+      static __forceinline bool occluded(const Accel::Intersectors* This, RayK<K>& ray, size_t k, IntersectContext* context, const PrimitiveK* prim, size_t num, size_t& lazy_node)
+      {
+        PrecalculationsK pre(ray.tnear() <= ray.tfar,ray); // FIXME: might cause trouble
+        for (size_t i=0; i<num; i++) {
+          if (IntersectorK::occluded(pre,ray,k,context,prim[i]))
+            return true;
         }
+        return false;
+      }
 
-        static __forceinline size_t occluded(Precalculations* pre, size_t valid, Ray** rays, IntersectContext* context, const Primitive* prim, size_t num, size_t& lazy_node) 
-        {
-          size_t hit = 0;
-          do {
-            const size_t i = __bscf(valid);            
-            if (occluded(pre[i],*rays[i],context,prim,num,lazy_node))
+      static __forceinline size_t occluded(const Accel::Intersectors* This, size_t cur_mask, RayK<K>** __restrict__ inputPackets, IntersectContext* context, const PrimitiveK* prim, size_t num, size_t& lazy_node)
+      {
+        size_t m_occluded = 0;
+        for (size_t i=0; i<num; i++) {
+          size_t bits = cur_mask & (~m_occluded);
+          for (; bits!=0; )
+          {
+            const size_t rayID = bscf(bits);
+            RayHitK<K> &ray = *inputPackets[rayID / K];
+            const size_t k = rayID % K;
+            PrecalculationsK pre(ray.tnear() <= ray.tfar,ray); // FIXME: might cause trouble
+            if (IntersectorK::occluded(pre,ray,k,context,prim[i]))
             {
-              hit |= (size_t)1 << i;
-              rays[i]->geomID = 0;
+              m_occluded |= (size_t)1 << rayID;
+              ray.tfar[k] = neg_inf;
             }
-          } while(valid);
-
-          return hit;
+          }
         }
-      };
+        return m_occluded;
+      }
+    };
   }
 }

@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2017 Intel Corporation                                    //
+// Copyright 2009-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -27,14 +27,16 @@ namespace embree
   public:
     struct Type : public PrimitiveType 
     {
-      Type();
-      size_t size(const char* This) const;
+      const char* name() const;
+      size_t sizeActive(const char* This) const;
+      size_t sizeTotal(const char* This) const;
+      size_t getBytes(const char* This) const;
     };
     static Type type;
 
   public:
 
-    /* Returns maximal number of stored quads */
+    /* Returns maximum number of stored quads */
     static __forceinline size_t max_size() { return M; }
     
     /* Returns required number of primitive blocks for N primitives */
@@ -46,27 +48,27 @@ namespace embree
     __forceinline QuadMv() {}
 
     /* Construction from vertices and IDs */
-    __forceinline QuadMv(const Vec3vf<M>& v0, const Vec3vf<M>& v1, const Vec3vf<M>& v2, const Vec3vf<M>& v3, const vint<M>& geomIDs, const vint<M>& primIDs)
+    __forceinline QuadMv(const Vec3vf<M>& v0, const Vec3vf<M>& v1, const Vec3vf<M>& v2, const Vec3vf<M>& v3, const vuint<M>& geomIDs, const vuint<M>& primIDs)
       : v0(v0), v1(v1), v2(v2), v3(v3), geomIDs(geomIDs), primIDs(primIDs) {}
     
     /* Returns a mask that tells which quads are valid */
-    __forceinline vbool<M> valid() const { return geomIDs != vint<M>(-1); }
+    __forceinline vbool<M> valid() const { return geomIDs != vuint<M>(-1); }
 
     /* Returns true if the specified quad is valid */
     __forceinline bool valid(const size_t i) const { assert(i<M); return geomIDs[i] != -1; }
 
     /* Returns the number of stored quads */
-    __forceinline size_t size() const { return __bsf(~movemask(valid())); }
+    __forceinline size_t size() const { return bsf(~movemask(valid())); }
 
     /* Returns the geometry IDs */
-    __forceinline       vint<M>& geomID()       { return geomIDs; }
-    __forceinline const vint<M>& geomID() const { return geomIDs; }
-    __forceinline int geomID(const size_t i) const { assert(i<M); return geomIDs[i]; }
+    __forceinline       vuint<M>& geomID()       { return geomIDs; }
+    __forceinline const vuint<M>& geomID() const { return geomIDs; }
+    __forceinline unsigned int geomID(const size_t i) const { assert(i<M); return geomIDs[i]; }
 
     /* Returns the primitive IDs */
-    __forceinline       vint<M> primID()       { return primIDs; }
-    __forceinline const vint<M> primID() const { return primIDs; }
-    __forceinline int  primID(const size_t i) const { assert(i<M); return primIDs[i]; }
+    __forceinline       vuint<M> primID()       { return primIDs; }
+    __forceinline const vuint<M> primID() const { return primIDs; }
+    __forceinline unsigned int primID(const size_t i) const { assert(i<M); return primIDs[i]; }
 
     /* Calculate the bounds of the quads */
     __forceinline BBox3fa bounds() const 
@@ -99,14 +101,14 @@ namespace embree
       vfloat<M>::store_nt(&dst->v3.x,src.v3.x);
       vfloat<M>::store_nt(&dst->v3.y,src.v3.y);
       vfloat<M>::store_nt(&dst->v3.z,src.v3.z);
-      vint<M>::store_nt(&dst->geomIDs,src.geomIDs);
-      vint<M>::store_nt(&dst->primIDs,src.primIDs);
+      vuint<M>::store_nt(&dst->geomIDs,src.geomIDs);
+      vuint<M>::store_nt(&dst->primIDs,src.primIDs);
     }
 
     /* Fill quad from quad list */
     __forceinline void fill(const PrimRef* prims, size_t& begin, size_t end, Scene* scene)
     {
-      vint<M> vgeomID = -1, vprimID = -1;
+      vuint<M> vgeomID = -1, vprimID = -1;
       Vec3vf<M> v0 = zero, v1 = zero, v2 = zero, v3 = zero;
       
       for (size_t i=0; i<M && begin<end; i++, begin++)
@@ -134,7 +136,7 @@ namespace embree
     __forceinline BBox3fa update(QuadMesh* mesh)
     {
       BBox3fa bounds = empty;
-      vint<M> vgeomID = -1, vprimID = -1;
+      vuint<M> vgeomID = -1, vprimID = -1;
       Vec3vf<M> v0 = zero, v1 = zero, v2 = zero;
 	
       for (size_t i=0; i<M; i++)
@@ -165,8 +167,8 @@ namespace embree
     Vec3vf<M> v2;      // 3rd vertex of the quads
     Vec3vf<M> v3;      // 4rd vertex of the quads
   private:
-    vint<M> geomIDs; // geometry ID
-    vint<M> primIDs; // primitive ID
+    vuint<M> geomIDs; // geometry ID
+    vuint<M> primIDs; // primitive ID
   };
 
   template<int M>

@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2017 Intel Corporation                                    //
+// Copyright 2009-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -52,7 +52,7 @@ namespace embree
       }
       else
       {
-		BBox3fa subTreeBounds[MAX_NUM_SUB_TREES];
+        BBox3fa subTreeBounds[MAX_NUM_SUB_TREES];
         numSubTrees = 0;
         gather_subtree_refs(bvh->root,numSubTrees,0);
         if (numSubTrees)
@@ -180,7 +180,7 @@ namespace embree
 
     template<int N, typename Mesh, typename Primitive>
     BVHNRefitT<N,Mesh,Primitive>::BVHNRefitT (BVH* bvh, Builder* builder, Mesh* mesh, size_t mode)
-      : bvh(bvh), builder(builder), refitter(nullptr), mesh(mesh) {}
+      : bvh(bvh), builder(builder), refitter(new BVHNRefitter<N>(bvh,*(typename BVHNRefitter<N>::LeafBoundsInterface*)this)), mesh(mesh) {}
 
     template<int N, typename Mesh, typename Primitive>
     void BVHNRefitT<N,Mesh,Primitive>::clear()
@@ -192,29 +192,11 @@ namespace embree
     template<int N, typename Mesh, typename Primitive>
     void BVHNRefitT<N,Mesh,Primitive>::build()
     {
-      /* build initial BVH */
-      if (builder) {
+      if (mesh->topologyChanged()) {
         builder->build();
-        builder.reset(nullptr);
-        refitter.reset(new BVHNRefitter<N>(bvh,*(typename BVHNRefitter<N>::LeafBoundsInterface*)this));
       }
-      
-      /* refit BVH */
-      /*double t0 = 0.0;
-      if (bvh->device->verbosity(2)) {
-        std::cout << "refitting BVH" << N << " <" << bvh->primTy.name << "> ... " << std::flush;
-        t0 = getSeconds();
-        }*/
-      
-      refitter->refit();
-
-      /*if (bvh->device->verbosity(2)) 
-      {
-        double t1 = getSeconds();
-        std::cout << "[DONE]" << std::endl;
-        std::cout << "  dt = " << 1000.0f*(t1-t0) << "ms, perf = " << 1E-6*double(mesh->size())/(t1-t0) << " Mprim/s" << std::endl;
-        std::cout << BVHNStatistics<N>(bvh).str();
-        }*/
+      else
+        refitter->refit();
     }
 
     template class BVHNRefitter<4>;
@@ -222,13 +204,7 @@ namespace embree
     template class BVHNRefitter<8>;
 #endif
     
-    Builder* BVH4Line4iMeshBuilderSAH (void* bvh, LineSegments* mesh, size_t mode);
-
-#if defined(EMBREE_GEOMETRY_LINES)
-    Builder* BVH4Line4iMeshRefitSAH (void* accel, LineSegments* mesh, size_t mode) { return new BVHNRefitT<4,LineSegments,Line4i>((BVH4*)accel,BVH4Line4iMeshBuilderSAH(accel,mesh,mode),mesh,mode); }
-#endif
-
-#if defined(EMBREE_GEOMETRY_TRIANGLES)
+#if defined(EMBREE_GEOMETRY_TRIANGLE)
     Builder* BVH4Triangle4MeshBuilderSAH  (void* bvh, TriangleMesh* mesh, size_t mode);
     Builder* BVH4Triangle4vMeshBuilderSAH (void* bvh, TriangleMesh* mesh, size_t mode);
     Builder* BVH4Triangle4iMeshBuilderSAH (void* bvh, TriangleMesh* mesh, size_t mode);
@@ -247,7 +223,7 @@ namespace embree
 #endif
 #endif
 
-#if defined(EMBREE_GEOMETRY_QUADS)
+#if defined(EMBREE_GEOMETRY_QUAD)
     Builder* BVH4Quad4vMeshBuilderSAH (void* bvh, QuadMesh* mesh, size_t mode);
     Builder* BVH4Quad4vMeshRefitSAH (void* accel, QuadMesh* mesh, size_t mode) { return new BVHNRefitT<4,QuadMesh,Quad4v>((BVH4*)accel,BVH4Quad4vMeshBuilderSAH(accel,mesh,mode),mesh,mode); }
 
@@ -259,12 +235,12 @@ namespace embree
 #endif
 
 #if defined(EMBREE_GEOMETRY_USER)
-    Builder* BVH4VirtualMeshBuilderSAH (void* bvh, AccelSet* mesh, size_t mode);
-    Builder* BVH4VirtualMeshRefitSAH (void* accel, AccelSet* mesh, size_t mode) { return new BVHNRefitT<4,AccelSet,Object>((BVH4*)accel,BVH4VirtualMeshBuilderSAH(accel,mesh,mode),mesh,mode); }
+    Builder* BVH4VirtualMeshBuilderSAH (void* bvh, UserGeometry* mesh, size_t mode);
+    Builder* BVH4VirtualMeshRefitSAH (void* accel, UserGeometry* mesh, size_t mode) { return new BVHNRefitT<4,UserGeometry,Object>((BVH4*)accel,BVH4VirtualMeshBuilderSAH(accel,mesh,mode),mesh,mode); }
 
 #if  defined(__AVX__)
-    Builder* BVH8VirtualMeshBuilderSAH (void* bvh, AccelSet* mesh, size_t mode);
-    Builder* BVH8VirtualMeshRefitSAH (void* accel, AccelSet* mesh, size_t mode) { return new BVHNRefitT<8,AccelSet,Object>((BVH8*)accel,BVH8VirtualMeshBuilderSAH(accel,mesh,mode),mesh,mode); }
+    Builder* BVH8VirtualMeshBuilderSAH (void* bvh, UserGeometry* mesh, size_t mode);
+    Builder* BVH8VirtualMeshRefitSAH (void* accel, UserGeometry* mesh, size_t mode) { return new BVHNRefitT<8,UserGeometry,Object>((BVH8*)accel,BVH8VirtualMeshBuilderSAH(accel,mesh,mode),mesh,mode); }
 #endif
 #endif
   }
