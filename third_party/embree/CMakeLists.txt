@@ -395,8 +395,7 @@ include(package)
 # Search paths
 ##############################################################
 IF (TASKING_TBB)
-  FIND_PACKAGE(TBB REQUIRED)
-  INCLUDE_DIRECTORIES(${TBB_INCLUDE_DIRS})
+  INCLUDE_DIRECTORIES(../tbb/include)
 ENDIF()
 
 ##############################################################
