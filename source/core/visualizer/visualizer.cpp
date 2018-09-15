@@ -475,7 +475,7 @@ bool Visualizer::RenderFrame() {
 		return false;
 	}
 
-	char *mappedData = (char *)m_stagingBufferAllocInfo[imageIndex].pMappedData;
+	byte *mappedData = (byte *)m_stagingBufferAllocInfo[imageIndex].pMappedData;
 	for (uint j = 0; j < m_accumulationFrameBuffer.Height; ++j) {
 		const size_t offset = j * m_accumulationFrameBuffer.Width;
 		for (uint i = 0; i < m_accumulationFrameBuffer.Width; ++i) {
@@ -484,10 +484,10 @@ bool Visualizer::RenderFrame() {
 
 			float3 *color = &m_accumulationFrameBuffer.ColorData[frameBufferIndex];
 			float weight = m_accumulationFrameBuffer.Weights[frameBufferIndex];
-			mappedData[mappedDataIndex + 0] = color->x / weight * 255; // Red
-			mappedData[mappedDataIndex + 1] = color->y / weight * 255;   // Green
-			mappedData[mappedDataIndex + 2] = color->z / weight * 255;   // Blue
-			mappedData[mappedDataIndex + 3] = 255; // Alpha
+			mappedData[mappedDataIndex + 0] = (byte)(color->x / weight * 255); // Red
+			mappedData[mappedDataIndex + 1] = (byte)(color->y / weight * 255);   // Green
+			mappedData[mappedDataIndex + 2] = (byte)(color->z / weight * 255);   // Blue
+			mappedData[mappedDataIndex + 3] = (byte)255; // Alpha
 		}
 	}
 
