@@ -14,6 +14,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include "math/vector_math.h"
 
 
 namespace Lantern {
@@ -132,8 +133,8 @@ void CreateSphere(float radius, uint sliceCount, uint stackCount, Mesh *mesh) {
 	mesh->Tangents.emplace_back(1.0f, 0.0f, 0.0f);
 	mesh->TexCoords.emplace_back(0.0f, 0.0f);
 
-	float phiStep = M_PI / stackCount;
-	float thetaStep = 2.0f * M_PI / sliceCount;
+	float phiStep = (float)M_PI / stackCount;
+	float thetaStep = 2.0f * (float)M_PI / sliceCount;
 
 	// Compute vertices for each stack ring (do not count the poles as rings)
 	for (uint i = 1; i <= stackCount - 1; ++i) {
@@ -228,8 +229,8 @@ void Subdivide(Mesh *mesh) {
 	// *-----*-----*
 	// v0    m2     v2
 
-	uint numTris = inputCopy.Indices.size() / 3;
-	for (uint i = 0; i < numTris; ++i) {
+	size_t numTris = inputCopy.Indices.size() / 3;
+	for (size_t i = 0; i < numTris; ++i) {
 		float3a v0 = inputCopy.Positions[inputCopy.Indices[i * 3 + 0]];
 		float3a v1 = inputCopy.Positions[inputCopy.Indices[i * 3 + 1]];
 		float3a v2 = inputCopy.Positions[inputCopy.Indices[i * 3 + 2]];
@@ -291,12 +292,12 @@ inline float QuadrantAwareArcTan(float y, float x) {
 		result = atanf(y / x); // in [-pi/2, +pi/2]
 
 		if (result < 0.0f) {
-			result += 2.0f * M_PI; // in [0, 2*pi).
+			result += 2.0f * (float)M_PI; // in [0, 2*pi).
 		}
 	} else {
 		// Quadrant II or III
 
-		result = atanf(y / x) + M_PI; // in [0, 2*pi).
+		result = atanf(y / x) + (float)M_PI; // in [0, 2*pi).
 	}
 
 	return result;
@@ -340,8 +341,8 @@ void CreateGeosphere(float radius, uint numSubdivisions, Mesh *mesh) {
 
 	std::size_t numVertices = mesh->Positions.size();
 	mesh->Normals.resize(numVertices);
-	mesh->Tangents.resize(numVertices);
-	mesh->TexCoords.resize(numVertices);
+	mesh->Tangents.clear();
+	mesh->TexCoords.clear();
 
 	// Project vertices onto sphere and scale.
 	for (uint i = 0; i < numVertices; ++i) {
@@ -349,23 +350,8 @@ void CreateGeosphere(float radius, uint numSubdivisions, Mesh *mesh) {
 		float3 n = normalize(mesh->Positions[i]);
 		float3a p = float3a(radius * n, 1.0f);
 
-		// Project onto sphere.
 		mesh->Positions[i] = p;
 		mesh->Normals[i] = n;
-
-		// Derive texture coordinates from spherical coordinates.
-		float theta = QuadrantAwareArcTan(p.x, p.z);
-		float phi = acosf(p.y / radius);
-
-		mesh->TexCoords[i].x = theta / (2.0f * M_PI);
-		mesh->TexCoords[i].y = phi / M_PI;
-
-		// Partial derivative of P with respect to theta
-		float dx = radius * sinf(phi) * cosf(theta);
-		float dy = radius * cosf(phi);
-		float dz = radius * sinf(phi) * -sinf(theta);
-
-		mesh->Tangents[i] = normalize(float3(dx, dy, dz));
 	}
 }
 
