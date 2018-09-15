@@ -9,7 +9,6 @@
 #include "renderer/surface_interaction.h"
 
 #include "scene/scene.h"
-#include "scene/ray.h"
 
 #include "materials/material.h"
 #include "materials/bsdfs/bsdf.h"
@@ -97,7 +96,11 @@ void Renderer::RenderTile(uint index, uint width, uint height, uint numTilesX, u
 }
 
 void Renderer::RenderPixel(uint x, uint y, UniformSampler *sampler) const {
-	Ray ray = m_scene->Camera->CalculateRayFromPixel(x, y, sampler);
+	RTC_ALIGN(16) RTCRayHit rayHit;
+	rayHit.ray = m_scene->Camera->CalculateRayFromPixel(x, y, sampler);
+	rayHit.hit.geomID = RTC_INVALID_GEOMETRY_ID;
+	rayHit.hit.instID[0] = RTC_INVALID_GEOMETRY_ID;
+	rayHit.hit.primID = RTC_INVALID_GEOMETRY_ID;
 
 	float3 color(0.0f);
 	float3 throughput(1.0f);
@@ -110,13 +113,16 @@ void Renderer::RenderPixel(uint x, uint y, UniformSampler *sampler) const {
 	uint bounces = 0;
 	const uint maxBounces = 1500;
 	for (; bounces < maxBounces; ++bounces) {
-		m_scene->Intersect(ray);
+		m_scene->Intersect(rayHit);
 
 		// The ray missed. Return the background color
-		if (ray.GeomID == INVALID_GEOMETRY_ID) {
+		if (rayHit.hit.geomID == RTC_INVALID_GEOMETRY_ID) {
 			color += throughput * m_scene->BackgroundColor;
 			break;
 		}
+
+		float3a origin = float3a(rayHit.ray.org_x, rayHit.ray.org_y, rayHit.ray.org_z);
+		float3a direction = normalize(float3a(rayHit.ray.dir_x, rayHit.ray.dir_y, rayHit.ray.dir_z));
 
 		// We hit an object
 		hitSurface = true;
@@ -125,36 +131,43 @@ void Renderer::RenderPixel(uint x, uint y, UniformSampler *sampler) const {
 		if (medium != nullptr) {
 			float weight = 1.0f;
 			float pdf = 1.0f;
-			float distance = medium->SampleDistance(sampler, ray.TFar, &weight, &pdf);
+			float distance = medium->SampleDistance(sampler, rayHit.ray.tfar, &weight, &pdf);
 			float3 transmission = medium->Transmission(distance);
 			throughput = throughput * weight * transmission;
 
-			if (distance < ray.TFar) {
+			if (distance < rayHit.ray.tfar) {
 				// Create a scatter event
 				hitSurface = false;
-				
-				ray.Origin = ray.Origin + ray.Direction * distance;
+
+				float3a newOrigin = origin + direction * distance;
+				rayHit.ray.org_x = newOrigin.x;
+				rayHit.ray.org_y = newOrigin.y;
+				rayHit.ray.org_z = newOrigin.z;
 
 				// Reset the other ray properties
 				float directionPdf;
-				float3a wo = normalize(ray.Direction);
-				ray.Direction = medium->SampleScatterDirection(sampler, wo, &directionPdf);
-				ray.TNear = 0.001f;
-				ray.TFar = infinity;
-				ray.GeomID = INVALID_GEOMETRY_ID;
-				ray.PrimID = INVALID_PRIMATIVE_ID;
-				ray.InstID = INVALID_INSTANCE_ID;
-				ray.Mask = 0xFFFFFFFF;
-				ray.Time = 0.0f;
+				float3a newDirection = medium->SampleScatterDirection(sampler, direction, &directionPdf);
+				rayHit.ray.dir_x = newDirection.x;
+				rayHit.ray.dir_y = newDirection.y;
+				rayHit.ray.dir_z = newDirection.z;
+
+				rayHit.ray.tnear = 0.001f;
+				rayHit.ray.tfar = embree::inf;
+				rayHit.ray.mask = 0xFFFFFFFF;
+				rayHit.ray.time = 0.0f;
+
+				rayHit.hit.geomID = RTC_INVALID_GEOMETRY_ID;
+				rayHit.hit.instID[0] = RTC_INVALID_GEOMETRY_ID;
+				rayHit.hit.primID = RTC_INVALID_GEOMETRY_ID;
 			}
 		}
 
 		if (hitSurface) {
 			// Fetch the material
-			Material *material = m_scene->GetMaterial(ray.GeomID);
+			Material *material = m_scene->GetMaterial(rayHit.hit.geomID);
 			// The object might be emissive. If so, it will have a corresponding light
 			// Otherwise, GetLight will return nullptr
-			Light *light = m_scene->GetLight(ray.GeomID);
+			Light *light = m_scene->GetLight(rayHit.hit.geomID);
 
 			// If this is the first bounce or if we just had a specular bounce,
 			// we need to add the emmisive light
@@ -162,19 +175,18 @@ void Renderer::RenderPixel(uint x, uint y, UniformSampler *sampler) const {
 				color += throughput * light->Le();
 			}
 
-			interaction.Position = ray.Origin + ray.Direction * ray.TFar;
-			if (m_scene->HasNormals(ray.GeomID)) {
-				interaction.Normal = normalize(m_scene->InterpolateNormal(ray.GeomID, ray.PrimID, ray.U, ray.V));
+			interaction.Position = origin + direction * rayHit.ray.tfar;
+			if (m_scene->HasNormals(rayHit.hit.geomID)) {
+				interaction.Normal = normalize(m_scene->InterpolateNormal(rayHit.hit.geomID, rayHit.hit.primID, rayHit.hit.u, rayHit.hit.v));
 			} else {
-				interaction.Normal = normalize(ray.GeomNormal);
+				interaction.Normal = normalize(float3a());
 			}
-			if (m_scene->HasTexCoords(ray.GeomID)) {
-				interaction.TexCoord = m_scene->InterpolateTexCoord(ray.GeomID, ray.PrimID, ray.U, ray.V);
+			if (m_scene->HasTexCoords(rayHit.hit.geomID)) {
+				interaction.TexCoord = m_scene->InterpolateTexCoord(rayHit.hit.geomID, rayHit.hit.primID, rayHit.hit.u, rayHit.hit.v);
 			} else {
 				interaction.TexCoord = float2(0.0f, 0.0f);
 			}
-			//interaction.TexCoord = float2(ray.U, ray.V);
-			interaction.OutputDirection = normalize(-ray.Direction);
+			interaction.OutputDirection = -direction;
 			interaction.IORo = 0.0f;
 
 
@@ -199,19 +211,24 @@ void Renderer::RenderPixel(uint x, uint y, UniformSampler *sampler) const {
 			// Shoot a new ray
 
 			// Set the origin at the intersection point
-			ray.Origin = interaction.Position;
+			rayHit.ray.org_x = interaction.Position.x;
+			rayHit.ray.org_y = interaction.Position.y;
+			rayHit.ray.org_z = interaction.Position.z;
 
 			// Reset the other ray properties
-			ray.Direction = interaction.InputDirection;
-			if (AnyNan(ray.Direction))
-				printf("bad");
-			ray.TNear = 0.001f;
-			ray.TFar = infinity;
-			ray.GeomID = INVALID_GEOMETRY_ID;
-			ray.PrimID = INVALID_PRIMATIVE_ID;
-			ray.InstID = INVALID_INSTANCE_ID;
-			ray.Mask = 0xFFFFFFFF;
-			ray.Time = 0.0f;
+			float directionPdf;
+			rayHit.ray.dir_x = interaction.InputDirection.x;
+			rayHit.ray.dir_y = interaction.InputDirection.y;
+			rayHit.ray.dir_z = interaction.InputDirection.z;
+
+			rayHit.ray.tnear = 0.001f;
+			rayHit.ray.tfar = embree::inf;
+			rayHit.ray.mask = 0xFFFFFFFF;
+			rayHit.ray.time = 0.0f;
+
+			rayHit.hit.geomID = RTC_INVALID_GEOMETRY_ID;
+			rayHit.hit.instID[0] = RTC_INVALID_GEOMETRY_ID;
+			rayHit.hit.primID = RTC_INVALID_GEOMETRY_ID;
 		}
 
 		// Russian Roulette

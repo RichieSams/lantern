@@ -8,7 +8,7 @@
 
 #include "math/vector_types.h"
 
-#include <cmath>
+#include <math.h>
 
 
 namespace Lantern {

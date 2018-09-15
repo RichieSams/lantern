@@ -43,7 +43,6 @@ SetSourceGroup(NAME Scene
 	             scene/image_cache.cpp
 	             scene/light.h
 	             scene/mesh_elements.h
-	             scene/ray.h
 	             scene/scene.h
 	             scene/scene.cpp
 	             scene/obj_loader.h

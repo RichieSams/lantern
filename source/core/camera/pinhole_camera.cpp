@@ -6,22 +6,19 @@
 
 #include "camera/pinhole_camera.h"
 
-#include "scene/ray.h"
-
 
 namespace Lantern {
 
 PinholeCamera::PinholeCamera()
 		: FrameBufferWidth(0),
-          FrameBufferHeight(0),
-          m_filter(ReconstructionFilter::Type::Tent),
+		  FrameBufferHeight(0),
+		  m_filter(ReconstructionFilter::Type::Tent),
 		  m_phi((float)M_PI_2),
 		  m_theta(0.0f),
 		  m_radius(10.0f),
 		  m_up(1.0f),
 		  m_target(0.0f, 0.0f, 0.0f),
 		  m_tanFovXDiv2(0.5773503f /* tan(60 degrees / 2) */),
-
 		  m_tanFovYDiv2(tanf(0.5235f /* 60 degrees / 2 */ * 720 / 1280)) {
 	UpdateOrigin();
 	UpdateCartesianCoordSystem();
@@ -29,8 +26,8 @@ PinholeCamera::PinholeCamera()
 
 PinholeCamera::PinholeCamera(float phi, float theta, float radius, uint clientWidth, uint clientHeight, float3 target, float fov, ReconstructionFilter::Type filterType)
 		: FrameBufferWidth(clientWidth),
-          FrameBufferHeight(clientHeight),
-          m_filter(filterType),
+		  FrameBufferHeight(clientHeight),
+		  m_filter(filterType),
 		  m_phi(phi),
 		  m_theta(theta),
 		  m_radius(radius),
@@ -88,29 +85,29 @@ void PinholeCamera::Pan(float dx, float dy) {
 	UpdateOrigin();
 }
 
-Ray PinholeCamera::CalculateRayFromPixel(uint x, uint y, UniformSampler *sampler) const {
-	Ray ray;
+RTCRay PinholeCamera::CalculateRayFromPixel(uint x, uint y, UniformSampler *sampler) const {
+	RTCRay ray;
+	memset(&ray, 0, sizeof(ray));
 
-	ray.Origin = m_origin;
-	ray.TNear = 0.0f;
-	ray.TFar = infinity;
-	ray.GeomID = INVALID_GEOMETRY_ID;
-	ray.PrimID = INVALID_PRIMATIVE_ID;
-	ray.InstID = INVALID_INSTANCE_ID;
-	ray.Mask = 0xFFFFFFFF;
-	ray.Time = 0.0f;
+	ray.org_x = m_origin.x;
+	ray.org_y = m_origin.y;
+	ray.org_z = m_origin.z;
+
+	ray.tnear = 0.0f;
+	ray.tfar = embree::inf;
+	ray.mask = 0xFFFFFFFF;
 
 	float u = m_filter.Sample(sampler->NextFloat());
 	float v = m_filter.Sample(sampler->NextFloat());
-	
+
 	float3a viewVector((((x + 0.5f + u) / FrameBufferWidth) * 2.0f - 1.0f) * m_tanFovXDiv2,
-	                   -(((y + 0.5f + v) / FrameBufferHeight) * 2.0f - 1.0f) * m_tanFovYDiv2,
-	                   -1.0f);
+		-(((y + 0.5f + v) / FrameBufferHeight) * 2.0f - 1.0f) * m_tanFovYDiv2,
+		-1.0f);
 
 	// Matrix multiply
-	ray.Direction = normalize(float3a(dot(viewVector, m_matrixMulXAxis),
-	                            dot(viewVector, m_matrixMulYAxis),
-	                            dot(viewVector, m_matrixMulZAxis)));
+	ray.dir_x = dot(viewVector, m_matrixMulXAxis);
+	ray.dir_y = dot(viewVector, m_matrixMulYAxis);
+	ray.dir_z = dot(viewVector, m_matrixMulZAxis);
 
 	return ray;
 }

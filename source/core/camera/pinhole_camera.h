@@ -10,10 +10,11 @@
 #include "math/vector_types.h"
 #include "math/uniform_sampler.h"
 
-#include "scene/ray.h"
-
 #include "camera/frame_buffer.h"
 #include "camera/reconstruction_filter.h"
+
+#define EMBREE_STATIC_LIB
+#include "embree3/rtcore.h"
 
 
 namespace Lantern {
@@ -89,7 +90,7 @@ public:
 	 * @param x         The x coordinate of the pixel
 	 * @param y         The y coordinate of the pixel
 	 */
-	Ray CalculateRayFromPixel(uint x, uint y, UniformSampler *sampler) const;
+	RTCRay CalculateRayFromPixel(uint x, uint y, UniformSampler *sampler) const;
 
 private:
 	/**

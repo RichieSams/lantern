@@ -8,11 +8,11 @@
 
 #include "math/linearspace4.h"
 
-#include <math/vec2.h>
-#include <math/vec3.h>
-#include <math/vec4.h>
+#include "math/vec2.h"
+#include "math/vec3.h"
+#include "math/vec4.h"
 
-#include <math/vec3fa.h>
+#include "math/vec3fa.h"
 
 
 typedef embree::Vec2<float> float2;

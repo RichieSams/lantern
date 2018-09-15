@@ -11,18 +11,15 @@
 #include "camera/pinhole_camera.h"
 
 #include "scene/light.h"
-#include "scene/ray.h"
 #include "scene/image_cache.h"
+
+#define EMBREE_STATIC_LIB
+#include "embree3/rtcore.h"
 
 #include <unordered_map>
 #include <experimental/filesystem>
 namespace fs = std::experimental::filesystem;
 
-
-struct __RTCDevice;
-typedef __RTCDevice * RTCDevice;
-struct __RTCScene;
-typedef __RTCScene * RTCScene;
 
 namespace Lantern {
 
@@ -49,8 +46,6 @@ private:
 	std::vector<Medium *> m_media;
 	std::vector<Material *> m_materials;
 	std::vector<Texture *> m_textures;
-	std::vector<float *> m_meshNormals;
-	std::vector<float *> m_meshTexCoords;
 	std::vector<Light *> m_lights;
 
 	ImageCache m_imageCache;
@@ -85,7 +80,7 @@ public:
 	std::size_t NumLights() const { return m_lights.size(); }
 	Light *RandomOneLight(UniformSampler *sampler);
 
-	void Intersect(Ray &ray) const;
+	void Intersect(RTCRayHit &ray) const;
 	bool HasNormals(uint meshId) {
 		return m_models[meshId].hasNormals;
 	}

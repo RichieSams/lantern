@@ -36,27 +36,35 @@ float3 AreaLight::SampleLi(UniformSampler *sampler, Scene *scene, SurfaceInterac
 	}
 
 	// Make sure there's nothing occluding us
-	Ray ray;
-	ray.Origin = interaction.Position;
-	ray.Direction = direction;
-	ray.TNear = 0.001f;
-	ray.TFar = embree::inf;
-	ray.GeomID = INVALID_GEOMETRY_ID;
-	ray.PrimID = INVALID_PRIMATIVE_ID;
-	ray.InstID = INVALID_INSTANCE_ID;
-	ray.Mask = 0xFFFFFFFF;
-	ray.Time = 0.0f;
+	RTC_ALIGN(16) RTCRayHit rayHit;
+	memset(&rayHit, 0, sizeof(rayHit));
 
-	scene->Intersect(ray);
-	if (ray.GeomID != m_geomId) {
+	rayHit.ray.org_x = interaction.Position.x;
+	rayHit.ray.org_y = interaction.Position.y;
+	rayHit.ray.org_z = interaction.Position.z;
+
+	rayHit.ray.dir_x = direction.x;
+	rayHit.ray.dir_y = direction.y;
+	rayHit.ray.dir_z = direction.z;
+
+	rayHit.ray.tnear = 0.001f;
+	rayHit.ray.tfar = embree::inf;
+	rayHit.ray.mask = 0xFFFFFFFF;
+
+	rayHit.hit.geomID = RTC_INVALID_GEOMETRY_ID;
+	rayHit.hit.instID[0] = RTC_INVALID_GEOMETRY_ID;
+	rayHit.hit.primID = RTC_INVALID_GEOMETRY_ID;
+
+	scene->Intersect(rayHit);
+	if (rayHit.hit.geomID != m_geomId) {
 		*pdf = 0.0f;
 		return float3(0.0f);
 	}
 
 	// Calculate the pdf
-	float3a intersectionPoint = ray.Origin + ray.Direction * ray.TFar;
+	float3a intersectionPoint = float3a(rayHit.ray.org_x, rayHit.ray.org_y, rayHit.ray.org_z) + normalize(float3a(rayHit.ray.dir_x, rayHit.ray.dir_y, rayHit.ray.dir_z)) * rayHit.ray.tfar;
 	float distanceSquared = sqr_length(intersectionPoint - interaction.Position);
-	*pdf = distanceSquared / (std::abs(dot(normalize(scene->InterpolateNormal(ray.GeomID, ray.PrimID, ray.U, ray.V)), -direction)) * m_area);
+	*pdf = distanceSquared / (std::abs(dot(normalize(scene->InterpolateNormal(rayHit.hit.geomID, rayHit.hit.primID, rayHit.hit.u, rayHit.hit.v)), -direction)) * m_area);
 
 	// Return the full radiance value
 	// The value will be attenuated by the BRDF
@@ -70,27 +78,35 @@ float AreaLight::PdfLi(Scene *scene, SurfaceInteraction &interaction) const {
 	}
 
 	// Make sure there's nothing occluding us
-	Ray ray;
-	ray.Origin = interaction.Position;
-	ray.Direction = interaction.InputDirection;
-	ray.TNear = 0.001f;
-	ray.TFar = infinity;
-	ray.GeomID = INVALID_GEOMETRY_ID;
-	ray.PrimID = INVALID_PRIMATIVE_ID;
-	ray.InstID = INVALID_INSTANCE_ID;
-	ray.Mask = 0xFFFFFFFF;
-	ray.Time = 0.0f;
+	RTC_ALIGN(16) RTCRayHit rayHit;
+	memset(&rayHit, 0, sizeof(rayHit));
 
-	scene->Intersect(ray);
-	if (ray.GeomID != m_geomId) {
+	rayHit.ray.org_x = interaction.Position.x;
+	rayHit.ray.org_y = interaction.Position.y;
+	rayHit.ray.org_z = interaction.Position.z;
+
+	rayHit.ray.dir_x = interaction.InputDirection.x;
+	rayHit.ray.dir_y = interaction.InputDirection.y;
+	rayHit.ray.dir_z = interaction.InputDirection.z;
+
+	rayHit.ray.tnear = 0.001f;
+	rayHit.ray.tfar = embree::inf;
+	rayHit.ray.mask = 0xFFFFFFFF;
+
+	rayHit.hit.geomID = RTC_INVALID_GEOMETRY_ID;
+	rayHit.hit.instID[0] = RTC_INVALID_GEOMETRY_ID;
+	rayHit.hit.primID = RTC_INVALID_GEOMETRY_ID;
+
+	scene->Intersect(rayHit);
+	if (rayHit.hit.geomID != m_geomId) {
 		return 0.0f;
 	}
 
 	// Calculate the pdf
-	float3a intersectionPoint = ray.Origin + ray.Direction * ray.TFar;
+	float3a intersectionPoint = float3a(rayHit.ray.org_x, rayHit.ray.org_y, rayHit.ray.org_z) + normalize(float3a(rayHit.ray.dir_x, rayHit.ray.dir_y, rayHit.ray.dir_z)) * rayHit.ray.tfar;
 	float distanceSquared = sqr_length(intersectionPoint - interaction.Position);
 	
-	return distanceSquared / (std::abs(dot(normalize(scene->InterpolateNormal(ray.GeomID, ray.PrimID, ray.U, ray.V)), interaction.InputDirection)) * m_area);
+	return distanceSquared / (std::abs(dot(normalize(scene->InterpolateNormal(rayHit.hit.geomID, rayHit.hit.primID, rayHit.hit.u, rayHit.hit.v)), interaction.InputDirection)) * m_area);
 }
 
 } // End of namespace Lantern

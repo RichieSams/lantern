@@ -24,11 +24,9 @@
 
 #include "io/lantern_model_file.h"
 
-#include <json.hpp>
-#include <json_schema_validator.hpp>
+#include "json.hpp"
+#include "json_schema_validator.hpp"
 
-#define EMBREE_STATIC_LIB
-#include <embree2/rtcore.h>
 
 #include <stdlib.h>
 
@@ -36,7 +34,7 @@
 namespace Lantern {
 
 Scene::Scene()
-	: Camera(nullptr), 
+	: Camera(nullptr),
 	  BackgroundColor(0.0f),
 	  m_device(rtcNewDevice(nullptr)),
 	  m_scene(nullptr) {
@@ -45,7 +43,7 @@ Scene::Scene()
 Scene::~Scene() {
 	CleanupScene();
 
-	rtcDeleteDevice(m_device);
+	rtcReleaseDevice(m_device);
 }
 
 float4 CalculateBoundingSphere(float3a *positions, std::size_t len) {
@@ -85,7 +83,7 @@ bool Scene::LoadSceneFromJSON(const char *filePath) {
 	m_jsonPath = canonical(fs::path(filePath));
 
 	if (ParseJSON()) {
-		rtcCommit(m_scene);
+		rtcCommitScene(m_scene);
 		return true;
 	}
 
@@ -97,7 +95,7 @@ bool Scene::ReloadSceneFromJSON() {
 	CleanupScene();
 
 	if (ParseJSON()) {
-		rtcCommit(m_scene);
+		rtcCommitScene(m_scene);
 		return true;
 	}
 
@@ -115,16 +113,19 @@ Light *Scene::RandomOneLight(UniformSampler *sampler) {
 	return m_lights[lightIndex];
 }
 
-void Scene::Intersect(Ray &ray) const {
-	rtcIntersect(m_scene, ray);
+void Scene::Intersect(RTCRayHit &ray) const {
+	RTCIntersectContext context;
+	rtcInitIntersectContext(&context);
+	context.flags = RTC_INTERSECT_CONTEXT_FLAG_INCOHERENT;
+	rtcIntersect1(m_scene, &context, &ray);
 }
 
 float3 Scene::InterpolateNormal(uint meshId, uint primId, float u, float v) const {
 	float3 normal;
-	rtcInterpolate(m_scene, meshId, primId, u, v, RTC_USER_VERTEX_BUFFER0, &normal.x, nullptr, nullptr, 3);
+	rtcInterpolate1(rtcGetGeometry(m_scene, meshId), primId, u, v, RTC_BUFFER_TYPE_VERTEX_ATTRIBUTE, 0, &normal.x, nullptr, nullptr, 3);
 
 	if (AnyNan(normal)) {
-		printf("nan");
+		printf("nan normal");
 	}
 
 	return normal;
@@ -132,10 +133,10 @@ float3 Scene::InterpolateNormal(uint meshId, uint primId, float u, float v) cons
 
 float2 Scene::InterpolateTexCoord(uint meshId, uint primId, float u, float v) const {
 	float2 texCoord;
-	rtcInterpolate(m_scene, meshId, primId, u, v, RTC_USER_VERTEX_BUFFER1, &texCoord.x, nullptr, nullptr, 2);
+	rtcInterpolate1(rtcGetGeometry(m_scene, meshId), primId, u, v, RTC_BUFFER_TYPE_VERTEX_ATTRIBUTE, 1, &texCoord.x, nullptr, nullptr, 2);
 
 	if (AnyNan(texCoord)) {
-		printf("nan");
+		printf("nan texCoord");
 	}
 
 	return texCoord;
@@ -192,7 +193,9 @@ bool Scene::ParseJSON() {
 	}
 
 
-	m_scene = rtcDeviceNewScene(m_device, RTC_SCENE_STATIC, RTC_INTERSECT1 | RTC_INTERPOLATE);
+	m_scene = rtcNewScene(m_device);
+	rtcSetSceneFlags(m_scene, RTC_SCENE_FLAG_NONE);
+	rtcSetSceneBuildQuality(m_scene, RTC_BUILD_QUALITY_HIGH);
 
 	std::ifstream ifs(m_jsonPath);
 	if (!ifs.good()) {
@@ -263,8 +266,8 @@ bool Scene::ParseJSON() {
 				Texture *newTexture;
 				if (bsdf["albedo"]["type"] == "constant") {
 					newTexture = new ConstantTexture(float3(bsdf["albedo"]["value"][0].get<float>(),
-				                                            bsdf["albedo"]["value"][1].get<float>(),
-				                                            bsdf["albedo"]["value"][2].get<float>()));
+					                                        bsdf["albedo"]["value"][1].get<float>(),
+					                                        bsdf["albedo"]["value"][2].get<float>()));
 				} else if (bsdf["albedo"]["type"] == "image") {
 					uint imageId = m_imageCache.AddImage(bsdf["albedo"]["file_path"].get<std::string>().c_str());
 					newTexture = new ImageTexture(&m_imageCache, imageId);
@@ -320,15 +323,15 @@ bool Scene::ParseJSON() {
 				Medium *newMedia = new NonScatteringMedium(float3(medium["absorption_color"][0].get<float>(),
 				                                                  medium["absorption_color"][1].get<float>(),
 				                                                  medium["absorption_color"][2].get<float>()),
-				                                                  medium["absorption_at_distance"].get<float>());
+				                                           medium["absorption_at_distance"].get<float>());
 				m_media.push_back(newMedia);
 				mediaMap[name] = newMedia;
 			} else if (type == "isotropic_scattering") {
 				Medium *newMedia = new IsotropicScatteringMedium(float3(medium["absorption_color"][0].get<float>(),
 				                                                        medium["absorption_color"][1].get<float>(),
 				                                                        medium["absorption_color"][2].get<float>()),
-				                                                        medium["absorption_at_distance"].get<float>(),
-				                                                        medium["scattering_distance"].get<float>());
+				                                                 medium["absorption_at_distance"].get<float>(),
+				                                                 medium["scattering_distance"].get<float>());
 				m_media.push_back(newMedia);
 				mediaMap[name] = newMedia;
 			}
@@ -446,17 +449,15 @@ bool Scene::ParseJSON() {
 }
 
 uint Scene::AddMesh(Mesh *mesh, float4x4 &transform, float *out_surfaceArea, float4 *out_boundingSphere, bool *out_hasNormals, bool *out_hasTexCoords) {
-	uint meshId = rtcNewTriangleMesh(m_scene, RTC_GEOMETRY_STATIC, mesh->Indices.size() / 3, mesh->Positions.size());
+	RTCGeometry geometry = rtcNewGeometry(m_device, RTC_GEOMETRY_TYPE_TRIANGLE);
+	rtcSetGeometryBuildQuality(geometry, RTC_BUILD_QUALITY_HIGH);
+	rtcSetGeometryTimeStepCount(geometry, 1);
 
-	float3a *vertices = (float3a *)rtcMapBuffer(m_scene, meshId, RTC_VERTEX_BUFFER);
+	float3a *vertices = (float3a *)rtcSetNewGeometryBuffer(geometry, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT3, sizeof(float3a), mesh->Positions.size());
 	for (uint i = 0, j = 0; j < mesh->Positions.size(); ++i, ++j) {
-		float4 vertex(mesh->Positions[i], 1.0f);
-		vertex = transform * vertex;
+		float3a vertex(mesh->Positions[i], 1.0f);
 
-		vertices[j].x = vertex.x;
-		vertices[j].y = vertex.y;
-		vertices[j].z = vertex.z;
-		vertices[j].w = 1.0f;
+		vertices[j] = transform * vertex;
 	}
 
 	// Calculate the surface area
@@ -469,85 +470,95 @@ uint Scene::AddMesh(Mesh *mesh, float4x4 &transform, float *out_surfaceArea, flo
 		*out_surfaceArea += 0.5f * length(cross(v0 - v1, v0 - v2));
 	}
 
-	*out_boundingSphere = CalculateBoundingSphere(vertices, mesh->Positions.size() / 3);
-	rtcUnmapBuffer(m_scene, meshId, RTC_VERTEX_BUFFER);
+	*out_boundingSphere = CalculateBoundingSphere(vertices, mesh->Positions.size());
 
 
-	uint *indices = (uint *)rtcMapBuffer(m_scene, meshId, RTC_INDEX_BUFFER);
+	uint *indices = (uint *)rtcSetNewGeometryBuffer(geometry, RTC_BUFFER_TYPE_INDEX, 0, RTC_FORMAT_UINT3, 3 * sizeof(uint), mesh->Indices.size() / 3);
 	memcpy(indices, &mesh->Indices[0], mesh->Indices.size() * sizeof(uint));
-	rtcUnmapBuffer(m_scene, meshId, RTC_INDEX_BUFFER);
 
-	float *normals = (float *)_aligned_malloc(sizeof(float3) * mesh->Normals.size(), 16);
-	memcpy(normals, &mesh->Normals[0], sizeof(float3) * mesh->Normals.size());
-	rtcSetBuffer(m_scene, meshId, RTC_USER_VERTEX_BUFFER0, normals, 0u, sizeof(float3));
-	m_meshNormals.push_back(normals);
+	rtcSetGeometryVertexAttributeCount(geometry, 1 + (mesh->TexCoords.size() > 0 ? 1 : 0));
+
+	float3 *normals = (float3 *)rtcSetNewGeometryBuffer(geometry, RTC_BUFFER_TYPE_VERTEX_ATTRIBUTE, 0, RTC_FORMAT_FLOAT3, sizeof(float3), mesh->Normals.size());
+	memcpy(normals, &mesh->Normals[0], mesh->Normals.size() * sizeof(float3));
+
 	*out_hasNormals = true;
 
 	if (mesh->TexCoords.size() > 0) {
-		float *texCoords = (float *)_aligned_malloc(sizeof(float2) * mesh->TexCoords.size(), 16);
-		memcpy(texCoords, &mesh->TexCoords[0], sizeof(float2) * mesh->TexCoords.size());
-		rtcSetBuffer(m_scene, meshId, RTC_USER_VERTEX_BUFFER1, texCoords, 0u, sizeof(float2));
-		m_meshTexCoords.push_back(texCoords);
+		float2 *texCoords = (float2 *)rtcSetNewGeometryBuffer(geometry, RTC_BUFFER_TYPE_VERTEX_ATTRIBUTE, 1, RTC_FORMAT_FLOAT2, sizeof(float2), mesh->TexCoords.size());
+		memcpy(texCoords, &mesh->TexCoords[0], mesh->TexCoords.size() * sizeof(float2));
 
 		*out_hasTexCoords = true;
 	} else {
 		*out_hasTexCoords = false;
 	}
 
+	rtcCommitGeometry(geometry);
+	uint meshId = rtcAttachGeometry(m_scene, geometry);
+	rtcReleaseGeometry(geometry);
+
 	return meshId;
 }
 
 uint Scene::AddLMF(LanternModelFile *lmf, float4x4 &transform, float *out_surfaceArea, float4 *out_boundingSphere, bool *out_hasNormals, bool *out_hasTexCoords) {
-	uint meshId;
-	std::size_t numPrimitives;
-	std::size_t numVertices = lmf->Positions.size() / 3;
+	RTCGeometry geometry;
 	if (lmf->VerticesPerPrimative == 3) {
-		numPrimitives = lmf->Indices.size() / 3;
-
-		meshId = rtcNewTriangleMesh(m_scene, RTC_GEOMETRY_STATIC, numPrimitives, numVertices);
+		geometry = rtcNewGeometry(m_device, RTC_GEOMETRY_TYPE_TRIANGLE);
+		rtcSetGeometryBuildQuality(geometry, RTC_BUILD_QUALITY_HIGH);
+		rtcSetGeometryTimeStepCount(geometry, 1);
 	} else if (lmf->VerticesPerPrimative == 4) {
-		numPrimitives = lmf->Indices.size() / 4;
-
-		meshId = rtcNewQuadMesh(m_scene, RTC_GEOMETRY_STATIC, numPrimitives, numVertices);
+		geometry = rtcNewGeometry(m_device, RTC_GEOMETRY_TYPE_QUAD);
+		rtcSetGeometryBuildQuality(geometry, RTC_BUILD_QUALITY_HIGH);
+		rtcSetGeometryTimeStepCount(geometry, 1);
 	} else {
 		printf("Lantern only supports 3 or 4 vertices per primitive. Given [%hhu]\n", lmf->VerticesPerPrimative);
 		return -1;
 	}
 
-	float3a *vertices = (float3a *)rtcMapBuffer(m_scene, meshId, RTC_VERTEX_BUFFER);
-	for (uint i = 0, j = 0; j < numVertices; i += 3, ++j) {
-		float4 vertex(lmf->Positions[i], lmf->Positions[i + 1], lmf->Positions[i + 2], 1.0f);
-		vertex = transform * vertex;
+	float3a *vertices = (float3a *)rtcSetNewGeometryBuffer(geometry, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT3, sizeof(float3a), lmf->Positions.size() / 3);
+	for (uint i = 0, j = 0; j < lmf->Positions.size() / 3; i += 3, ++j) {
+		float3a vertex(lmf->Positions[i], lmf->Positions[i + 1], lmf->Positions[i + 2], 1.0f);
 
-		vertices[j].x = vertex.x;
-		vertices[j].y = vertex.y;
-		vertices[j].z = vertex.z;
-		vertices[j].w = 1.0f;
+		vertices[j] = transform * vertex;
 	}
 
 	// Calculate the surface area
 	*out_surfaceArea = 0.0f;
-	for (std::size_t i = 0; i < lmf->Indices.size(); i += 3) {
-		float3a v0 = vertices[lmf->Indices[i]];
-		float3a v1 = vertices[lmf->Indices[i + 1]];
-		float3a v2 = vertices[lmf->Indices[i + 2]];
+	if (lmf->VerticesPerPrimative == 3) {
+		for (std::size_t i = 0; i < lmf->Indices.size(); i += 3) {
+			float3a v0 = vertices[lmf->Indices[i]];
+			float3a v1 = vertices[lmf->Indices[i + 1]];
+			float3a v2 = vertices[lmf->Indices[i + 2]];
 
-		*out_surfaceArea += 0.5f * length(cross(v0 - v1, v0 - v2));
+			// Calculate the area of a triangle using the half cross product: https://math.stackexchange.com/a/128999
+			*out_surfaceArea += 0.5f * length(cross(v0 - v1, v0 - v2));
+		}
+
+		*out_boundingSphere = CalculateBoundingSphere(vertices, lmf->Positions.size() / 3);
+
+		uint *indices = (uint *)rtcSetNewGeometryBuffer(geometry, RTC_BUFFER_TYPE_INDEX, 0, RTC_FORMAT_UINT3, 3 * sizeof(uint), lmf->Indices.size() / 3);
+		memcpy(indices, &lmf->Indices[0], lmf->Indices.size() * sizeof(uint));
+	} else if (lmf->VerticesPerPrimative == 4) {
+		for (std::size_t i = 0; i < lmf->Indices.size(); i += 4) {
+			float3a v0 = vertices[lmf->Indices[i]];
+			float3a v1 = vertices[lmf->Indices[i + 1]];
+			float3a v2 = vertices[lmf->Indices[i + 2]];
+			float3a v3 = vertices[lmf->Indices[i + 2]];
+
+			// Shoelace formula: https://en.wikipedia.org/wiki/Shoelace_formula
+			*out_surfaceArea += 0.5f * length(cross(v0 - v1, v0 - v2)) + 0.5f * length(cross(v0 - v2, v0 - v3));
+		}
+
+		*out_boundingSphere = CalculateBoundingSphere(vertices, lmf->Positions.size());
+
+		uint *indices = (uint *)rtcSetNewGeometryBuffer(geometry, RTC_BUFFER_TYPE_INDEX, 0, RTC_FORMAT_UINT4, 4 * sizeof(uint), lmf->Indices.size() / 4);
+		memcpy(indices, &lmf->Indices[0], lmf->Indices.size() * sizeof(uint));
 	}
 
-	*out_boundingSphere = CalculateBoundingSphere(vertices, numVertices);
-	rtcUnmapBuffer(m_scene, meshId, RTC_VERTEX_BUFFER);
-
-
-	uint *indices = (uint *)rtcMapBuffer(m_scene, meshId, RTC_INDEX_BUFFER);
-	memcpy(indices, &lmf->Indices[0], lmf->Indices.size() * sizeof(uint));
-	rtcUnmapBuffer(m_scene, meshId, RTC_INDEX_BUFFER);
+	rtcSetGeometryVertexAttributeCount(geometry, (lmf->Normals.size() > 0 ? 1 : 0) + (lmf->TexCoords.size() > 0 ? 1 : 0));
 
 	if (lmf->Normals.size() > 0) {
-		float *normals = (float *)_aligned_malloc(sizeof(float) * lmf->Normals.size(), 16);
-		memcpy(normals, &lmf->Normals[0], sizeof(float) * lmf->Normals.size());
-		rtcSetBuffer(m_scene, meshId, RTC_USER_VERTEX_BUFFER0, normals, 0u, sizeof(float) * 3);
-		m_meshNormals.push_back(normals);
+		float3 *normals = (float3 *)rtcSetNewGeometryBuffer(geometry, RTC_BUFFER_TYPE_VERTEX_ATTRIBUTE, 0, RTC_FORMAT_FLOAT3, sizeof(float3), lmf->Normals.size() / 3);
+		memcpy(normals, &lmf->Normals[0], lmf->Normals.size() * sizeof(float));
 
 		*out_hasNormals = true;
 	} else {
@@ -555,15 +566,17 @@ uint Scene::AddLMF(LanternModelFile *lmf, float4x4 &transform, float *out_surfac
 	}
 
 	if (lmf->TexCoords.size() > 0) {
-		float *texCoords = (float *)_aligned_malloc(sizeof(float) * lmf->TexCoords.size(), 16);
-		memcpy(texCoords, &lmf->TexCoords[0], sizeof(float) * lmf->TexCoords.size());
-		rtcSetBuffer(m_scene, meshId, RTC_USER_VERTEX_BUFFER1, texCoords, 0u, sizeof(float) * 2);
-		m_meshTexCoords.push_back(texCoords);
+		float2 *texCoords = (float2 *)rtcSetNewGeometryBuffer(geometry, RTC_BUFFER_TYPE_VERTEX_ATTRIBUTE, 1, RTC_FORMAT_FLOAT2, sizeof(float2), lmf->TexCoords.size() / 2);
+		memcpy(texCoords, &lmf->TexCoords[0], lmf->TexCoords.size() * sizeof(float));
 
 		*out_hasTexCoords = true;
 	} else {
 		*out_hasTexCoords = false;
 	}
+
+	rtcCommitGeometry(geometry);
+	uint meshId = rtcAttachGeometry(m_scene, geometry);
+	rtcReleaseGeometry(geometry);
 
 	return meshId;
 }
@@ -579,10 +592,6 @@ void Scene::CleanupScene() {
 		delete medium;
 	}
 	m_media.clear();
-	for (auto &normals : m_meshNormals) {
-		_aligned_free(normals);
-	}
-	m_meshNormals.clear();
 	for (auto &light : m_lights) {
 		delete light;
 	}
@@ -593,7 +602,7 @@ void Scene::CleanupScene() {
 
 	m_imageCache.Clear();
 
-	rtcDeleteScene(m_scene);
+	rtcReleaseScene(m_scene);
 }
 
 } // End of namespace Lantern
