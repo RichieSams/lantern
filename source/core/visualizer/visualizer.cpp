@@ -484,9 +484,9 @@ bool Visualizer::RenderFrame() {
 
 			float3 *color = &m_accumulationFrameBuffer.ColorData[frameBufferIndex];
 			float weight = m_accumulationFrameBuffer.Weights[frameBufferIndex];
-			mappedData[mappedDataIndex + 0] = (byte)(color->x / weight * 255); // Red
-			mappedData[mappedDataIndex + 1] = (byte)(color->y / weight * 255);   // Green
-			mappedData[mappedDataIndex + 2] = (byte)(color->z / weight * 255);   // Blue
+			mappedData[mappedDataIndex + 0] = (byte)(std::max(0.0f, std::min(color->x / weight, 1.0f)) * 255.0f); // Red
+			mappedData[mappedDataIndex + 1] = (byte)(std::max(0.0f, std::min(color->y / weight, 1.0f)) * 255.0f); // Green
+			mappedData[mappedDataIndex + 2] = (byte)(std::max(0.0f, std::min(color->z / weight, 1.0f)) * 255.0f); // Blue
 			mappedData[mappedDataIndex + 3] = (byte)255; // Alpha
 		}
 	}
