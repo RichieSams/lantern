@@ -10,6 +10,10 @@
 
 #include "camera/frame_buffer.h"
 
+#include "imgui.h"
+#include "imgui_impl_glfw.h"
+#include "imgui_impl_vulkan.h"
+
 #define VULKAN_HPP_NO_EXCEPTIONS
 #include <vulkan/vulkan.hpp>
 
@@ -38,10 +42,6 @@ private:
 	FrameBuffer m_accumulationFrameBuffer;
 
 	GLFWwindow *m_window;
-	double m_lastMousePosX;
-	double m_lastMousePosY;
-	bool m_leftMouseCaptured;
-	bool m_middleMouseCaptured;
 
 	vk::Instance m_instance;
 	vk::DebugReportCallbackEXT m_debugCallback;
@@ -53,15 +53,32 @@ private:
 
 	VmaAllocator m_allocator;
 	
+	vk::DescriptorPool m_descriptorPool;
+
+	vk::SurfaceFormatKHR m_surfaceFormat;
+	vk::PresentModeKHR m_presentMode;
+
+	uint32_t m_graphicsQueueFamilyIndex;
 	vk::Queue m_graphicsQueue;
-	vk::Queue m_presentQueue;
 	vk::SwapchainKHR m_swapchain;
-	vk::Format m_swapchainFormat;
 	vk::Extent2D m_swapchainExtent;
 
-	std::vector<vk::Image> m_swapChainImages;
-	std::vector<vk::ImageView> m_swapChainImageViews;
-	std::vector<vk::Framebuffer> m_frameBuffers;
+	uint32_t m_frameCount;
+	struct FrameData {
+		vk::CommandPool commandPool;
+		vk::CommandBuffer commandBuffer;
+
+		vk::Fence fence;
+		vk::Semaphore imageAcquired;
+		vk::Semaphore imguiRenderCompleted;
+
+		vk::Image backbuffer;
+		vk::ImageView backbufferView;
+		vk::Framebuffer frameBuffer;
+	};
+	FrameData *m_frameData;
+
+	uint32_t m_frameIndex;
 
 	vk::ShaderModule m_vertexShader;
 	vk::ShaderModule m_pixelShader;
@@ -71,18 +88,14 @@ private:
 
 	vk::RenderPass m_renderPass;
 
-	vk::CommandPool m_commandPool;
-	std::vector<vk::CommandBuffer> m_commandBuffers;
-
-	vk::Semaphore m_imageAvailable;
-	vk::Semaphore m_renderFinished;
-
 	std::vector<vk::Image> m_stagingImage;
 	std::vector<VmaAllocation> m_stagingBufferAllocation;
 	std::vector<VmaAllocationInfo> m_stagingBufferAllocInfo;
 
 public:
+	bool Init(int width, int height);
 	void Run();
+	void Shutdown();
 
 	static void MouseButtonCallback(GLFWwindow *window, int button, int action, int mods);
 	static void CursorPosCallback(GLFWwindow *window, double xpos, double ypos);
@@ -91,20 +104,12 @@ public:
 	static void CharCallback(GLFWwindow *window, unsigned int c);
 
 private:
-	bool Init();
-	void Shutdown();
-
 	bool RenderFrame();
+	bool RenderImGui(vk::Semaphore *imageAcquiredSemaphore);
 
-	bool CreateSwapChain(uint width, uint height);
-	void CleanUpSwapChainAndDependents();
-	bool RecreateSwapChainAndDependents();
-
-	bool CreateImageViews();
-	bool CreateRenderPass();
-	bool CreateGraphicsPipeline();
-	bool CreateFrameBuffers();
-	bool CreateCommandBuffers();
+	bool InitVulkan();
+	bool InitVulkanWindow(int width, int height);
+	bool CreateSwapChain(int width, int height);
 };
 
 } // End of namespace Lantern

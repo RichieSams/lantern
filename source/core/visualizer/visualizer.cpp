@@ -10,10 +10,9 @@
 
 #include "scene/scene.h"
 
+#define GLFW_INCLUDE_NONE
 #define GLFW_INCLUDE_VULKAN
-#include <GLFW/glfw3.h>
-
-#include <imgui.h>
+#include "GLFW/glfw3.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -52,22 +51,6 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(
 	return VK_FALSE;
 }
 
-struct SwapChainSupportDetails {
-	vk::SurfaceCapabilitiesKHR capabilities;
-	std::vector<vk::SurfaceFormatKHR> formats;
-	std::vector<vk::PresentModeKHR> presentModes;
-};
-
-SwapChainSupportDetails QuerySwapChainSupport(vk::PhysicalDevice device, vk::SurfaceKHR surface) {
-	SwapChainSupportDetails details;
-	details.capabilities = device.getSurfaceCapabilitiesKHR(surface).value;
-	details.formats = device.getSurfaceFormatsKHR(surface).value;
-	details.presentModes = device.getSurfacePresentModesKHR(surface).value;
-
-	return details;
-}
-
-
 
 // Needed for message pump callbacks
 Visualizer *g_visualizer;
@@ -77,9 +60,7 @@ Visualizer::Visualizer(Scene *scene, FrameBuffer *currentFrameBuffer, std::atomi
           m_currentFrameBuffer(currentFrameBuffer),
           m_swapFrameBuffer(swapFrameBuffer),
           m_accumulationFrameBuffer(scene->Camera->FrameBufferWidth, scene->Camera->FrameBufferHeight),
-		  m_window(nullptr),
-		  m_leftMouseCaptured(false),
-		  m_middleMouseCaptured(false) {
+		  m_window(nullptr) {
 	g_visualizer = this;
 }
 
@@ -91,11 +72,6 @@ static void ErrorCallback(int error, const char *description) {
 }
 
 void Visualizer::Run() {
-	if (!Init()) {
-		Shutdown();
-		return;
-	}
-
 	auto lastRender = std::chrono::high_resolution_clock::now();
 	auto startTime = lastRender;
 
@@ -109,118 +85,29 @@ void Visualizer::Run() {
 
 	// Wait for the queues to flush before shutting down
 	m_device.waitIdle();
-
-	Shutdown();
 }
 
 void Visualizer::MouseButtonCallback(GLFWwindow *window, int button, int action, int mods) {
-	if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS && mods == GLFW_MOD_ALT) {
-		glfwGetCursorPos(window, &g_visualizer->m_lastMousePosX, &g_visualizer->m_lastMousePosY);
-		g_visualizer->m_leftMouseCaptured = true;
-	} else if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE) {
-		g_visualizer->m_leftMouseCaptured = false;
-	} else if (button == GLFW_MOUSE_BUTTON_MIDDLE && action == GLFW_PRESS && mods == GLFW_MOD_ALT) {
-		glfwGetCursorPos(window, &g_visualizer->m_lastMousePosX, &g_visualizer->m_lastMousePosY);
-		g_visualizer->m_middleMouseCaptured = true;
-	} else if (button == GLFW_MOUSE_BUTTON_MIDDLE && action == GLFW_RELEASE) {
-		g_visualizer->m_middleMouseCaptured = false;
-	}
 
-	//g_visualizer->m_imGuiImpl.MouseButtonCallback(window, button, action, mods);
 }
 
 void Visualizer::CursorPosCallback(GLFWwindow *window, double xpos, double ypos) {
-	if (g_visualizer->m_leftMouseCaptured) {
-		double oldX = g_visualizer->m_lastMousePosX;
-		double oldY = g_visualizer->m_lastMousePosY;
-		glfwGetCursorPos(window, &g_visualizer->m_lastMousePosX, &g_visualizer->m_lastMousePosY);
 
-		g_visualizer->m_scene->Camera->Rotate((float)(oldY - g_visualizer->m_lastMousePosY) / 300,
-		                                      (float)(oldX - g_visualizer->m_lastMousePosX) / 300);
-
-		g_visualizer->m_accumulationFrameBuffer.Reset();
-	} else if (g_visualizer->m_middleMouseCaptured) {
-		double oldX = g_visualizer->m_lastMousePosX;
-		double oldY = g_visualizer->m_lastMousePosY;
-		glfwGetCursorPos(window, &g_visualizer->m_lastMousePosX, &g_visualizer->m_lastMousePosY);
-
-		g_visualizer->m_scene->Camera->Pan((float)(oldX - g_visualizer->m_lastMousePosX) * 0.01f,
-		                                   (float)(g_visualizer->m_lastMousePosY - oldY) * 0.01f);
-
-		g_visualizer->m_accumulationFrameBuffer.Reset();
-	}
 }
 
 void Visualizer::ScrollCallback(GLFWwindow *window, double xoffset, double yoffset) {
-	g_visualizer->m_scene->Camera->Zoom((float)yoffset);
-	g_visualizer->m_accumulationFrameBuffer.Reset();
 
-	//g_visualizer->m_imGuiImpl.ScrollCallback(window, xoffset, yoffset);
 }
 
 void Visualizer::KeyCallback(GLFWwindow *window, int key, int scancode, int action, int mods) {
-	//g_visualizer->m_imGuiImpl.KeyCallback(window, key, scancode, action, mods);
+
 }
 
 void Visualizer::CharCallback(GLFWwindow *window, uint c) {
-	//g_visualizer->m_imGuiImpl.CharCallback(window, c);
+
 }
 
-struct QueueIndices {
-	int Graphics = -1;
-	int Present = -1;
-	int Compute = -1;
-	int Transfer = -1;
-};
-
-QueueIndices GetQueueIndices(vk::PhysicalDevice *device, vk::SurfaceKHR surface) {
-	auto properties = device->getQueueFamilyProperties();
-
-	QueueIndices indices;
-	for (int i = 0; i < 1; ++i) {
-		if (properties[i].queueFlags & vk::QueueFlagBits::eGraphics) {
-			indices.Graphics = i;
-		} 
-		if (properties[i].queueFlags & vk::QueueFlagBits::eCompute) {
-			indices.Compute = i;
-		} 
-		if (properties[i].queueFlags & vk::QueueFlagBits::eTransfer) {
-			indices.Transfer = i;
-		}
-
-		vk::Bool32 supported = false;
-		device->getSurfaceSupportKHR(i, surface, &supported);
-		if (supported) {
-			indices.Present = i;
-		}
-	}
-
-	return indices;
-}
-
-bool CreateShader(const char *filePath, vk::Device device, vk::ShaderModule *shader) {
-	std::ifstream file(filePath, std::ios::ate | std::ios::binary);
-
-	if (!file.is_open()) {
-		return false;
-	}
-
-	size_t fileSize = (size_t)file.tellg();
-	void *buffer = malloc(fileSize);
-
-	file.seekg(0);
-	file.read((char *)buffer, fileSize);
-	file.close();
-
-	vk::ShaderModuleCreateInfo info({}, fileSize, (uint32_t *)buffer);
-
-	vk::Result result = device.createShaderModule(&info, nullptr, shader);
-	free(buffer);
-
-	return result == vk::Result::eSuccess;
-}
-
-bool Visualizer::Init() {
+bool Visualizer::Init(int width, int height) {
 	// Setup window
 	glfwSetErrorCallback(ErrorCallback);
 	if (!glfwInit()) {
@@ -228,214 +115,143 @@ bool Visualizer::Init() {
 		exit(EXIT_FAILURE);
 	}
 
-	int width = 1280;// m_scene->Camera->FrameBufferData.Width;
-	int height = 720;// m_scene->Camera->FrameBufferData.Height;
-
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-	glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
+	glfwWindowHint(GLFW_RESIZABLE, 0);
 	GLFWwindow *window = glfwCreateWindow(width, height, "Lantern", nullptr, nullptr);
+	if (window == nullptr) {
+		printf("Failed to create GLFW windows");
+		return false;
+	}
 	m_window = window;
 
+	if (!glfwVulkanSupported()) {
+		printf("GLFW: Vulkan not supported");
+		return false;
+	}
+
+	if (!InitVulkan()) {
+		return false;
+	}
+
+	// Create window surface
+	VkResult createResult = glfwCreateWindowSurface((VkInstance)m_instance, window, nullptr, (VkSurfaceKHR *)&m_surface);
+	if (createResult != VK_SUCCESS) {
+		printf("Vulkan: Failed to create window surface - Error code: %d", createResult);
+		return false;
+	}
+
+	int actualWidth;
+	int actualHeight;
+	glfwGetFramebufferSize(window, &actualWidth, &actualHeight);
+
+	if (!InitVulkanWindow(actualWidth, actualHeight)) {
+		return false;
+	}
+
 	// Setup ImGui binding
-	//m_imGuiImpl.InitImpl(window);
+	IMGUI_CHECKVERSION();
+	ImGui::CreateContext();
 
-	// Bind callbacks
-	glfwSetMouseButtonCallback(window, MouseButtonCallback);
-	glfwSetCursorPosCallback(window, CursorPosCallback);
-	glfwSetScrollCallback(window, ScrollCallback);
-	glfwSetKeyCallback(window, KeyCallback);
-	glfwSetCharCallback(window, CharCallback);
+	// Setup GLFW binding
+	ImGui_ImplGlfw_InitForVulkan(window, true);
 
-
-	// Set Up Vulkan
-
-	vk::ApplicationInfo appInfo("Lantern", VK_MAKE_VERSION(1, 0, 0), "Lantern", VK_MAKE_VERSION(1, 0, 0), VK_API_VERSION_1_0);
-
-	// Set what extensions we need
-	// GLFW needs a few in order to run
-	uint glfwExtensionCount = 0;
-	const char **glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
-
-	std::vector<const char *> extensions;
-	for (uint i = 0; i < glfwExtensionCount; ++i) {
-		extensions.push_back(glfwExtensions[i]);
-	}
-
-	// Now add some of our own
-	extensions.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
-
-	// Create the instance
-	vk::InstanceCreateInfo instanceInfo({}, &appInfo, SizeOfArray(kValidationLayers), kValidationLayers, extensions.size(), extensions.data());
-
-	vk::Result result = vk::createInstance(&instanceInfo, nullptr, &m_instance);
-	if (result != vk::Result::eSuccess) {
-		printf("Failed to create Vulkan Instance. Error Code: %d", result);
-		return false;
-	}
-
-	if (glfwCreateWindowSurface((VkInstance)m_instance, window, nullptr, (VkSurfaceKHR *)&m_surface) != VK_SUCCESS) {
-		printf("Failed to create Vulkan Surface. Error Code: %d", result);
-		return false;
-	}
-
-	vk::DebugReportCallbackCreateInfoEXT debugInfo(vk::DebugReportFlagBitsEXT::eError | vk::DebugReportFlagBitsEXT::eWarning, DebugCallback, nullptr);
-	m_instance.createDebugReportCallbackEXT(&debugInfo, nullptr, &m_debugCallback);
-
-
-	auto physicalDevices = m_instance.enumeratePhysicalDevices().value;
-
-	for (vk::PhysicalDevice &device : physicalDevices) {
-		vk::PhysicalDeviceProperties deviceProperties;
-		vk::PhysicalDeviceFeatures deviceFeatures;
-
-		device.getProperties(&deviceProperties);
-		device.getFeatures(&deviceFeatures);
-
-		auto deviceExtensions = device.enumerateDeviceExtensionProperties().value;
-
-		if (deviceProperties.deviceType == vk::PhysicalDeviceType::eDiscreteGpu) {
-			m_physicalDevice = device;
-			printf("Chose %s\n", deviceProperties.deviceName);
-			break;
+	// Setup Vulkan binding
+	ImGui_ImplVulkan_InitInfo initInfo;
+	initInfo.Instance = (VkInstance)m_instance;
+	initInfo.PhysicalDevice = (VkPhysicalDevice)m_physicalDevice;
+	initInfo.Device = (VkDevice)m_device;
+	initInfo.QueueFamily = m_graphicsQueueFamilyIndex;
+	initInfo.Queue = (VkQueue)m_graphicsQueue;
+	initInfo.PipelineCache = VK_NULL_HANDLE;
+	initInfo.DescriptorPool = (VkDescriptorPool)m_descriptorPool;
+	initInfo.Allocator = nullptr;
+	initInfo.CheckVkResultFn = [](VkResult err) {
+		if (err == 0) {
+			return;
 		}
-	}
-
-	// Create the Device and Queues
-	QueueIndices indices = GetQueueIndices(&m_physicalDevice, m_surface);
-
-	std::vector<vk::DeviceQueueCreateInfo> queueInfos;
-	std::set<int> uniqueIndices = {
-		indices.Graphics,
-		indices.Present
+		printf("VkResult %d\n", err);
 	};
+	ImGui_ImplVulkan_Init(&initInfo, (VkRenderPass)m_renderPass);
 
-	float queuePriority = 1.0f;
-	for (int index : uniqueIndices) {
-		vk::DeviceQueueCreateInfo info({}, index, 1, &queuePriority);
-		queueInfos.push_back(info);
-	}
+	// Setup style
+	ImGui::StyleColorsDark();
 
-	if (indices.Graphics != indices.Present) {
-		printf("The device Graphics queue and Present queue are different");
-		return false;
-	}
+	// Upload Fonts
+	{
+		// Use any command queue
+		vk::CommandPool commandPool = m_frameData[0].commandPool;
+		vk::CommandBuffer commandBuffer = m_frameData[0].commandBuffer;
 
-	// We don't have any required features yet
-	vk::PhysicalDeviceFeatures requiredFeatures = {};
-	vk::DeviceCreateInfo deviceInfo({}, queueInfos.size(), queueInfos.data(), SizeOfArray(kValidationLayers), kValidationLayers, SizeOfArray(kDeviceExtensions), kDeviceExtensions, &requiredFeatures);
-
-	result = m_physicalDevice.createDevice(&deviceInfo, nullptr, &m_device);
-	if (result != vk::Result::eSuccess) {
-		printf("Failed to create Vulkan Device. Error Code: %d", result);
-		return false;
-	}
-
-	m_device.getQueue(indices.Graphics, 0, &m_graphicsQueue);
-	m_device.getQueue(indices.Present, 0, &m_presentQueue);
-
-	// Create the memory allocator
-	VmaAllocatorCreateInfo allocatorCreateInfo = {};
-	allocatorCreateInfo.physicalDevice = static_cast<VkPhysicalDevice>(m_physicalDevice);
-	allocatorCreateInfo.device = static_cast<VkDevice>(m_device);
-
-	vmaCreateAllocator(&allocatorCreateInfo, &m_allocator);
-
-
-	if (!CreateSwapChain(width, height)) {
-		return false;
-	}
-	if (!CreateImageViews()) {
-		return false;
-	}
-	
-	// Create the shaders
-	if (!CreateShader("fullscreen_triangle_vs.spv", m_device, &m_vertexShader)) {
-		printf("Failed to create the vertex shader: %s", "fullscreen_triangle_vs.spv");
-		return false;
-	}
-	if (!CreateShader("final_resolve_ps.spv", m_device, &m_pixelShader)) {
-		printf("Failed to create the pixel shader: %s", "final_resolve_ps.spv");
-		return false;
-	}
-
-	if (!CreateRenderPass()) {
-		return false;
-	}
-	if (!CreateGraphicsPipeline()) {
-		return false;
-	}
-	if (!CreateFrameBuffers()) {
-		return false;
-	}
-
-	// Create the staging images
-	m_stagingImage.resize(m_frameBuffers.size());
-	m_stagingBufferAllocation.resize(m_frameBuffers.size());
-	m_stagingBufferAllocInfo.resize(m_frameBuffers.size());
-	for (uint i = 0; i < m_frameBuffers.size(); ++i) {
-		vk::ImageCreateInfo stagingImageCreateInfo{};
-		stagingImageCreateInfo.imageType = vk::ImageType::e2D;
-		stagingImageCreateInfo.format = vk::Format::eR8G8B8A8Unorm;
-		stagingImageCreateInfo.extent = vk::Extent3D(m_swapchainExtent.width, m_swapchainExtent.height, 1);
-		stagingImageCreateInfo.mipLevels = 1;
-		stagingImageCreateInfo.arrayLayers = 1;
-		stagingImageCreateInfo.samples = vk::SampleCountFlagBits::e1;
-		stagingImageCreateInfo.tiling = vk::ImageTiling::eLinear;
-		stagingImageCreateInfo.usage = vk::ImageUsageFlagBits::eTransferSrc;
-		stagingImageCreateInfo.sharingMode = vk::SharingMode::eExclusive;
-		stagingImageCreateInfo.initialLayout = vk::ImageLayout::eTransferSrcOptimal;
-
-		VmaAllocationCreateInfo stagingImageAllocCreateInfo{};
-		stagingImageAllocCreateInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
-		stagingImageAllocCreateInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
-
-		if (vmaCreateImage(m_allocator, (VkImageCreateInfo *)&stagingImageCreateInfo, &stagingImageAllocCreateInfo, (VkImage *)&m_stagingImage[i], &m_stagingBufferAllocation[i], &m_stagingBufferAllocInfo[i]) != VK_SUCCESS) {
-			printf("Failed to create staging image");
+		vk::Result result = m_device.resetCommandPool(commandPool, {});
+		if (result != vk::Result::eSuccess) {
+			printf("Vulkan: Failed to reset command pool. Error code: %d", result);
 			return false;
 		}
-	}
-	
 
-	// Create the command pool
-	vk::CommandPoolCreateInfo commandPoolInfo({}, indices.Graphics);
-	if (m_device.createCommandPool(&commandPoolInfo, nullptr, &m_commandPool) != vk::Result::eSuccess) {
-		printf("Failed to create the command pool");
-		return false;
-	}
+		vk::CommandBufferBeginInfo beginInfo;
+		beginInfo.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit;
 
-	if (!CreateCommandBuffers()) {
-		return false;
-	}
+		result = commandBuffer.begin(beginInfo);
+		if (result != vk::Result::eSuccess) {
+			printf("Vulkan: Failed to begin command buffer. Error code: %d", result);
+			return false;
+		}
 
-	// Create the semaphores
-	vk::SemaphoreCreateInfo semaphoreInfo = {};
-	if (m_device.createSemaphore(&semaphoreInfo, nullptr, &m_imageAvailable) != vk::Result::eSuccess) {
-		printf("Failed to create Semaphore");
-		return false;
-	}
-	if (m_device.createSemaphore(&semaphoreInfo, nullptr, &m_renderFinished) != vk::Result::eSuccess) {
-		printf("Failed to create Semaphore");
-		return false;
+		ImGui_ImplVulkan_CreateFontsTexture((VkCommandBuffer)commandBuffer);
+
+		vk::SubmitInfo submitInfo;
+		submitInfo.commandBufferCount = 1;
+		submitInfo.pCommandBuffers = &commandBuffer;
+
+		result = commandBuffer.end();
+		if (result != vk::Result::eSuccess) {
+			printf("Vulkan: Failed to end command buffer. Error code: %d", result);
+			return false;
+		}
+		result = m_graphicsQueue.submit(1, &submitInfo, vk::Fence(nullptr));
+		if (result != vk::Result::eSuccess) {
+			printf("Vulkan: Failed to submit command buffer. Error code: %d", result);
+			return false;
+		}
+
+		result = m_device.waitIdle();
+		if (result != vk::Result::eSuccess) {
+			printf("Vulkan: Failed to wait idle. Error code: %d", result);
+			return false;
+		}
+
+		ImGui_ImplVulkan_InvalidateFontUploadObjects();
 	}
 
 	return true;
 }
 
 void Visualizer::Shutdown() {
-	CleanUpSwapChainAndDependents();
-	
-	for (uint i = 0; i < m_stagingImage.size(); ++i) {
-		vmaDestroyImage(m_allocator, (VkImage)m_stagingImage[i], m_stagingBufferAllocation[i]);
+	m_device.waitIdle();
+
+	ImGui_ImplVulkan_Shutdown();
+	ImGui_ImplGlfw_Shutdown();
+	ImGui::DestroyContext();
+
+	//vmaDestroyAllocator(m_allocator);
+
+	m_device.destroyRenderPass(m_renderPass, nullptr);
+
+	for (uint32_t i = 0; i < m_frameCount; ++i) {
+		FrameData *data = &m_frameData[i];
+
+		m_device.destroyFramebuffer(data->frameBuffer, nullptr);
+		m_device.destroyImageView(data->backbufferView, nullptr);
+		m_device.destroyFence(data->fence, nullptr);
+		m_device.destroySemaphore(data->imageAcquired, nullptr);
+		m_device.destroySemaphore(data->imguiRenderCompleted, nullptr);
+		m_device.destroyCommandPool(data->commandPool, nullptr); // This will clean up the associated command buffers
 	}
-	vmaDestroyAllocator(m_allocator);
+	delete[] m_frameData;
 
-	m_device.destroySemaphore(m_imageAvailable);
-	m_device.destroySemaphore(m_renderFinished);
-	m_device.destroyCommandPool(m_commandPool, nullptr);
-	m_device.destroyShaderModule(m_vertexShader, nullptr);
-	m_device.destroyShaderModule(m_pixelShader, nullptr);
+	m_device.destroyDescriptorPool(m_descriptorPool, nullptr);
+	m_device.destroySwapchainKHR(m_swapchain, nullptr);
 	m_device.destroy(nullptr);
-
 	m_instance.destroyDebugReportCallbackEXT(m_debugCallback, nullptr);
 	m_instance.destroySurfaceKHR(m_surface, nullptr);
 	m_instance.destroy(nullptr);
@@ -445,229 +261,217 @@ void Visualizer::Shutdown() {
 }
 
 bool Visualizer::RenderFrame() {
-	// Get the next framebuffer to accumulate from
-	m_currentFrameBuffer = std::atomic_exchange(m_swapFrameBuffer, m_currentFrameBuffer);
+	// Start the Dear ImGui frame
+	ImGui_ImplVulkan_NewFrame();
+	ImGui_ImplGlfw_NewFrame();
+	ImGui::NewFrame();
 
-	if (!m_currentFrameBuffer->Empty) {
-		for (uint y = 0; y < m_currentFrameBuffer->Height; ++y) {
-			const size_t offset = y * m_currentFrameBuffer->Width;
-			for (uint x = 0; x < m_currentFrameBuffer->Width; ++x) {
-				const size_t index = offset + x;
-				m_accumulationFrameBuffer.ColorData[index] += m_currentFrameBuffer->ColorData[index];
-				m_accumulationFrameBuffer.Bounces[index] += m_currentFrameBuffer->Bounces[index];
-				m_accumulationFrameBuffer.Weights[index] += m_currentFrameBuffer->Weights[index];
-			}
-		}
-		m_currentFrameBuffer->Reset();
-	}
+	// 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
+	ImGui::ShowDemoWindow();
 
-	// Let the previous frame's queue flush
-	m_presentQueue.waitIdle();
 
-	// Render the frame
-	uint32 imageIndex;
-	vk::Result result = m_device.acquireNextImageKHR(m_swapchain, std::numeric_limits<uint64_t>::max(), m_imageAvailable, {}, &imageIndex);
-	if (result == vk::Result::eErrorOutOfDateKHR) {
-		RecreateSwapChainAndDependents();
-		return true;
-	} else if (result != vk::Result::eSuccess) {
-		printf("Failed to acquire next image");
+	// Rendering
+
+	// We always use the semaphore of the "last" index, since there's no way to know the current index without supplying a semaphore
+	vk::Semaphore &imageAcquiredSemaphore = m_frameData[m_frameIndex].imageAcquired;
+
+	vk::Result result = m_device.acquireNextImageKHR(m_swapchain, UINT64_MAX, imageAcquiredSemaphore, vk::Fence(nullptr), &m_frameIndex);
+	if (result != vk::Result::eSuccess) {
+		printf("Vulkan: Failed to acquire next image. Error code: %d", result);
 		return false;
 	}
 
-	byte *mappedData = (byte *)m_stagingBufferAllocInfo[imageIndex].pMappedData;
-	for (uint j = 0; j < m_accumulationFrameBuffer.Height; ++j) {
-		const size_t offset = j * m_accumulationFrameBuffer.Width;
-		for (uint i = 0; i < m_accumulationFrameBuffer.Width; ++i) {
-			const size_t frameBufferIndex = offset + i;
-			const size_t mappedDataIndex = frameBufferIndex * 4;
 
-			float3 *color = &m_accumulationFrameBuffer.ColorData[frameBufferIndex];
-			float weight = m_accumulationFrameBuffer.Weights[frameBufferIndex];
-			mappedData[mappedDataIndex + 0] = (byte)(std::max(0.0f, std::min(color->x / weight, 1.0f)) * 255.0f); // Red
-			mappedData[mappedDataIndex + 1] = (byte)(std::max(0.0f, std::min(color->y / weight, 1.0f)) * 255.0f); // Green
-			mappedData[mappedDataIndex + 2] = (byte)(std::max(0.0f, std::min(color->z / weight, 1.0f)) * 255.0f); // Blue
-			mappedData[mappedDataIndex + 3] = (byte)255; // Alpha
-		}
-	}
+	// Render ImGui to the backbuffer
+	ImGui::Render();
+	RenderImGui(&imageAcquiredSemaphore);
 
-	// TODO: Wait on fence that the buffer is finished being transferred from
-	//       Outside this. Before we do the memcpy and submit the command buffer
+	vk::PresentInfoKHR info;
+	info.waitSemaphoreCount = 1;
+	info.pWaitSemaphores = &m_frameData[m_frameIndex].imguiRenderCompleted;
+	info.swapchainCount = 1;
+	info.pSwapchains = &m_swapchain;
+	info.pImageIndices = &m_frameIndex;
 
-	// Flush to GPU
-	vk::MappedMemoryRange flushRange(
-		(vk::DeviceMemory)m_stagingBufferAllocInfo[imageIndex].deviceMemory,
-		0,
-		vk::DeviceSize(VK_WHOLE_SIZE)
-	);
-	if (m_device.flushMappedMemoryRanges(flushRange) != vk::Result::eSuccess) {
-		printf("Failed to flush staging buffer");
-		return false;
-	}
-
-	vk::PipelineStageFlags waitStages[] = {
-		vk::PipelineStageFlagBits::eColorAttachmentOutput
-	};
-	vk::SubmitInfo submitInfo(1, &m_imageAvailable, waitStages, 1, &m_commandBuffers[imageIndex], 1, &m_renderFinished);
-
-	if (m_graphicsQueue.submit(1, &submitInfo, {}) != vk::Result::eSuccess) {
-		printf("Failed to submit draw command buffer");
-		return false;
-	}
-
-	vk::PresentInfoKHR presentInfo(1, &m_renderFinished, 1, &m_swapchain, &imageIndex, &result);
-	result = m_presentQueue.presentKHR(presentInfo);
-	if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR) {
-		RecreateSwapChainAndDependents();
-	} else if (result != vk::Result::eSuccess) {
-		printf("Failed to present");
+	result = m_graphicsQueue.presentKHR(&info);
+	if (result != vk::Result::eSuccess) {
+		printf("Vulkan: Failed to present. Error code: %d", result);
 		return false;
 	}
 
 	return true;
 }
 
-bool Visualizer::CreateSwapChain(uint width, uint height) {
-	// Set up the swap chain
-	SwapChainSupportDetails details = QuerySwapChainSupport(m_physicalDevice, m_surface);
+static vk::SurfaceFormatKHR GetSurfaceFormat(vk::PhysicalDevice physicalDevice, vk::SurfaceKHR surface, const vk::Format* requestedFormats, size_t requestedFormatsCount, const vk::ColorSpaceKHR requestedColorSpace) {
+	auto availableFormats = physicalDevice.getSurfaceFormatsKHR(surface).value;
 
-	// Find a suitable surface format
-	vk::SurfaceFormatKHR surfaceFormat = {};
+	// First check if only one format, VK_FORMAT_UNDEFINED, is available, which would imply that any format is available
+	if (availableFormats.size() == 1) {
+		if (availableFormats[0].format == vk::Format::eUndefined) {
+			vk::SurfaceFormatKHR surfaceFormat;
+			surfaceFormat.format = requestedFormats[0];
+			surfaceFormat.colorSpace = requestedColorSpace;
 
-	// If the device doesn't care what we choose, just pick the one we want
-	if (details.formats.size() == 1 && details.formats[0].format == vk::Format::eUndefined) {
-		surfaceFormat.format = vk::Format::eR8G8B8A8Unorm;
-		surfaceFormat.colorSpace = vk::ColorSpaceKHR::eAdobergbNonlinearEXT; // sRBG
+			return surfaceFormat;
+		} else {
+			// No point in searching another format
+			return availableFormats[0];
+		}
 	} else {
-		// Search for the best one
-		bool found = false;
-		for (vk::SurfaceFormatKHR &surfaceFormat_ : details.formats) {
-			if (surfaceFormat_.format == vk::Format::eR8G8B8A8Unorm && surfaceFormat_.colorSpace == vk::ColorSpaceKHR::eAdobergbNonlinearEXT) {
-				found = true;
-				surfaceFormat = surfaceFormat_;
+		// Search the for the requested formats in the available formats, the first found will be used
+		for (size_t i = 0; i < requestedFormatsCount; ++i) {
+			for (auto &&available : availableFormats) {
+				if (available.format == requestedFormats[i] && available.colorSpace == requestedColorSpace) {
+					return available;
+				}
+			}
+		}
+
+		// If none of the requested image formats could be found, use the first available
+		return availableFormats[0];
+	}
+}
+
+bool Visualizer::InitVulkan() {
+	vk::Result result;
+
+	// Create Vulkan instance
+	{
+		uint glfwExtensionCount = 0;
+		const char **glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+
+		std::vector<const char *> extensions;
+		for (uint i = 0; i < glfwExtensionCount; ++i) {
+			extensions.push_back(glfwExtensions[i]);
+		}
+
+		// Now add some of our own
+		extensions.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
+
+		vk::ApplicationInfo appInfo;
+		appInfo.pApplicationName = "Lantern";
+		appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
+		appInfo.pEngineName = "Lantern";
+		appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
+		appInfo.apiVersion = VK_API_VERSION_1_0;
+
+		vk::InstanceCreateInfo instanceCreateInfo;
+		instanceCreateInfo.pApplicationInfo = &appInfo;
+		instanceCreateInfo.enabledExtensionCount = extensions.size();
+		instanceCreateInfo.ppEnabledExtensionNames = &extensions[0];
+		instanceCreateInfo.enabledLayerCount = SizeOfArray(kValidationLayers);
+		instanceCreateInfo.ppEnabledLayerNames = kValidationLayers;
+
+		result = vk::createInstance(&instanceCreateInfo, nullptr, &m_instance);
+		if (result != vk::Result::eSuccess) {
+			printf("Vulkan: Failed to create Vulkan Instance. Error code: %d", result);
+			return false;
+		}
+
+		vk::DebugReportCallbackCreateInfoEXT debugInfo;
+		debugInfo.flags = vk::DebugReportFlagBitsEXT::eError | vk::DebugReportFlagBitsEXT::eWarning | vk::DebugReportFlagBitsEXT::ePerformanceWarning;
+		debugInfo.pfnCallback = DebugCallback;
+
+		result = m_instance.createDebugReportCallbackEXT(&debugInfo, nullptr, &m_debugCallback);
+		if (result != vk::Result::eSuccess) {
+			printf("Vulkan: Failed to set debug callbacks. Error code: %d", result);
+			return false;
+		}
+	}
+
+	// Select GPU
+	{
+		auto physicalDevicesResult = m_instance.enumeratePhysicalDevices();
+		if (physicalDevicesResult.result != vk::Result::eSuccess) {
+			printf("Vulkan: Failed to enumerate physical devices");
+			return false;
+		}
+
+		// Try to find a discrete GPU
+		bool foundDiscrete = false;
+		for (vk::PhysicalDevice &device : physicalDevicesResult.value) {
+			vk::PhysicalDeviceProperties properties;
+			device.getProperties(&properties);
+
+			if (properties.deviceType == vk::PhysicalDeviceType::eDiscreteGpu) {
+				m_physicalDevice = device;
+				foundDiscrete = true;
 				break;
 			}
 		}
 
-		// Just give up and choose the first one
-		if (!found) {
-			surfaceFormat = details.formats[0];
+		// If we can't find one, just pick the first GPU
+		if (!foundDiscrete) {
+			m_physicalDevice = physicalDevicesResult.value[0];
 		}
 	}
 
-	// Find a suitable present mode
-	vk::PresentModeKHR presentMode = vk::PresentModeKHR::eImmediate;
-	for (vk::PresentModeKHR &mode : details.presentModes) {
-		if (mode == vk::PresentModeKHR::eMailbox) {
-			presentMode = mode;
-			// This is the ideal world, so we break
-			break;
-		} else if (mode == vk::PresentModeKHR::eFifo) {
-			presentMode = mode;
-			// This is a second best, so we *don't* break, hoping we find eMailbox
+	// Select graphics queue family
+	{
+		m_graphicsQueueFamilyIndex = (uint32_t)-1;
+
+		auto queueFamilyProperties = m_physicalDevice.getQueueFamilyProperties();
+		for (size_t i = 0; i < queueFamilyProperties.size(); ++i) {
+			if (queueFamilyProperties[i].queueFlags & vk::QueueFlagBits::eGraphics) {
+				m_graphicsQueueFamilyIndex = i;
+			}
+		}
+
+		if (m_graphicsQueueFamilyIndex == (uint32_t)-1) {
+			printf("Vulkan: Failed to find a graphics queue");
+			return false;
 		}
 	}
 
-	// Choose the best swap extent
-	vk::Extent2D swapExtent;
-	// If we already have an extent, just use that
-	// Otherwise, fall back on the width and height specified
-	if (details.capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
-		swapExtent = details.capabilities.currentExtent;
-	} else {
-		swapExtent.width = std::max(details.capabilities.minImageExtent.width, std::min(details.capabilities.maxImageExtent.width, width));
-		swapExtent.height = std::max(details.capabilities.minImageExtent.height, std::min(details.capabilities.maxImageExtent.height, height));
-	}
+	// Create logical device with 1 queue
+	{
+		const float queuePriority[] = { 1.0f };
 
-	uint imageCount = 2;
-	if (presentMode == vk::PresentModeKHR::eMailbox) {
-		imageCount = 3; // Triple buffering
-	}
-	// Clamp to the max image count
-	if (details.capabilities.maxImageCount > 0 && imageCount > details.capabilities.maxImageCount) {
-		imageCount = details.capabilities.maxImageCount;
-	}
+		vk::DeviceQueueCreateInfo queueCreateInfo;
+		queueCreateInfo.queueFamilyIndex = m_graphicsQueueFamilyIndex;
+		queueCreateInfo.queueCount = 1;
+		queueCreateInfo.pQueuePriorities = queuePriority;
 
-	// Finally create the swap chain
-	vk::SwapchainCreateInfoKHR swapChainInfo;
-	swapChainInfo.surface = m_surface;
-	swapChainInfo.minImageCount = imageCount;
-	swapChainInfo.imageFormat = surfaceFormat.format;
-	swapChainInfo.imageColorSpace = surfaceFormat.colorSpace;
-	swapChainInfo.imageExtent = swapExtent;
-	swapChainInfo.imageArrayLayers = 1;
-	swapChainInfo.imageUsage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferDst;
-	swapChainInfo.imageSharingMode = vk::SharingMode::eExclusive;
-	swapChainInfo.queueFamilyIndexCount = 0;
-	swapChainInfo.pQueueFamilyIndices = nullptr;
-	swapChainInfo.preTransform = details.capabilities.currentTransform;
-	swapChainInfo.compositeAlpha = vk::CompositeAlphaFlagBitsKHR::eOpaque;
-	swapChainInfo.presentMode = presentMode;
-	swapChainInfo.clipped = VK_TRUE;
+		vk::DeviceCreateInfo deviceCreateInfo;
+		deviceCreateInfo.queueCreateInfoCount = 1;
+		deviceCreateInfo.pQueueCreateInfos = &queueCreateInfo;
+		deviceCreateInfo.enabledExtensionCount = SizeOfArray(kDeviceExtensions);
+		deviceCreateInfo.ppEnabledExtensionNames = kDeviceExtensions;
 	
-	if (m_device.createSwapchainKHR(&swapChainInfo, nullptr, &m_swapchain) != vk::Result::eSuccess) {
-		printf("Failed to create the swapchain");
-		return false;
-	}
-	m_swapchainFormat = surfaceFormat.format;
-	m_swapchainExtent = swapExtent;
+		result = m_physicalDevice.createDevice(&deviceCreateInfo, nullptr, &m_device);
+		if (result != vk::Result::eSuccess) {
+			printf("Vulkan: Failed to create logical device. Error code: %d", result);
+			return false;
+		}
 
-	return true;
-}
-
-void Visualizer::CleanUpSwapChainAndDependents() {
-	for (vk::Framebuffer &frameBuffer : m_frameBuffers) {
-		m_device.destroyFramebuffer(frameBuffer, nullptr);
-	}
-	m_device.freeCommandBuffers(m_commandPool, m_commandBuffers);
-	
-	m_device.destroyPipeline(m_mainPipeline, nullptr);
-	m_device.destroyPipelineLayout(m_mainPipelineLayout, nullptr);
-	m_device.destroyRenderPass(m_renderPass, nullptr);
-
-	for (vk::ImageView &view : m_swapChainImageViews) {
-		m_device.destroyImageView(view, nullptr);
-	}
-	
-	m_device.destroySwapchainKHR(m_swapchain, nullptr);
-}
-
-bool Visualizer::RecreateSwapChainAndDependents() {
-	m_device.waitIdle();
-
-	CleanUpSwapChainAndDependents();
-
-	if (!CreateSwapChain(1, 1)) {
-		return false;
-	}
-	if (!CreateImageViews()) {
-		return false;
-	}
-	if (!CreateRenderPass()) {
-		return false;
-	}
-	if (!CreateGraphicsPipeline()) {
-		return false;
-	}
-	if (!CreateFrameBuffers()) {
-		return false;
-	}
-	if (!CreateCommandBuffers()) {
-		return false;
+		m_device.getQueue(m_graphicsQueueFamilyIndex, 0, &m_graphicsQueue);
 	}
 
-	return true;
-}
+	// Create descriptor pool
+	{
+		vk::DescriptorPoolSize poolSizes[] = {
+			{vk::DescriptorType::eSampler, 1000},
+			{vk::DescriptorType::eCombinedImageSampler, 1000},
+			{vk::DescriptorType::eSampledImage, 1000},
+			{vk::DescriptorType::eStorageImage, 1000},
+			{vk::DescriptorType::eUniformTexelBuffer, 1000},
+			{vk::DescriptorType::eStorageTexelBuffer, 1000},
+			{vk::DescriptorType::eUniformBuffer, 1000},
+			{vk::DescriptorType::eStorageBuffer, 1000},
+			{vk::DescriptorType::eUniformBufferDynamic, 1000},
+			{vk::DescriptorType::eStorageBufferDynamic, 1000},
+			{vk::DescriptorType::eInputAttachment, 1000},
+		};
 
-bool Visualizer::CreateImageViews() {
-	// Get the handles for the swapchain image views
-	m_swapChainImages = m_device.getSwapchainImagesKHR(m_swapchain).value;
+		vk::DescriptorPoolCreateInfo createInfo;
+		createInfo.flags = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet;
+		createInfo.maxSets = 1000 * SizeOfArray(poolSizes);
+		createInfo.poolSizeCount = SizeOfArray(poolSizes);
+		createInfo.pPoolSizes = poolSizes;
 
-	m_swapChainImageViews.resize(m_swapChainImages.size());
-	for (uint i = 0; i < m_swapChainImages.size(); ++i) {
-		vk::ImageViewCreateInfo imageViewInfo({}, m_swapChainImages[i], vk::ImageViewType::e2D, m_swapchainFormat, {}, vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1));
-		if (m_device.createImageView(&imageViewInfo, nullptr, &m_swapChainImageViews[i]) != vk::Result::eSuccess) {
-			printf("Failed to create a swapchain image view");
+		result = m_device.createDescriptorPool(&createInfo, nullptr, &m_descriptorPool);
+		if (result != vk::Result::eSuccess) {
+			printf("Vulkan: Failed to create descriptor pool. Error code: %d", result);
 			return false;
 		}
 	}
@@ -675,233 +479,351 @@ bool Visualizer::CreateImageViews() {
 	return true;
 }
 
-bool Visualizer::CreateRenderPass() {
-	// Create the main render pass
+bool Visualizer::InitVulkanWindow(int width, int height) {
+	vk::Result result;
 
-	vk::AttachmentDescription attachments[] = {
-		// Backbuffer
-		vk::AttachmentDescription(
-			{},                                      // flags
-			m_swapchainFormat,                       // format
-			vk::SampleCountFlagBits::e1,             // samples
-			vk::AttachmentLoadOp::eDontCare,         // loadOp
-			vk::AttachmentStoreOp::eStore,           // storeOp
-			vk::AttachmentLoadOp::eDontCare,         // stencilLoadOp
-			vk::AttachmentStoreOp::eDontCare,        // stencilStoreOp
-			vk::ImageLayout::eUndefined,             // initialLayout
-			vk::ImageLayout::ePresentSrcKHR          // finalLayout
-		)
-	};
-
-	vk::AttachmentReference colorAttachmentReferences[] = {
-		// The backbuffer is a color attachment
-		vk::AttachmentReference(
-			0,                                          // attachmentIndex
-			vk::ImageLayout::eColorAttachmentOptimal    // layout
-		)
-	};
-
-	vk::SubpassDescription subpasses[] = {
-		// Final resolve pass
-		vk::SubpassDescription(
-			{},                                        // flags
-			vk::PipelineBindPoint::eGraphics,          // pipelineBindPoint
-			0,                                         // inputAttachmentCount
-			nullptr,                                   // pInputAttachments
-			SizeOfArray(colorAttachmentReferences),    // colorAttachmentCount
-			colorAttachmentReferences,                 // pColorAttachments
-			nullptr,                                   // pResolveAttachments
-			nullptr,                                   // pDepthStencilAttachment
-			0,                                         // preserveAttachmentCount
-			nullptr                                    // pPreserveAttachments
-		)
-	};
-
-	vk::SubpassDependency subpassDependencies[] = {
-		// External to final resolve pass
-		vk::SubpassDependency(
-			VK_SUBPASS_EXTERNAL,                                  // srcSubpass
-			0,                                                    // dstSubpass
-			vk::PipelineStageFlagBits::eBottomOfPipe,             // srcStageMask
-			vk::PipelineStageFlagBits::eTransfer,                 // dstStageMask
-			(vk::AccessFlagBits)0,                                // srcAccessMask
-			vk::AccessFlagBits::eColorAttachmentWrite,            // dstAccessMask
-			vk::DependencyFlagBits::eByRegion                     // dependencyFlags
-		),
-		// Final resolve to external
-		vk::SubpassDependency(
-			0,                                                    // srcSubpass
-			VK_SUBPASS_EXTERNAL,                                  // dstSubpass
-			vk::PipelineStageFlagBits::eColorAttachmentOutput,    // srcStageMask
-			vk::PipelineStageFlagBits::eBottomOfPipe,             // dstStageMask
-			vk::AccessFlagBits::eColorAttachmentWrite,            // srcAccessMask
-			vk::AccessFlagBits::eMemoryRead,                      // dstAccessMask
-			vk::DependencyFlagBits::eByRegion                     // dependencyFlags
-		)
-	};
-
-	vk::RenderPassCreateInfo renderPassInfo(
-		{},                                  // flags
-		SizeOfArray(attachments),            // attachmentCount
-		attachments,                         // pAttachments
-		SizeOfArray(subpasses),              // subpassCount
-		subpasses,                           // pSubpasses
-		SizeOfArray(subpassDependencies),    // dependencyCount
-		subpassDependencies                  // pDependencies
-	);
-	if (m_device.createRenderPass(&renderPassInfo, nullptr, &m_renderPass) != vk::Result::eSuccess) {
-		printf("Failed to create render pass");
-		return false;
-	}
-
-	return true;
-}
-
-bool Visualizer::CreateGraphicsPipeline() {
-	vk::PipelineShaderStageCreateInfo shaderStageInfos[] = {
-		{{}, vk::ShaderStageFlagBits::eVertex, m_vertexShader, "main"},
-		{{}, vk::ShaderStageFlagBits::eFragment, m_pixelShader, "main"}
-	};
-
-	vk::PipelineVertexInputStateCreateInfo inputStateInfo({}, 0, nullptr, 0, nullptr);
-	vk::PipelineInputAssemblyStateCreateInfo inputAssemblyInfo({}, vk::PrimitiveTopology::eTriangleList, VK_FALSE);
-
-	vk::Viewport viewport(0, 0, m_swapchainExtent.width, m_swapchainExtent.height, 0.0f, 1.0f);
-	vk::Rect2D scissor({0, 0}, m_swapchainExtent);
-	vk::PipelineViewportStateCreateInfo viewportInfo({}, 1, &viewport, 1, &scissor);
-
-	vk::PipelineRasterizationStateCreateInfo rasterInfo({}, VK_FALSE, VK_FALSE, vk::PolygonMode::eFill, vk::CullModeFlagBits::eBack, vk::FrontFace::eClockwise, VK_FALSE, 0.0f, 0.0f, 0.0f, 1.0f);
-	vk::PipelineMultisampleStateCreateInfo multisamplingInfo({}, vk::SampleCountFlagBits::e1, VK_FALSE, 1.0f, nullptr, VK_FALSE, VK_FALSE);
-	vk::PipelineColorBlendAttachmentState blendAttachment(VK_FALSE,
-	                                                      vk::BlendFactor::eOne, vk::BlendFactor::eZero, vk::BlendOp::eAdd,
-	                                                      vk::BlendFactor::eOne, vk::BlendFactor::eZero, vk::BlendOp::eAdd,
-	                                                      vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eA);
-	vk::PipelineColorBlendStateCreateInfo blendInfo({}, VK_FALSE, vk::LogicOp::eCopy, 1, &blendAttachment);
-
-	vk::PipelineLayoutCreateInfo pipelineLayoutInfo({}, 0, nullptr, 0, nullptr);
-	if (m_device.createPipelineLayout(&pipelineLayoutInfo, nullptr, &m_mainPipelineLayout) != vk::Result::eSuccess) {
-		printf("Failed to create the pipeline layout");
-		return false;
-	}
-
-	// Create the pipeline
-	vk::GraphicsPipelineCreateInfo pipelineInfo({}, 2, shaderStageInfos, &inputStateInfo, &inputAssemblyInfo, nullptr, &viewportInfo, &rasterInfo, &multisamplingInfo, nullptr, &blendInfo, nullptr, m_mainPipelineLayout, m_renderPass);
-	if (m_device.createGraphicsPipelines({}, 1, &pipelineInfo, nullptr, &m_mainPipeline) != vk::Result::eSuccess) {
-		printf("Failed to create pipeline");
-		return false;
-	}
-
-	return true;
-}
-
-bool Visualizer::CreateFrameBuffers() {
-	// Create the framebuffers
-	m_frameBuffers.resize(m_swapChainImageViews.size());
-	for (uint i = 0; i < m_swapChainImageViews.size(); ++i) {
-		vk::FramebufferCreateInfo frameBufferInfo({}, m_renderPass, 1, &m_swapChainImageViews[i], m_swapchainExtent.width, m_swapchainExtent.height, 1);
-		if (m_device.createFramebuffer(&frameBufferInfo, nullptr, &m_frameBuffers[i]) != vk::Result::eSuccess) {
-			printf("Failed to create swapchain framebuffers");
+	// Check for WSI support
+	{
+		vk::Bool32 supported = false;
+		result = m_physicalDevice.getSurfaceSupportKHR(m_graphicsQueueFamilyIndex, m_surface, &supported);
+		if (result != vk::Result::eSuccess) {
+			printf("Vulkan: Failed to query for surface support - Error code: %d", result);
+			return false;
+		}
+		if (supported != VK_TRUE) {
+			printf("Vulkan: No WSI support on physical device");
 			return false;
 		}
 	}
 
-	return true;
-}
+	// Get Surface format
+	{
+		const vk::Format requestedFormats[] = {
+			vk::Format::eB8G8R8A8Unorm,
+			vk::Format::eR8G8B8A8Unorm,
+			vk::Format::eB8G8R8Unorm,
+			vk::Format::eR8G8B8Unorm,
+		};
+		const vk::ColorSpaceKHR requestedColorSpace = vk::ColorSpaceKHR::eSrgbNonlinear;
 
-bool Visualizer::CreateCommandBuffers() {
-	// Create the command buffers
-	m_commandBuffers.resize(m_frameBuffers.size());
-	vk::CommandBufferAllocateInfo commandBufferAllocateInfo(m_commandPool, vk::CommandBufferLevel::ePrimary, m_commandBuffers.size());
-	if (m_device.allocateCommandBuffers(&commandBufferAllocateInfo, m_commandBuffers.data()) != vk::Result::eSuccess) {
-		printf("Failed to allocate the command buffers");
-		return false;
+		m_surfaceFormat = GetSurfaceFormat(m_physicalDevice, m_surface, requestedFormats, SizeOfArray(requestedFormats), requestedColorSpace);
 	}
 
-	for (uint i = 0; i < m_commandBuffers.size(); ++i) {
-		vk::CommandBufferBeginInfo commandBufferBeginInfo({}, nullptr);
-		m_commandBuffers[i].begin(commandBufferBeginInfo);
+	// Present mode
+	// FIFO is required by Vulkan spec
+	m_presentMode = vk::PresentModeKHR::eFifo;
+	m_frameCount = 2;
 
-		vk::RenderPassBeginInfo renderPassBeginInfo{};
-		renderPassBeginInfo.renderPass = m_renderPass;
-		renderPassBeginInfo.framebuffer = m_frameBuffers[i];
-		renderPassBeginInfo.renderArea = vk::Rect2D({0, 0}, m_swapchainExtent);
-		renderPassBeginInfo.clearValueCount = 0;
-		renderPassBeginInfo.pClearValues = nullptr;
+	// Create swapchain
+	CreateSwapChain(width, height);
+
+	// Create per frame data structures
+	{
+		for (uint32_t i = 0; i < m_frameCount; i++) {
+			// Create Command pool
+			{
+				vk::CommandPoolCreateInfo info;
+				info.flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer;
+				info.queueFamilyIndex = m_graphicsQueueFamilyIndex;
+
+				result = m_device.createCommandPool(&info, nullptr, &m_frameData[i].commandPool);
+				if (result != vk::Result::eSuccess) {
+					printf("Vulkan: Failed to create command pool. Error code: %d", result);
+					return false;
+				}
+			}
+			// Create command buffer
+			{
+				vk::CommandBufferAllocateInfo info;
+				info.commandPool = m_frameData[i].commandPool;
+				info.commandBufferCount = 1;
+				info.level = vk::CommandBufferLevel::ePrimary;
+
+				result = m_device.allocateCommandBuffers(&info, &m_frameData[i].commandBuffer);
+				if (result != vk::Result::eSuccess) {
+					printf("Vulkan: Failed to create command buffer. Error code: %d", result);
+					return false;
+				}
+			}
+			// Create fence
+			{
+				vk::FenceCreateInfo info;
+				info.flags = vk::FenceCreateFlagBits::eSignaled;
+
+				result = m_device.createFence(&info, nullptr, &m_frameData[i].fence);
+				if (result != vk::Result::eSuccess) {
+					printf("Vulkan: Failed to create fence. Error code: %d", result);
+					return false;
+				}
+			}
+			// Create semaphores
+			{
+				vk::SemaphoreCreateInfo info;
+
+				result = m_device.createSemaphore(&info, nullptr, &m_frameData[i].imageAcquired);
+				if (result != vk::Result::eSuccess) {
+					printf("Vulkan: Failed to create imageAcquired semaphore. Error code: %d", result);
+					return false;
+				}
+
+				result = m_device.createSemaphore(&info, nullptr, &m_frameData[i].imguiRenderCompleted);
+				if (result != vk::Result::eSuccess) {
+					printf("Vulkan: Failed to create renderCompleted semaphore. Error code: %d", result);
+					return false;
+				}
+			}
+		}
+	}
+
+	// Create the Render Pass
+	{
+		vk::AttachmentDescription attachment;
+		attachment.format = m_surfaceFormat.format;
+		attachment.samples = vk::SampleCountFlagBits::e1;
+		attachment.loadOp = vk::AttachmentLoadOp::eDontCare;
+		attachment.storeOp = vk::AttachmentStoreOp::eStore;
+		attachment.stencilLoadOp = vk::AttachmentLoadOp::eDontCare;
+		attachment.stencilStoreOp = vk::AttachmentStoreOp::eDontCare;
+		attachment.initialLayout = vk::ImageLayout::eUndefined;
+		attachment.finalLayout = vk::ImageLayout::ePresentSrcKHR;
+
+		vk::AttachmentReference colorAttachment;
+		colorAttachment.attachment = 0;
+		colorAttachment.layout = vk::ImageLayout::eColorAttachmentOptimal;
+
+		vk::SubpassDescription subpass;
+		subpass.pipelineBindPoint = vk::PipelineBindPoint::eGraphics;
+		subpass.colorAttachmentCount = 1;
+		subpass.pColorAttachments = &colorAttachment;
+
+		vk::SubpassDependency dependency;
+		dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+		dependency.dstSubpass = 0;
+		dependency.srcStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+		dependency.dstStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+		dependency.srcAccessMask = vk::AccessFlags();
+		dependency.dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
+
+		vk::RenderPassCreateInfo info;
+		info.attachmentCount = 1;
+		info.pAttachments = &attachment;
+		info.subpassCount = 1;
+		info.pSubpasses = &subpass;
+		info.dependencyCount = 1;
+		info.pDependencies = &dependency;
+
+		result = m_device.createRenderPass(&info, nullptr, &m_renderPass);
+		if (result != vk::Result::eSuccess) {
+			printf("Vulkan: Failed to create render pass. Error code: %d", result);
+			return false;
+		}
+	}
+
+	// Create the backbuffer Views
+	{
+		vk::ImageViewCreateInfo info;
+		info.viewType = vk::ImageViewType::e2D;
+		info.format = m_surfaceFormat.format;
+		info.components.r = vk::ComponentSwizzle::eR;
+		info.components.g = vk::ComponentSwizzle::eG;
+		info.components.b = vk::ComponentSwizzle::eB;
+		info.components.a = vk::ComponentSwizzle::eA;
+
+		vk::ImageSubresourceRange imageRange;
+		imageRange.aspectMask = vk::ImageAspectFlagBits::eColor;
+		imageRange.baseMipLevel = 0;
+		imageRange.levelCount = 1;
+		imageRange.baseArrayLayer = 0;
+		imageRange.layerCount = 1;
+
+		info.subresourceRange = imageRange;
+
+		for (uint32_t i = 0; i < m_frameCount; ++i) {
+			info.image = m_frameData[i].backbuffer;
+			result = m_device.createImageView(&info, nullptr, &m_frameData[i].backbufferView);
+			if (result != vk::Result::eSuccess) {
+				printf("Vulkan: Failed to create backbuffer image view. Error code: %d", result);
+				return false;
+			}
+		}
+	}
+
+	// Create Framebuffer
+	{
+		vk::FramebufferCreateInfo info;
+		info.renderPass = m_renderPass;
+		info.attachmentCount = 1;
+		// info.pAttachements is set in the for loop below
+		info.width = width;
+		info.height = height;
+		info.layers = 1;
 		
-		m_commandBuffers[i].beginRenderPass(&renderPassBeginInfo, vk::SubpassContents::eInline);
-		m_commandBuffers[i].bindPipeline(vk::PipelineBindPoint::eGraphics, m_mainPipeline);
+		for (uint32_t i = 0; i < m_frameCount; i++) {
+			info.pAttachments = &m_frameData[i].backbufferView;
+			result = m_device.createFramebuffer(&info, nullptr, &m_frameData[i].frameBuffer);
+			if (result != vk::Result::eSuccess) {
+				printf("Vulkan: Failed to create framebuffer. Error code: %d", result);
+				return false;
+			}
+		}
+	}
 
-		// Transition image to Transfer Dest Optimal 
-		vk::ImageMemoryBarrier imageToTransferSrc(
-			(vk::AccessFlagBits)0,                   // srcAccessMask 
-			vk::AccessFlagBits::eTransferWrite,      // dstAccessMask 
-			vk::ImageLayout::eUndefined,             // oldLayout 
-			vk::ImageLayout::eTransferDstOptimal,    // newLayout 
-			VK_QUEUE_FAMILY_IGNORED,                 // srcQueueFamilyIndex 
-			VK_QUEUE_FAMILY_IGNORED,                 // dstQueueFamilyIndex 
-			m_swapChainImages[i],                    // image 
-			vk::ImageSubresourceRange(               // subresourceRange 
-				vk::ImageAspectFlagBits::eColor,     // aspectMask 
-				0,                                   // baseMipLevel 
-				1,                                   // levelCount 
-				0,                                   // baseArrayLayer 
-				1                                    // layerCount 
-			)
-		);
-		m_commandBuffers[i].pipelineBarrier(
-			vk::PipelineStageFlagBits::eTopOfPipe,    // srcStageMask 
-			vk::PipelineStageFlagBits::eTransfer,     // dstStageMask 
-			vk::DependencyFlagBits(),                 // dependencyFlags 
-			0,                                        // memoryBarrierCount 
-			nullptr,                                  // pMemoryBarriers 
-			0,                                        // bufferMemoryBarrierCount 
-			nullptr,                                  // pBufferMemoryBarriers 
-			1,                                        // imageMemoryBarrierCount 
-			&imageToTransferSrc                       // pImageMemoryBarriers 
-		);
+	m_frameIndex = 0;
 
-		vk::ImageBlit blitRegion{};
-		blitRegion.srcSubresource.aspectMask = vk::ImageAspectFlagBits::eColor;
-		blitRegion.srcSubresource.layerCount = 1;
-		blitRegion.srcOffsets[1] = vk::Offset3D(m_swapchainExtent.width, m_swapchainExtent.height, 1);
-		blitRegion.dstSubresource.aspectMask = vk::ImageAspectFlagBits::eColor;
-		blitRegion.dstSubresource.layerCount = 1;
-		blitRegion.dstOffsets[1] = vk::Offset3D(m_swapchainExtent.width, m_swapchainExtent.height, 1);
-		m_commandBuffers[i].blitImage(m_stagingImage[i], vk::ImageLayout::eTransferSrcOptimal, m_swapChainImages[i], vk::ImageLayout::eTransferDstOptimal, 1, &blitRegion, vk::Filter::eLinear);
+	return true;
+}
 
-		// Transition image to ePresentSrcKHR 
-		vk::ImageMemoryBarrier imageToShaderRead(
-			vk::AccessFlagBits::eTransferWrite,         // srcAccessMask 
-			vk::AccessFlagBits::eMemoryRead,            // dstAccessMask 
-			vk::ImageLayout::eTransferDstOptimal,       // oldLayout 
-			vk::ImageLayout::ePresentSrcKHR,            // newLayout 
-			VK_QUEUE_FAMILY_IGNORED,                    // srcQueueFamilyIndex 
-			VK_QUEUE_FAMILY_IGNORED,                    // dstQueueFamilyIndex 
-			m_swapChainImages[i],                       // image 
-			vk::ImageSubresourceRange(                  // subresourceRange 
-				vk::ImageAspectFlagBits::eColor,        // aspectMask 
-				0,                                      // baseMipLevel 
-				1,                                      // levelCount 
-				0,                                      // baseArrayLayer 
-				1                                       // layerCount 
-			)
-		);
-		m_commandBuffers[i].pipelineBarrier(
-			vk::PipelineStageFlagBits::eTransfer,          // srcStageMask 
-			vk::PipelineStageFlagBits::eBottomOfPipe,      // dstStageMask 
-			vk::DependencyFlagBits(),                      // dependencyFlags 
-			0,                                             // memoryBarrierCount 
-			nullptr,                                       // pMemoryBarriers 
-			0,                                             // bufferMemoryBarrierCount 
-			nullptr,                                       // pBufferMemoryBarriers 
-			1,                                             // imageMemoryBarrierCount 
-			&imageToShaderRead                             // pImageMemoryBarriers 
-		);
+static int GetMinImageCount(vk::PresentModeKHR mode) {
+	if (mode == vk::PresentModeKHR::eMailbox)
+		return 3;
+	if (mode == vk::PresentModeKHR::eFifo || mode == vk::PresentModeKHR::eFifoRelaxed)
+		return 2;
+	if (mode == vk::PresentModeKHR::eImmediate)
+		return 1;
+	assert(false);
+	return 1;
+}
 
-		m_commandBuffers[i].endRenderPass();
+bool Visualizer::CreateSwapChain(int width, int height) {
+	vk::SwapchainKHR oldSwapchain = m_swapchain;
 
-		if (m_commandBuffers[i].end() != vk::Result::eSuccess) {
-			printf("Failed to record command buffer");
+	vk::SwapchainCreateInfoKHR info;
+	info.surface = m_surface;
+	info.minImageCount = GetMinImageCount(m_presentMode);
+	info.imageFormat = m_surfaceFormat.format;
+	info.imageColorSpace = m_surfaceFormat.colorSpace;
+	info.imageArrayLayers = 1;
+	info.imageUsage = vk::ImageUsageFlagBits::eColorAttachment;
+	info.imageSharingMode = vk::SharingMode::eExclusive;
+	info.preTransform = vk::SurfaceTransformFlagBitsKHR::eIdentity;
+	info.compositeAlpha = vk::CompositeAlphaFlagBitsKHR::eOpaque;
+	info.presentMode = m_presentMode;
+	info.clipped = VK_TRUE;
+	info.oldSwapchain = m_swapchain;
+
+	vk::SurfaceCapabilitiesKHR capabilities;
+	vk::Result result = m_physicalDevice.getSurfaceCapabilitiesKHR(m_surface, &capabilities);
+	if (result != vk::Result::eSuccess) {
+		printf("Vulkan: Failed to fetch surface capabilities. Error code: %d", result);
+		return false;
+	}
+
+	if (info.minImageCount < capabilities.minImageCount) {
+		info.minImageCount = capabilities.minImageCount;
+	} else if (capabilities.maxImageCount != 0 && info.minImageCount > capabilities.maxImageCount) {
+		info.minImageCount = capabilities.maxImageCount;
+	}
+
+	if (capabilities.currentExtent.width == 0xffffffff) {
+		info.imageExtent.width = width;
+		info.imageExtent.height = height;
+	} else {
+		info.imageExtent.width = capabilities.currentExtent.width;
+		info.imageExtent.height = capabilities.currentExtent.height;
+	}
+
+	m_swapchainExtent = info.imageExtent;
+
+	result = m_device.createSwapchainKHR(&info, nullptr, &m_swapchain);
+	if (result != vk::Result::eSuccess) {
+		printf("Vulkan: Failed to create swapchain. Error code: %d", result);
+		return false;
+	}
+
+	result = m_device.getSwapchainImagesKHR(m_swapchain, &m_frameCount, nullptr);
+	if (result != vk::Result::eSuccess) {
+		printf("Vulkan: Failed to get swapchain image count. Error code: %d", result);
+		return false;
+	}
+
+	m_frameData = new FrameData[m_frameCount];
+
+	auto resultValue = m_device.getSwapchainImagesKHR(m_swapchain);
+	if (resultValue.result != vk::Result::eSuccess) {
+		printf("Vulkan: Failed to get swapchain images. Error code: %d", resultValue.result);
+		return false;
+	}
+	for (uint32_t i = 0; i < m_frameCount; ++i) {
+		m_frameData[i].backbuffer = resultValue.value[i];
+	}
+
+	if (oldSwapchain) {
+		m_device.destroySwapchainKHR(oldSwapchain, nullptr);
+	}
+
+	return true;
+}
+
+bool Visualizer::RenderImGui(vk::Semaphore *imageAcquiredSemaphore) {
+	vk::Result result;
+
+	FrameData *frame = &m_frameData[m_frameIndex];
+	{
+		result = m_device.waitForFences(1, &frame->fence, VK_TRUE, UINT64_MAX);
+		if (result != vk::Result::eSuccess) {
+			printf("Vulkan: Failed to wait for fence. Error code: %d", result);
+			return false;
+		}
+
+		result = m_device.resetFences(1, &frame->fence);
+		if (result != vk::Result::eSuccess) {
+			printf("Vulkan: Failed to wait for fence. Error code: %d", result);
+			return false;
+		}
+	}
+	{
+		result = m_device.resetCommandPool(frame->commandPool, {});
+		if (result != vk::Result::eSuccess) {
+			printf("Vulkan: Failed to reset command pool. Error code: %d", result);
+			return false;
+		}
+
+		vk::CommandBufferBeginInfo beginInfo;
+		beginInfo.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit;
+
+		result = frame->commandBuffer.begin(&beginInfo);
+		if (result != vk::Result::eSuccess) {
+			printf("Vulkan: Failed to begin command buffer. Error code: %d", result);
+			return false;
+		}
+	}
+	{
+		vk::RenderPassBeginInfo beginInfo;
+		beginInfo.renderPass = m_renderPass;
+		beginInfo.framebuffer = frame->frameBuffer;
+		beginInfo.renderArea.extent = m_swapchainExtent;
+		beginInfo.clearValueCount = 0;
+		beginInfo.pClearValues = nullptr;
+
+		frame->commandBuffer.beginRenderPass(&beginInfo, vk::SubpassContents::eInline);
+	}
+
+	// Record Imgui Draw Data and draw funcs into command buffer
+	ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), (VkCommandBuffer)frame->commandBuffer);
+
+	// Submit command buffer
+	frame->commandBuffer.endRenderPass();
+	{
+		vk::PipelineStageFlags waitStage = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+
+		vk::SubmitInfo info;
+		info.waitSemaphoreCount = 1;
+		info.pWaitSemaphores = imageAcquiredSemaphore;
+		info.pWaitDstStageMask = &waitStage;
+		info.commandBufferCount = 1;
+		info.pCommandBuffers = &frame->commandBuffer;
+		info.signalSemaphoreCount = 1;
+		info.pSignalSemaphores = &frame->imguiRenderCompleted;
+
+		result = frame->commandBuffer.end();
+		if (result != vk::Result::eSuccess) {
+			printf("Vulkan: Failed to end command buffer. Error code: %d", result);
+			return false;
+		}
+
+		m_graphicsQueue.submit(1, &info, frame->fence);
+		if (result != vk::Result::eSuccess) {
+			printf("Vulkan: Failed to submit command buffer. Error code: %d", result);
 			return false;
 		}
 	}
