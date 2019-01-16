@@ -4,9 +4,9 @@
 * Copyright Adrian Astley 2015 - 2016
 */
 
-#include "renderer/renderer.h"
+#include "integrator/integrator.h"
 
-#include "renderer/surface_interaction.h"
+#include "integrator/surface_interaction.h"
 
 #include "scene/scene.h"
 
@@ -25,7 +25,7 @@
 
 namespace Lantern {
 
-void Renderer::RenderFrame() {
+void Integrator::RenderFrame() {
 	uint width = m_scene->Camera->FrameBufferWidth;
 	uint height = m_scene->Camera->FrameBufferHeight;
 
@@ -72,7 +72,7 @@ inline uint HashFinalize(uint hash) {
 	return hash;
 }
 
-void Renderer::RenderTile(uint index, uint width, uint height, uint numTilesX, uint numTilesY) const {
+void Integrator::RenderTile(uint index, uint width, uint height, uint numTilesX, uint numTilesY) const {
 	uint tileY = index / numTilesX;
 	uint tileX = index - tileY * numTilesX;
 
@@ -95,7 +95,7 @@ void Renderer::RenderTile(uint index, uint width, uint height, uint numTilesX, u
 	}
 }
 
-void Renderer::RenderPixel(uint x, uint y, UniformSampler *sampler) const {
+void Integrator::RenderPixel(uint x, uint y, UniformSampler *sampler) const {
 	RTC_ALIGN(16) RTCRayHit rayHit;
 	rayHit.ray = m_scene->Camera->CalculateRayFromPixel(x, y, sampler);
 	rayHit.hit.geomID = RTC_INVALID_GEOMETRY_ID;
@@ -249,7 +249,7 @@ void Renderer::RenderPixel(uint x, uint y, UniformSampler *sampler) const {
 	m_currentFrameBuffer->Weights[index] += 1.0f;
 }
 
-float3 Renderer::SampleOneLight(UniformSampler *sampler, SurfaceInteraction interaction, BSDF *bsdf, Light *hitLight) const {
+float3 Integrator::SampleOneLight(UniformSampler *sampler, SurfaceInteraction interaction, BSDF *bsdf, Light *hitLight) const {
 	std::size_t numLights = m_scene->NumLights();
 	
 	// Return black if there are no lights
@@ -270,7 +270,7 @@ float3 Renderer::SampleOneLight(UniformSampler *sampler, SurfaceInteraction inte
 	return (float)numLights * EstimateDirect(light, sampler, interaction, bsdf);
 }
 
-float3 Renderer::EstimateDirect(Light *light, UniformSampler *sampler, SurfaceInteraction &interaction, BSDF *bsdf) const {
+float3 Integrator::EstimateDirect(Light *light, UniformSampler *sampler, SurfaceInteraction &interaction, BSDF *bsdf) const {
 	float3 directLighting = float3(0.0f);
 	float3 f;
 	float lightPdf, scatteringPdf;

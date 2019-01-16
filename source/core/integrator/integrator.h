@@ -21,9 +21,9 @@ class Scene;
 class Light;
 class FrameBuffer;
 
-class Renderer {
+class Integrator {
 public:
-	Renderer(Scene *scene, FrameBuffer *currentFrameBuffer, std::atomic<FrameBuffer *> *swapFrameBuffer)
+	Integrator(Scene *scene, FrameBuffer *currentFrameBuffer, std::atomic<FrameBuffer *> *swapFrameBuffer)
 		: m_scene(scene),
 	      m_currentFrameBuffer(currentFrameBuffer),
 	      m_swapFrameBuffer(swapFrameBuffer),

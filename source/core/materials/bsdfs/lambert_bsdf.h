@@ -9,7 +9,7 @@
 #include "materials/bsdfs/bsdf.h"
 #include "materials/textures/texture.h"
 
-#include "renderer/surface_interaction.h"
+#include "integrator/surface_interaction.h"
 
 #include "math/sampling.h"
 

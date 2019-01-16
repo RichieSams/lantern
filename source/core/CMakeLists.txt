@@ -78,11 +78,11 @@ SetSourceGroup(NAME "Materials/Media"
 	             materials/media/isotropic_scattering_medium.h
 )
 
-SetSourceGroup(NAME Renderer
+SetSourceGroup(NAME Integrator
 	PREFIX LANTERN_CORE
-	SOURCE_FILES renderer/renderer.h
-	             renderer/renderer.cpp
-	             renderer/surface_interaction.h
+	SOURCE_FILES integrator/integrator.h
+	             integrator/integrator.cpp
+	             integrator/surface_interaction.h
 )
 
 SetSourceGroup(NAME Visualizer
@@ -103,7 +103,7 @@ set(LANTERN_CORE_SRC
 	${LANTERN_CORE_MATERIALS_BSDFS}
 	${LANTERN_CORE_MATERIALS_MEDIA}
 	${LANTERN_CORE_MATERIALS_TEXTURES}
-	${LANTERN_CORE_RENDERER}
+	${LANTERN_CORE_INTEGRATOR}
 	${LANTERN_CORE_VISUALIZER}
 	${LANTERN_CORE_VISUALIZER_SHADERS}
 )

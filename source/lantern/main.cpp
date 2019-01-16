@@ -8,7 +8,7 @@
 
 #include "visualizer/visualizer.h"
 
-#include "renderer/renderer.h"
+#include "integrator/integrator.h"
 
 #include "argparse.h"
 
@@ -62,7 +62,7 @@ int main(int argc, const char *argv[]) {
 	};
 	std::atomic<Lantern::FrameBuffer *> swapBuffer(&transferFrames[1]);
 
-	Lantern::Renderer renderer(&scene, &transferFrames[0], &swapBuffer);
+	Lantern::Integrator integrator(&scene, &transferFrames[0], &swapBuffer);
 	Lantern::Visualizer visualizer(&scene, &transferFrames[2], &swapBuffer);
 	if (!visualizer.Init(scene.Camera->FrameBufferWidth, scene.Camera->FrameBufferHeight)) {
 		return 1;
@@ -70,11 +70,11 @@ int main(int argc, const char *argv[]) {
 	
 	std::atomic_bool quit(false);
 	std::thread rendererThread(
-		[](Lantern::Renderer *renderer, std::atomic_bool *quit) {
+		[](Lantern::Integrator *integrator, std::atomic_bool *quit) {
 			while (!quit->load(std::memory_order_relaxed)) {
-				renderer->RenderFrame();
+				integrator->RenderFrame();
 			}
-	}, &renderer, &quit);
+	}, &integrator, &quit);
 
 	visualizer.Run();
 	visualizer.Shutdown();

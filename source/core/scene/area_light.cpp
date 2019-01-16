@@ -10,7 +10,7 @@
 
 #include "math/sampling.h"
 
-#include "renderer/surface_interaction.h"
+#include "integrator/surface_interaction.h"
 
 
 namespace Lantern {

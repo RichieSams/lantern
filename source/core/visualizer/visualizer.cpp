@@ -6,7 +6,7 @@
 
 #include "visualizer/visualizer.h"
 
-#include "renderer/renderer.h"
+#include "integrator/integrator.h"
 
 #include "scene/scene.h"
 
