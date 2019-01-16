@@ -62,23 +62,23 @@ int main(int argc, const char *argv[]) {
 	};
 	std::atomic<Lantern::FrameBuffer *> swapBuffer(&transferFrames[1]);
 
-//	Lantern::Renderer renderer(&scene, &transferFrames[0], &swapBuffer);
+	Lantern::Renderer renderer(&scene, &transferFrames[0], &swapBuffer);
 	Lantern::Visualizer visualizer(&scene, &transferFrames[2], &swapBuffer);
 	if (!visualizer.Init(scene.Camera->FrameBufferWidth, scene.Camera->FrameBufferHeight)) {
 		return 1;
 	}
 	
-//	std::atomic_bool quit(false);
-//	std::thread rendererThread(
-//		[](Lantern::Renderer *renderer, std::atomic_bool *quit) {
-//			while (!quit->load(std::memory_order_relaxed)) {
-//				renderer->RenderFrame();
-//			}
-//	}, &renderer, &quit);
+	std::atomic_bool quit(false);
+	std::thread rendererThread(
+		[](Lantern::Renderer *renderer, std::atomic_bool *quit) {
+			while (!quit->load(std::memory_order_relaxed)) {
+				renderer->RenderFrame();
+			}
+	}, &renderer, &quit);
 
 	visualizer.Run();
 	visualizer.Shutdown();
-//
-//	quit.store(true);
-//	rendererThread.join();
+
+	quit.store(true);
+	rendererThread.join();
 }

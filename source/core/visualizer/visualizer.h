@@ -68,13 +68,18 @@ private:
 		vk::CommandPool commandPool;
 		vk::CommandBuffer commandBuffer;
 
-		vk::Fence fence;
+		vk::Fence submitFinished;
+
 		vk::Semaphore imageAcquired;
 		vk::Semaphore imguiRenderCompleted;
 
 		vk::Image backbuffer;
 		vk::ImageView backbufferView;
 		vk::Framebuffer frameBuffer;
+
+		vk::Image stagingImage;
+		VmaAllocation stagingBufferAllocation;
+		VmaAllocationInfo stagingBufferAllocInfo;
 	};
 	FrameData *m_frameData;
 
@@ -86,11 +91,8 @@ private:
 	vk::PipelineLayout m_mainPipelineLayout;
 	vk::Pipeline m_mainPipeline;
 
-	vk::RenderPass m_renderPass;
-
-	std::vector<vk::Image> m_stagingImage;
-	std::vector<VmaAllocation> m_stagingBufferAllocation;
-	std::vector<VmaAllocationInfo> m_stagingBufferAllocInfo;
+	vk::RenderPass m_mainRenderPass;
+	vk::RenderPass m_imguiRenderPass;
 
 public:
 	bool Init(int width, int height);
@@ -105,7 +107,9 @@ public:
 
 private:
 	bool RenderFrame();
-	bool RenderImGui(vk::Semaphore *imageAcquiredSemaphore);
+
+	bool RenderImage(FrameData *frame);
+	bool RenderImGui(FrameData *frame);
 
 	bool InitVulkan();
 	bool InitVulkanWindow(int width, int height);
