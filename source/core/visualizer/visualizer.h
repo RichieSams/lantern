@@ -94,6 +94,12 @@ private:
 	vk::RenderPass m_mainRenderPass;
 	vk::RenderPass m_imguiRenderPass;
 
+	uint m_cumulativeFrameCounter;
+	double m_cumulativeFrameTime;
+
+	double m_frameTime;
+	uint m_fps;
+
 public:
 	bool Init(int width, int height);
 	void Run();

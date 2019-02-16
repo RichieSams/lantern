@@ -72,9 +72,6 @@ static void ErrorCallback(int error, const char *description) {
 }
 
 void Visualizer::Run() {
-	auto lastRender = std::chrono::high_resolution_clock::now();
-	auto startTime = lastRender;
-
 	while (!glfwWindowShouldClose(m_window)) {
 		glfwPollEvents();
 		
@@ -223,6 +220,11 @@ bool Visualizer::Init(int width, int height) {
 		ImGui_ImplVulkan_InvalidateFontUploadObjects();
 	}
 
+	m_frameTime = 0.0;
+	m_fps = 0;
+	m_cumulativeFrameCounter = 0;
+	m_cumulativeFrameTime = 0.0;
+
 	return true;
 }
 
@@ -262,14 +264,17 @@ void Visualizer::Shutdown() {
 }
 
 bool Visualizer::RenderFrame() {
+	auto start = std::chrono::high_resolution_clock::now();
+
 	// Start the Dear ImGui frame
 	ImGui_ImplVulkan_NewFrame();
 	ImGui_ImplGlfw_NewFrame();
 	ImGui::NewFrame();
 
-	// 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
-	ImGui::ShowDemoWindow();
-
+	ImGui::SetNextWindowPos(ImVec2(0, 0));
+	ImGui::Begin("Visualizer Stats", nullptr, ImVec2(0, 0), -1, ImGuiWindowFlags_AlwaysAutoResize);
+	ImGui::Text("%.1f ms/frame (%u FPS)", m_frameTime, m_fps);
+	ImGui::End();
 
 	// Rendering
 
@@ -403,6 +408,19 @@ bool Visualizer::RenderFrame() {
 	if (result != vk::Result::eSuccess) {
 		printf("Vulkan: Failed to present. Error code: %d", result);
 		return false;
+	}
+
+	auto end = std::chrono::high_resolution_clock::now();
+	auto diff = std::chrono::duration<double, std::milli>(end - start).count();
+	++m_cumulativeFrameCounter;
+	m_cumulativeFrameTime += diff;
+
+	if (m_cumulativeFrameTime >= 250.0) {
+		m_frameTime = m_cumulativeFrameTime / (double)m_cumulativeFrameCounter;
+		m_fps = m_cumulativeFrameCounter * 4;
+
+		m_cumulativeFrameCounter = 0;
+		m_cumulativeFrameTime = 0.0;
 	}
 
 	return true;
