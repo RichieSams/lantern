@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2005-2016 Intel Corporation
+    Copyright (c) 2005-2018 Intel Corporation
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -58,3 +58,16 @@ namespace std {
 #define __TBB_NO_IMPLICIT_LINKAGE 1
 #endif
 
+#if _MSC_VER
+    #if !__TBB_NO_IMPLICIT_LINKAGE
+        #ifdef __TBB_LIB_NAME
+	        #pragma comment(lib, __TBB_STRING(__TBB_LIB_NAME))
+        #else
+			#ifdef _DEBUG
+				#pragma comment(lib, "tbb_debug.lib")
+			#else
+				#pragma comment(lib, "tbb.lib")
+			#endif
+        #endif
+    #endif
+#endif

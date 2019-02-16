@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2005-2016 Intel Corporation
+    Copyright (c) 2005-2018 Intel Corporation
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -32,7 +32,7 @@
 #include <stdarg.h>
 #include <string.h>
 
-#define INTEL_NO_MACRO_BODY 
+#define INTEL_NO_MACRO_BODY
 #define INTEL_ITTNOTIFY_API_PRIVATE
 #include "ittnotify.h"
 #include "legacy/ittnotify.h"
@@ -260,20 +260,24 @@ ITT_EXTERN_C void _N_(error_handler)(__itt_error_code, va_list args);
 #pragma warning(disable: 4055) /* warning C4055: 'type cast' : from data pointer 'void *' to function pointer 'XXX' */
 #endif /* ITT_PLATFORM==ITT_PLATFORM_WIN */
 
-static void __itt_report_error(__itt_error_code code, ...)
-{
+static void __itt_report_error_impl(int code, ...) {
     va_list args;
     va_start(args, code);
     if (_N_(_ittapi_global).error_handler != NULL)
     {
         __itt_error_handler_t* handler = (__itt_error_handler_t*)(size_t)_N_(_ittapi_global).error_handler;
-        handler(code, args);
+        handler((__itt_error_code)code, args);
     }
 #ifdef ITT_NOTIFY_EXT_REPORT
     _N_(error_handler)(code, args);
 #endif /* ITT_NOTIFY_EXT_REPORT */
     va_end(args);
 }
+
+//va_start cannot take enum (__itt_error_code) on clang, so it is necessary to transform it to int
+#define __itt_report_error(code, ...) \
+                __itt_report_error_impl((int)code,__VA_ARGS__)
+
 
 #if ITT_PLATFORM==ITT_PLATFORM_WIN
 #pragma warning(pop)
@@ -374,7 +378,7 @@ static __itt_string_handle* ITTAPI ITT_VERSIONIZE(ITT_JOIN(_N_(string_handle_cre
     {
         if (h->strW != NULL && !wcscmp(h->strW, name)) break;
     }
-    if (h == NULL) 
+    if (h == NULL)
     {
         NEW_STRING_HANDLE_W(&_N_(_ittapi_global),h,h_tail,name);
     }
@@ -936,6 +940,7 @@ ITT_EXTERN_C int _N_(init_ittlib)(const char* lib_name, __itt_group_id init_grou
                         switch (lib_version) {
                         case 0:
                             groups = __itt_group_legacy;
+                            /* Falls through */
                         case 1:
                             /* Fill all pointers from dynamic library */
                             for (i = 0; _N_(_ittapi_global).api_list_ptr[i].name != NULL; i++)
@@ -989,14 +994,12 @@ ITT_EXTERN_C int _N_(init_ittlib)(const char* lib_name, __itt_group_id init_grou
                     else
                     {
                         __itt_nullify_all_pointers();
-
-                        __itt_report_error(__itt_error_no_module, lib_name,
 #if ITT_PLATFORM==ITT_PLATFORM_WIN
-                            __itt_system_error()
+                        int error = __itt_system_error();
 #else  /* ITT_PLATFORM==ITT_PLATFORM_WIN */
-                            dlerror()
+                        const char* error = dlerror();
 #endif /* ITT_PLATFORM==ITT_PLATFORM_WIN */
-                        );
+                        __itt_report_error(__itt_error_no_module, lib_name, error);
                     }
                 }
                 else

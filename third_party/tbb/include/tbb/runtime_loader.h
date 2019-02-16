@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2005-2016 Intel Corporation
+    Copyright (c) 2005-2018 Intel Corporation
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -27,6 +27,18 @@
 
 #include "tbb_stddef.h"
 #include <climits>
+
+#if _MSC_VER
+    #if ! __TBB_NO_IMPLICIT_LINKAGE
+        #ifdef _DEBUG
+            #pragma comment( linker, "/nodefaultlib:tbb_debug.lib" )
+            #pragma comment( linker, "/defaultlib:tbbproxy_debug.lib" )
+        #else
+            #pragma comment( linker, "/nodefaultlib:tbb.lib" )
+            #pragma comment( linker, "/defaultlib:tbbproxy.lib" )
+        #endif
+    #endif
+#endif
 
 namespace tbb {
 

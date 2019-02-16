@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2005-2016 Intel Corporation
+    Copyright (c) 2005-2018 Intel Corporation
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -44,22 +44,6 @@ protected:
 
     concurrent_unordered_map_traits() : my_hash_compare() {}
     concurrent_unordered_map_traits(const hash_compare& hc) : my_hash_compare(hc) {}
-
-    class value_compare : public std::binary_function<value_type, value_type, bool>
-    {
-        friend class concurrent_unordered_map_traits<Key, T, Hash_compare, Allocator, Allow_multimapping>;
-
-    public:
-        bool operator()(const value_type& left, const value_type& right) const
-        {
-            return (my_hash_compare(left.first, right.first));
-        }
-
-        value_compare(const hash_compare& comparator) : my_hash_compare(comparator) {}
-
-    protected:
-        hash_compare my_hash_compare;    // the comparator predicate for keys
-    };
 
     template<class Type1, class Type2>
     static const Key& get_key(const std::pair<Type1, Type2>& value) {
@@ -112,19 +96,42 @@ public:
 
     // Construction/destruction/copying
     explicit concurrent_unordered_map(size_type n_of_buckets = base_type::initial_bucket_number,
-        const hasher& _Hasher = hasher(), const key_equal& _Key_equality = key_equal(),
+        const hasher& a_hasher = hasher(), const key_equal& a_keyeq = key_equal(),
         const allocator_type& a = allocator_type())
-        : base_type(n_of_buckets, key_compare(_Hasher, _Key_equality), a)
+        : base_type(n_of_buckets, key_compare(a_hasher, a_keyeq), a)
     {}
 
-    concurrent_unordered_map(const Allocator& a) : base_type(base_type::initial_bucket_number, key_compare(), a)
+    concurrent_unordered_map(size_type n_of_buckets, const allocator_type& a)
+        : base_type(n_of_buckets, key_compare(hasher(), key_equal()), a)
+    {}
+
+    concurrent_unordered_map(size_type n_of_buckets, const hasher& a_hasher, const allocator_type& a)
+        : base_type(n_of_buckets, key_compare(a_hasher, key_equal()), a)
+    {}
+
+    explicit concurrent_unordered_map(const Allocator& a) : base_type(base_type::initial_bucket_number, key_compare(), a)
     {}
 
     template <typename Iterator>
     concurrent_unordered_map(Iterator first, Iterator last, size_type n_of_buckets = base_type::initial_bucket_number,
-        const hasher& _Hasher = hasher(), const key_equal& _Key_equality = key_equal(),
+        const hasher& a_hasher = hasher(), const key_equal& a_keyeq = key_equal(),
         const allocator_type& a = allocator_type())
-        : base_type(n_of_buckets, key_compare(_Hasher, _Key_equality), a)
+        : base_type(n_of_buckets, key_compare(a_hasher, a_keyeq), a)
+    {
+        insert(first, last);
+    }
+
+    template <typename Iterator>
+    concurrent_unordered_map(Iterator first, Iterator last, size_type n_of_buckets, const allocator_type& a)
+        : base_type(n_of_buckets, key_compare(hasher(), key_equal()), a)
+    {
+        insert(first, last);
+    }
+
+    template <typename Iterator>
+    concurrent_unordered_map(Iterator first, Iterator last, size_type n_of_buckets, const hasher& a_hasher,
+        const allocator_type& a)
+        : base_type(n_of_buckets, key_compare(a_hasher, key_equal()), a)
     {
         insert(first, last);
     }
@@ -132,12 +139,26 @@ public:
 #if __TBB_INITIALIZER_LISTS_PRESENT
     //! Constructor from initializer_list
     concurrent_unordered_map(std::initializer_list<value_type> il, size_type n_of_buckets = base_type::initial_bucket_number,
-        const hasher& _Hasher = hasher(), const key_equal& _Key_equality = key_equal(),
+        const hasher& a_hasher = hasher(), const key_equal& a_keyeq = key_equal(),
         const allocator_type& a = allocator_type())
-        : base_type(n_of_buckets, key_compare(_Hasher, _Key_equality), a)
+        : base_type(n_of_buckets, key_compare(a_hasher, a_keyeq), a)
     {
-        this->insert(il.begin(),il.end());
+        insert(il.begin(),il.end());
     }
+
+    concurrent_unordered_map(std::initializer_list<value_type> il, size_type n_of_buckets, const allocator_type& a)
+        : base_type(n_of_buckets, key_compare(hasher(), key_equal()), a)
+    {
+        insert(il.begin(), il.end());
+    }
+
+    concurrent_unordered_map(std::initializer_list<value_type> il, size_type n_of_buckets, const hasher& a_hasher,
+        const allocator_type& a)
+        : base_type(n_of_buckets, key_compare(a_hasher, key_equal()), a)
+    {
+        insert(il.begin(), il.end());
+    }
+
 #endif //# __TBB_INITIALIZER_LISTS_PRESENT
 
 #if __TBB_CPP11_RVALUE_REF_PRESENT
@@ -248,19 +269,42 @@ public:
 
     // Construction/destruction/copying
     explicit concurrent_unordered_multimap(size_type n_of_buckets = base_type::initial_bucket_number,
-        const hasher& _Hasher = hasher(), const key_equal& _Key_equality = key_equal(),
+        const hasher& a_hasher = hasher(), const key_equal& a_keyeq = key_equal(),
         const allocator_type& a = allocator_type())
-        : base_type(n_of_buckets, key_compare(_Hasher, _Key_equality), a)
+        : base_type(n_of_buckets, key_compare(a_hasher, a_keyeq), a)
     {}
 
-    concurrent_unordered_multimap(const Allocator& a) : base_type(base_type::initial_bucket_number, key_compare(), a)
+    concurrent_unordered_multimap(size_type n_of_buckets, const allocator_type& a)
+        : base_type(n_of_buckets, key_compare(hasher(), key_equal()), a)
+    {}
+
+    concurrent_unordered_multimap(size_type n_of_buckets, const hasher& a_hasher, const allocator_type& a)
+        : base_type(n_of_buckets, key_compare(a_hasher, key_equal()), a)
+    {}
+
+    explicit concurrent_unordered_multimap(const Allocator& a) : base_type(base_type::initial_bucket_number, key_compare(), a)
     {}
 
     template <typename Iterator>
     concurrent_unordered_multimap(Iterator first, Iterator last, size_type n_of_buckets = base_type::initial_bucket_number,
-        const hasher& _Hasher = hasher(), const key_equal& _Key_equality = key_equal(),
+        const hasher& a_hasher = hasher(), const key_equal& a_keyeq = key_equal(),
         const allocator_type& a = allocator_type())
-        : base_type(n_of_buckets,key_compare(_Hasher,_Key_equality), a)
+        : base_type(n_of_buckets,key_compare(a_hasher,a_keyeq), a)
+    {
+        insert(first, last);
+    }
+
+    template <typename Iterator>
+    concurrent_unordered_multimap(Iterator first, Iterator last, size_type n_of_buckets, const allocator_type& a)
+        : base_type(n_of_buckets, key_compare(hasher(), key_equal()), a)
+    {
+        insert(first, last);
+    }
+
+    template <typename Iterator>
+    concurrent_unordered_multimap(Iterator first, Iterator last, size_type n_of_buckets, const hasher& a_hasher,
+        const allocator_type& a)
+        : base_type(n_of_buckets, key_compare(a_hasher, key_equal()), a)
     {
         insert(first, last);
     }
@@ -268,12 +312,26 @@ public:
 #if __TBB_INITIALIZER_LISTS_PRESENT
     //! Constructor from initializer_list
     concurrent_unordered_multimap(std::initializer_list<value_type> il, size_type n_of_buckets = base_type::initial_bucket_number,
-        const hasher& _Hasher = hasher(), const key_equal& _Key_equality = key_equal(),
+        const hasher& a_hasher = hasher(), const key_equal& a_keyeq = key_equal(),
         const allocator_type& a = allocator_type())
-        : base_type(n_of_buckets, key_compare(_Hasher, _Key_equality), a)
+        : base_type(n_of_buckets, key_compare(a_hasher, a_keyeq), a)
     {
-        this->insert(il.begin(),il.end());
+        insert(il.begin(),il.end());
     }
+
+    concurrent_unordered_multimap(std::initializer_list<value_type> il, size_type n_of_buckets, const allocator_type& a)
+        : base_type(n_of_buckets, key_compare(hasher(), key_equal()), a)
+    {
+        insert(il.begin(), il.end());
+    }
+
+    concurrent_unordered_multimap(std::initializer_list<value_type> il, size_type n_of_buckets, const hasher& a_hasher,
+        const allocator_type& a)
+        : base_type(n_of_buckets, key_compare(a_hasher, key_equal()), a)
+    {
+        insert(il.begin(), il.end());
+    }
+
 #endif //# __TBB_INITIALIZER_LISTS_PRESENT
 
 #if __TBB_CPP11_RVALUE_REF_PRESENT
