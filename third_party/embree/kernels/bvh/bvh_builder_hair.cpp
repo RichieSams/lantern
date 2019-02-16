@@ -17,17 +17,18 @@
 #include "../builders/bvh_builder_hair.h"
 #include "../builders/primrefgen.h"
 
+#include "../geometry/pointi.h"
 #include "../geometry/linei.h"
 #include "../geometry/curveNi.h"
 #include "../geometry/curveNv.h"
 
-#if defined(EMBREE_GEOMETRY_CURVE)
+#if defined(EMBREE_GEOMETRY_CURVE) || defined(EMBREE_GEOMETRY_POINT)
 
 namespace embree
 {
   namespace isa
   {
-    template<int N, typename CurvePrimitive, typename LinePrimitive>
+    template<int N, typename CurvePrimitive, typename LinePrimitive, typename PointPrimitive>
     struct BVHNHairBuilderSAH : public Builder
     {
       typedef BVHN<N> BVH;
@@ -46,12 +47,12 @@ namespace embree
         /* if we use the primrefarray for allocations we have to take it back from the BVH */
         if (settings.finished_range_threshold != size_t(inf))
           bvh->alloc.unshare(prims);
-      
+
         /* fast path for empty BVH */
         const size_t numPrimitives = scene->getNumPrimitives<CurveGeometry,false>();
         if (numPrimitives == 0) {
+          bvh->clear();
           prims.clear();
-          bvh->set(BVH::emptyNode,empty,0);
           return;
         }
 
@@ -83,7 +84,9 @@ namespace embree
             return BVH::emptyNode;
 
           const unsigned int geomID0 = prims[set.begin()].geomID();
-          if (scene->get(geomID0)->getCurveBasis() == Geometry::GTY_BASIS_LINEAR)
+          if (scene->get(geomID0)->getTypeMask() & Geometry::MTY_POINTS)
+            return PointPrimitive::createLeaf(bvh,prims,set,alloc);
+          else if (scene->get(geomID0)->getCurveBasis() == Geometry::GTY_BASIS_LINEAR)
             return LinePrimitive::createLeaf(bvh,prims,set,alloc);
           else
             return CurvePrimitive::createLeaf(bvh,prims,set,alloc);
@@ -109,6 +112,7 @@ namespace embree
            scene,prims.data(),pinfo,settings);
         
         bvh->set(root,LBBox3fa(pinfo.geomBounds),pinfo.size());
+        
         /* if we allocated using the primrefarray we have to keep it alive */
         if (settings.finished_range_threshold != size_t(inf))
           bvh->alloc.share(prims);
@@ -128,12 +132,12 @@ namespace embree
     };
     
     /*! entry functions for the builder */
-    Builder* BVH4Curve4vBuilder_OBB_New   (void* bvh, Scene* scene, size_t mode) { return new BVHNHairBuilderSAH<4,Curve4v,Line4i>((BVH4*)bvh,scene); }
-    Builder* BVH4Curve4iBuilder_OBB_New   (void* bvh, Scene* scene, size_t mode) { return new BVHNHairBuilderSAH<4,Curve4i,Line4i>((BVH4*)bvh,scene); }
+    Builder* BVH4Curve4vBuilder_OBB_New   (void* bvh, Scene* scene, size_t mode) { return new BVHNHairBuilderSAH<4,Curve4v,Line4i,Point4i>((BVH4*)bvh,scene); }
+    Builder* BVH4Curve4iBuilder_OBB_New   (void* bvh, Scene* scene, size_t mode) { return new BVHNHairBuilderSAH<4,Curve4i,Line4i,Point4i>((BVH4*)bvh,scene); }
 
 #if defined(__AVX__)
-    Builder* BVH8Curve8vBuilder_OBB_New   (void* bvh, Scene* scene, size_t mode) { return new BVHNHairBuilderSAH<8,Curve8v,Line8i>((BVH8*)bvh,scene); }
-    Builder* BVH4Curve8iBuilder_OBB_New   (void* bvh, Scene* scene, size_t mode) { return new BVHNHairBuilderSAH<4,Curve8i,Line8i>((BVH4*)bvh,scene); }
+    Builder* BVH8Curve8vBuilder_OBB_New   (void* bvh, Scene* scene, size_t mode) { return new BVHNHairBuilderSAH<8,Curve8v,Line8i,Point8i>((BVH8*)bvh,scene); }
+    Builder* BVH4Curve8iBuilder_OBB_New   (void* bvh, Scene* scene, size_t mode) { return new BVHNHairBuilderSAH<4,Curve8i,Line8i,Point8i>((BVH4*)bvh,scene); }
 #endif
 
   }

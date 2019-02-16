@@ -15,7 +15,7 @@
 // ======================================================================== //
 
 #define RTC_VERSION_MAJOR 3
-#define RTC_VERSION_MINOR 2
+#define RTC_VERSION_MINOR 5
 #define RTC_VERSION_PATCH 0
-#define RTC_VERSION 30200
-#define RTC_VERSION_STRING "3.2.0"
+#define RTC_VERSION 30500
+#define RTC_VERSION_STRING "3.5.0"

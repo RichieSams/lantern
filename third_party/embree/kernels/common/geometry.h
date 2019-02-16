@@ -25,32 +25,6 @@ namespace embree
 {
   class Scene;
 
-  /* calculate time segment itime and fractional time ftime */
-  __forceinline int getTimeSegment(float time, float numTimeSegments, float& ftime)
-  {
-    const float timeScaled = time * numTimeSegments;
-    const float itimef = clamp(floorf(timeScaled), 0.0f, numTimeSegments-1.0f);
-    ftime = timeScaled - itimef;
-    return int(itimef);
-  }
-
-  template<int N>
-  __forceinline vint<N> getTimeSegment(const vfloat<N>& time, const vfloat<N>& numTimeSegments, vfloat<N>& ftime)
-  {
-    const vfloat<N> timeScaled = time * numTimeSegments;
-    const vfloat<N> itimef = clamp(floor(timeScaled), vfloat<N>(zero), numTimeSegments-1.0f);
-    ftime = timeScaled - itimef;
-    return vint<N>(itimef);
-  }
-
-  /* calculate overlapping time segment range */
-  __forceinline range<int> getTimeSegmentRange(const BBox1f& time_range, float numTimeSegments)
-  {
-    const int itime_lower = (int)floor(time_range.lower*numTimeSegments);
-    const int itime_upper = (int)ceil (time_range.upper*numTimeSegments);
-    return make_range(itime_lower, itime_upper);
-  }
-
   /*! Base class all geometries are derived from */
   class Geometry : public RefCount
   {
@@ -80,10 +54,14 @@ namespace embree
       GTY_QUAD_MESH = 17,
       GTY_GRID_MESH = 18,
       GTY_SUBDIV_MESH = 19,
+
+      GTY_SPHERE_POINT = 21,
+      GTY_DISC_POINT = 22,
+      GTY_ORIENTED_DISC_POINT = 23,
       
-      GTY_USER_GEOMETRY = 20,
-      GTY_INSTANCE = 21,
-      GTY_END = 22,
+      GTY_USER_GEOMETRY = 25,
+      GTY_INSTANCE = 26,
+      GTY_END = 27,
 
       GTY_BASIS_LINEAR = 0,
       GTY_BASIS_BEZIER = 4,
@@ -121,7 +99,13 @@ namespace embree
                    MTY_FLAT_BSPLINE_CURVE | MTY_ROUND_BSPLINE_CURVE | MTY_ORIENTED_BSPLINE_CURVE |
                    MTY_FLAT_HERMITE_CURVE | MTY_ROUND_HERMITE_CURVE | MTY_ORIENTED_HERMITE_CURVE,
 
-      MTY_CURVES = MTY_CURVE2 | MTY_CURVE4,
+      MTY_SPHERE_POINT = 1 << GTY_SPHERE_POINT,
+      MTY_DISC_POINT = 1 << GTY_DISC_POINT,
+      MTY_ORIENTED_DISC_POINT = 1 << GTY_ORIENTED_DISC_POINT,
+
+      MTY_POINTS = MTY_SPHERE_POINT | MTY_DISC_POINT | MTY_ORIENTED_DISC_POINT,
+
+      MTY_CURVES = MTY_CURVE2 | MTY_CURVE4 | MTY_POINTS,
 
       MTY_TRIANGLE_MESH = 1 << GTY_TRIANGLE_MESH,
       MTY_QUAD_MESH = 1 << GTY_QUAD_MESH,
@@ -161,6 +145,11 @@ namespace embree
     /*! tests if geometry is modified */
     __forceinline bool isModified() const { return state != BUILD; }
 
+    /*! marks geometry modified */
+    __forceinline void setModified() {
+      if (state == BUILD) state = COMMITTED;
+    }
+
     /*! returns geometry type */
     __forceinline GType getType() const { return gtype; }
 
@@ -182,6 +171,9 @@ namespace embree
     /*! sets number of time steps */
     virtual void setNumTimeSteps (unsigned int numTimeSteps_in);
 
+    /*! sets motion blur time range */
+    void setTimeRange (const BBox1f range);
+
     /*! sets number of vertex attributes */
     virtual void setVertexAttributeCount (unsigned int N) {
       throw_RTCError(RTC_ERROR_INVALID_OPERATION,"operation not supported for this geometry"); 
@@ -197,6 +189,27 @@ namespace embree
     {
       this->quality = quality_in;
       Geometry::update();
+    }
+
+    /* calculate time segment itime and fractional time ftime */
+    __forceinline int timeSegment(float time, float& ftime) const {
+      return getTimeSegment(time,time_range.lower,time_range.upper,fnumTimeSegments,ftime);
+    }
+
+    template<int N>
+      __forceinline vint<N> timeSegment(const vfloat<N>& time, vfloat<N>& ftime) const {
+      return getTimeSegment(time,vfloat<N>(time_range.lower),vfloat<N>(time_range.upper),vfloat<N>(fnumTimeSegments),ftime);
+    }
+    
+    /* calculate overlapping time segment range */
+    __forceinline range<int> timeSegmentRange(const BBox1f& range) const {
+      return getTimeSegmentRange(range,time_range,fnumTimeSegments);
+    }
+
+    /* returns time that corresponds to time step */
+    __forceinline float timeStep(const int i) const {
+      assert(i>=0 && i<numTimeSteps);
+      return time_range.lower + time_range.size()*float(i)/fnumTimeSegments;
     }
     
     /*! for all geometries */
@@ -421,22 +434,23 @@ namespace embree
     Device* device;             //!< device this geometry belongs to
     Scene* scene;               //!< pointer to scene this mesh belongs to
 
-    void* userPtr;             //!< user pointer
+    void* userPtr;              //!< user pointer
     unsigned int geomID;        //!< internal geometry ID
     unsigned int numPrimitives; //!< number of primitives of this geometry
     
-    unsigned int numTimeSteps;     //!< number of time steps
-    float fnumTimeSegments;    //!< number of time segments (precalculation)
+    unsigned int numTimeSteps;  //!< number of time steps
+    float fnumTimeSegments;     //!< number of time segments (precalculation)
+    BBox1f time_range;          //!< motion blur time range
+    
     unsigned int mask;             //!< for masking out geometry
     struct {
-      GType gtype : 6;                 //!< geometry type
+      GType gtype : 6;                //!< geometry type
       RTCBuildQuality quality : 3;    //!< build quality for geometry
       State state : 2;
       bool numPrimitivesChanged : 1; //!< true if number of primitives changed
       bool enabled : 1;              //!< true if geometry is enabled
     };
-        
-  public:
+       
     RTCFilterFunctionN intersectionFilterN;
     RTCFilterFunctionN occlusionFilterN;
   };

@@ -16,32 +16,47 @@
 
 #pragma once
 
-#include "../common/default.h"
-#include "bezier_curve.h"
+#include "../common/geometry.h"
+#include "../common/ray.h"
 
 namespace embree
 {
-  template<typename Vertex>
-    struct HermiteCurveT : BezierCurveT<Vertex>
+  namespace isa
+  {
+    struct SpherePrecalculations1
     {
-      __forceinline HermiteCurveT() {}
+      float one_over_raydir2;
 
-      __forceinline HermiteCurveT(const BezierCurveT<Vertex>& curve)
-        : BezierCurveT<Vertex>(curve) {}
-      
-      __forceinline HermiteCurveT(const Vertex& v0, const Vertex& t0, const Vertex& v1, const Vertex& t1)
-        : BezierCurveT<Vertex>(v0,madd(1.0f/3.0f,t0,v0),nmadd(1.0f/3.0f,t1,v1),v1) {}
+      __forceinline SpherePrecalculations1() {}
 
-      __forceinline HermiteCurveT<Vec3fa> xfm_pr(const LinearSpace3fa& space, const Vec3fa& p) const
+      __forceinline SpherePrecalculations1(const Ray& ray, const void* ptr)
       {
-        Vec3fa q0 = xfmVector(space,this->v0-p); q0.w = this->v0.w;
-        Vec3fa q1 = xfmVector(space,this->v1-p); q1.w = this->v1.w;
-        Vec3fa q2 = xfmVector(space,this->v2-p); q2.w = this->v2.w;
-        Vec3fa q3 = xfmVector(space,this->v3-p); q3.w = this->v3.w;
-        return BezierCurveT<Vec3fa>(q0,q1,q2,q3);
+        one_over_raydir2 = rcp(dot(ray.dir, ray.dir));
       }
     };
-  
-  typedef HermiteCurveT<Vec3fa> HermiteCurve3fa;
-}
 
+    template<int K>
+    struct SpherePrecalculationsK
+    {
+      vfloat<K> one_over_raydir2;
+
+      __forceinline SpherePrecalculationsK(const vbool<K>& valid, const RayK<K>& ray)
+      {
+        one_over_raydir2 = rsqrt(dot(ray.dir, ray.dir));
+      }
+    };
+
+    struct DiscPrecalculations1
+    {
+      __forceinline DiscPrecalculations1() {}
+
+      __forceinline DiscPrecalculations1(const Ray& ray, const void* ptr) {}
+    };
+
+    template<int K>
+    struct DiscPrecalculationsK
+    {
+      __forceinline DiscPrecalculationsK(const vbool<K>& valid, const RayK<K>& ray) {}
+    };
+  }  // namespace isa
+}  // namespace embree

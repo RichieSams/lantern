@@ -54,7 +54,7 @@ namespace embree
 
     /* Construction from vertices and IDs */
     __forceinline LineMi(const vuint<M>& v0, const vuint<M>& geomIDs, const vuint<M>& primIDs, Geometry::GType gtype)
-      : gtype((unsigned char)gtype), m(popcnt(vuint<M>(primIDs) != vuint<M>(-1))), sharedGeomID(geomIDs[0]), v0(v0), primIDs(primIDs)
+      : gtype((unsigned char)gtype), m((unsigned char)popcnt(vuint<M>(primIDs) != vuint<M>(-1))), sharedGeomID(geomIDs[0]), v0(v0), primIDs(primIDs)
     {
       assert(all(vuint<M>(geomID()) == geomIDs));
     }
@@ -94,7 +94,7 @@ namespace embree
     __forceinline void gather(Vec4vf<M>& p0,
                               Vec4vf<M>& p1,
                               const LineSegments* geom,
-                              const vint<M>& itime) const;
+                              const int itime) const;
 
     __forceinline void gather(Vec4vf<M>& p0,
                               Vec4vf<M>& p1,
@@ -137,7 +137,7 @@ namespace embree
       LBBox3fa allBounds = empty;
       for (size_t i=0; i<M && valid(i); i++)
       {
-        const LineSegments* geom = scene->get<LineSegments>(geomID(i));
+        const LineSegments* geom = scene->get<LineSegments>(geomID((unsigned int)i));
         allBounds.extend(geom->linearBounds(primID(i), time_range));
       }
       return allBounds;
@@ -203,10 +203,10 @@ namespace embree
       template<typename BVH, typename SetMB, typename Allocator>
     __forceinline static typename BVH::NodeRecordMB4D createLeafMB(BVH* bvh, const SetMB& prims, const Allocator& alloc)
     {
-      size_t start = prims.object_range.begin();
-      size_t end   = prims.object_range.end();
-      size_t items = LineMi::blocks(prims.object_range.size());
-      size_t numbytes = LineMi::bytes(prims.object_range.size());
+      size_t start = prims.begin();
+      size_t end   = prims.end();
+      size_t items = LineMi::blocks(prims.size());
+      size_t numbytes = LineMi::bytes(prims.size());
       LineMi* accel = (LineMi*) alloc.malloc1(numbytes,M*sizeof(float));
       const typename BVH::NodeRef node = bvh->encodeLeaf((char*)accel,items);
       
@@ -269,18 +269,18 @@ namespace embree
   __forceinline void LineMi<4>::gather(Vec4vf4& p0,
                                        Vec4vf4& p1,
                                        const LineSegments* geom,
-                                       const vint4& itime) const
+                                       const int itime) const
   {
-    const vfloat4 a0 = vfloat4::loadu(geom->vertexPtr(v0[0],itime[0]));
-    const vfloat4 a1 = vfloat4::loadu(geom->vertexPtr(v0[1],itime[1]));
-    const vfloat4 a2 = vfloat4::loadu(geom->vertexPtr(v0[2],itime[2]));
-    const vfloat4 a3 = vfloat4::loadu(geom->vertexPtr(v0[3],itime[3]));
+    const vfloat4 a0 = vfloat4::loadu(geom->vertexPtr(v0[0],itime));
+    const vfloat4 a1 = vfloat4::loadu(geom->vertexPtr(v0[1],itime));
+    const vfloat4 a2 = vfloat4::loadu(geom->vertexPtr(v0[2],itime));
+    const vfloat4 a3 = vfloat4::loadu(geom->vertexPtr(v0[3],itime));
     transpose(a0,a1,a2,a3,p0.x,p0.y,p0.z,p0.w);
 
-    const vfloat4 b0 = vfloat4::loadu(geom->vertexPtr(v0[0]+1,itime[0]));
-    const vfloat4 b1 = vfloat4::loadu(geom->vertexPtr(v0[1]+1,itime[1]));
-    const vfloat4 b2 = vfloat4::loadu(geom->vertexPtr(v0[2]+1,itime[2]));
-    const vfloat4 b3 = vfloat4::loadu(geom->vertexPtr(v0[3]+1,itime[3]));
+    const vfloat4 b0 = vfloat4::loadu(geom->vertexPtr(v0[0]+1,itime));
+    const vfloat4 b1 = vfloat4::loadu(geom->vertexPtr(v0[1]+1,itime));
+    const vfloat4 b2 = vfloat4::loadu(geom->vertexPtr(v0[2]+1,itime));
+    const vfloat4 b3 = vfloat4::loadu(geom->vertexPtr(v0[3]+1,itime));
     transpose(b0,b1,b2,b3,p1.x,p1.y,p1.z,p1.w);
   }
 
@@ -291,16 +291,16 @@ namespace embree
                                          float time) const
   {
     const LineSegments* geom = scene->get<LineSegments>(geomID());
-    const vfloat4 numTimeSegments(geom->fnumTimeSegments);
-    vfloat4 ftime;
-    const vint4 itime = getTimeSegment(vfloat4(time), numTimeSegments, ftime);
+
+    float ftime;
+    const int itime = geom->timeSegment(time, ftime);
 
     Vec4vf4 a0,a1;
     gather(a0,a1,geom,itime);
     Vec4vf4 b0,b1;
     gather(b0,b1,geom,itime+1);
-    p0 = lerp(a0,b0,ftime);
-    p1 = lerp(a1,b1,ftime);
+    p0 = lerp(a0,b0,vfloat4(ftime));
+    p1 = lerp(a1,b1,vfloat4(ftime));
   }
 
 #if defined(__AVX__)
@@ -337,26 +337,26 @@ namespace embree
   __forceinline void LineMi<8>::gather(Vec4vf8& p0,
                                        Vec4vf8& p1,
                                        const LineSegments* geom,
-                                       const vint8& itime) const
+                                       const int itime) const
   {
-    const vfloat4 a0 = vfloat4::loadu(geom->vertexPtr(v0[0],itime[0]));
-    const vfloat4 a1 = vfloat4::loadu(geom->vertexPtr(v0[1],itime[1]));
-    const vfloat4 a2 = vfloat4::loadu(geom->vertexPtr(v0[2],itime[2]));
-    const vfloat4 a3 = vfloat4::loadu(geom->vertexPtr(v0[3],itime[3]));
-    const vfloat4 a4 = vfloat4::loadu(geom->vertexPtr(v0[4],itime[4]));
-    const vfloat4 a5 = vfloat4::loadu(geom->vertexPtr(v0[5],itime[5]));
-    const vfloat4 a6 = vfloat4::loadu(geom->vertexPtr(v0[6],itime[6]));
-    const vfloat4 a7 = vfloat4::loadu(geom->vertexPtr(v0[7],itime[7]));
+    const vfloat4 a0 = vfloat4::loadu(geom->vertexPtr(v0[0],itime));
+    const vfloat4 a1 = vfloat4::loadu(geom->vertexPtr(v0[1],itime));
+    const vfloat4 a2 = vfloat4::loadu(geom->vertexPtr(v0[2],itime));
+    const vfloat4 a3 = vfloat4::loadu(geom->vertexPtr(v0[3],itime));
+    const vfloat4 a4 = vfloat4::loadu(geom->vertexPtr(v0[4],itime));
+    const vfloat4 a5 = vfloat4::loadu(geom->vertexPtr(v0[5],itime));
+    const vfloat4 a6 = vfloat4::loadu(geom->vertexPtr(v0[6],itime));
+    const vfloat4 a7 = vfloat4::loadu(geom->vertexPtr(v0[7],itime));
     transpose(a0,a1,a2,a3,a4,a5,a6,a7,p0.x,p0.y,p0.z,p0.w);
 
-    const vfloat4 b0 = vfloat4::loadu(geom->vertexPtr(v0[0]+1,itime[0]));
-    const vfloat4 b1 = vfloat4::loadu(geom->vertexPtr(v0[1]+1,itime[1]));
-    const vfloat4 b2 = vfloat4::loadu(geom->vertexPtr(v0[2]+1,itime[2]));
-    const vfloat4 b3 = vfloat4::loadu(geom->vertexPtr(v0[3]+1,itime[3]));
-    const vfloat4 b4 = vfloat4::loadu(geom->vertexPtr(v0[4]+1,itime[4]));
-    const vfloat4 b5 = vfloat4::loadu(geom->vertexPtr(v0[5]+1,itime[5]));
-    const vfloat4 b6 = vfloat4::loadu(geom->vertexPtr(v0[6]+1,itime[6]));
-    const vfloat4 b7 = vfloat4::loadu(geom->vertexPtr(v0[7]+1,itime[7]));
+    const vfloat4 b0 = vfloat4::loadu(geom->vertexPtr(v0[0]+1,itime));
+    const vfloat4 b1 = vfloat4::loadu(geom->vertexPtr(v0[1]+1,itime));
+    const vfloat4 b2 = vfloat4::loadu(geom->vertexPtr(v0[2]+1,itime));
+    const vfloat4 b3 = vfloat4::loadu(geom->vertexPtr(v0[3]+1,itime));
+    const vfloat4 b4 = vfloat4::loadu(geom->vertexPtr(v0[4]+1,itime));
+    const vfloat4 b5 = vfloat4::loadu(geom->vertexPtr(v0[5]+1,itime));
+    const vfloat4 b6 = vfloat4::loadu(geom->vertexPtr(v0[6]+1,itime));
+    const vfloat4 b7 = vfloat4::loadu(geom->vertexPtr(v0[7]+1,itime));
     transpose(b0,b1,b2,b3,b4,b5,b6,b7,p1.x,p1.y,p1.z,p1.w);
   }
 
@@ -367,16 +367,16 @@ namespace embree
                                          float time) const
   {
     const LineSegments* geom = scene->get<LineSegments>(geomID());
-    const vfloat8 numTimeSegments(geom->fnumTimeSegments);
-    vfloat8 ftime;
-    const vint8 itime = getTimeSegment(vfloat8(time), numTimeSegments, ftime);
+
+    float ftime;
+    const int itime = geom->timeSegment(time, ftime);
 
     Vec4vf8 a0,a1;
     gather(a0,a1,geom,itime);
     Vec4vf8 b0,b1;
     gather(b0,b1,geom,itime+1);
-    p0 = lerp(a0,b0,ftime);
-    p1 = lerp(a1,b1,ftime);
+    p0 = lerp(a0,b0,vfloat8(ftime));
+    p1 = lerp(a1,b1,vfloat8(ftime));
   }
 
 #endif

@@ -46,9 +46,19 @@ namespace embree
       return bounds.bounds();
     }
 
+    /*! returns bounds for some time */
+    __forceinline BBox3fa getBounds(float t) const {
+      return bounds.interpolate(t);
+    }
+
     /*! returns linear bounds */
     __forceinline LBBox3fa getLinearBounds() const {
       return bounds;
+    }
+
+    /*! checks if acceleration structure is empty */
+    __forceinline bool isEmpty() const {
+      return bounds.bounds0.lower.x == float(pos_inf);
     }
 
   public:

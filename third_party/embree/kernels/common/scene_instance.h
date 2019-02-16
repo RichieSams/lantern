@@ -56,7 +56,7 @@ namespace embree
      /*! calculates the bounds of instance */
     __forceinline BBox3fa bounds(size_t i, size_t itime) const {
       assert(i == 0);
-      return xfmBounds(local2world[itime],object->bounds.bounds());
+      return xfmBounds(local2world[itime],object->getBounds(float(itime)/fnumTimeSegments));
     }
 
      /*! calculates the linear bounds at the itimeGlobal'th time segment */
@@ -66,9 +66,9 @@ namespace embree
     }
 
     /*! calculates the linear bounds of the i'th primitive for the specified time range */
-    __forceinline LBBox3fa linearBounds(size_t i, const BBox1f& time_range) const {
+    __forceinline LBBox3fa linearBounds(size_t i, const BBox1f& dt) const {
       assert(i == 0);
-      return LBBox3fa([&] (size_t itime) { return bounds(i, itime); }, time_range, fnumTimeSegments);
+      return LBBox3fa([&] (size_t itime) { return bounds(i, itime); }, dt, time_range, fnumTimeSegments);
     }
 
     /*! check if the i'th primitive is valid between the specified time range */
@@ -81,22 +81,29 @@ namespace embree
       return true;
     }
       
+    __forceinline AffineSpace3fa getLocal2World() const {
+      return local2world[0];
+    }
+
+    __forceinline AffineSpace3fa getLocal2World(float t) const
+    {
+      float ftime; const unsigned int itime = timeSegment(t, ftime);
+      return lerp(local2world[itime+0],local2world[itime+1],ftime);
+    }
+
     __forceinline AffineSpace3fa getWorld2Local() const {
       return world2local0;
     }
 
-    __forceinline AffineSpace3fa getWorld2Local(float t) const 
-    {
-      float ftime;
-      const unsigned int itime = getTimeSegment(t, fnumTimeSegments, ftime);
-      return rcp(lerp(local2world[itime+0],local2world[itime+1],ftime));
+    __forceinline AffineSpace3fa getWorld2Local(float t) const {
+      return rcp(getLocal2World(t));
     }
 
     template<int K>
     __forceinline AffineSpace3vf<K> getWorld2Local(const vbool<K>& valid, const vfloat<K>& t) const
     { 
       vfloat<K> ftime;
-      const vint<K> itime_k = getTimeSegment(t, vfloat<K>(fnumTimeSegments), ftime);
+      const vint<K> itime_k = timeSegment(t, ftime);
       assert(any(valid));
       const size_t index = bsf(movemask(valid));
       const int itime = itime_k[index];
@@ -163,8 +170,8 @@ namespace embree
         assert(r.end()   == 1);
         
         PrimInfoMB pinfo(empty);
-        if (!valid(0, getTimeSegmentRange(t0t1, fnumTimeSegments))) return pinfo;
-        const PrimRefMB prim(linearBounds(0,t0t1),this->numTimeSegments(),this->numTimeSegments(),this->geomID,unsigned(0));
+        if (!valid(0, timeSegmentRange(t0t1))) return pinfo;
+        const PrimRefMB prim(linearBounds(0,t0t1),this->numTimeSegments(),this->time_range,this->numTimeSegments(),this->geomID,unsigned(0));
         pinfo.add_primref(prim);
         prims[k++] = prim;
         return pinfo;
