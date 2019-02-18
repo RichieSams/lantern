@@ -6,7 +6,10 @@
 
 #include "visualizer/visualizer.h"
 
-#include "integrator/integrator.h"
+#include "visualizer/tone_mappers/clamp.h"
+#include "visualizer/tone_mappers/filmic.h"
+#include "visualizer/tone_mappers/reinhard.h"
+#include "visualizer/tone_mappers/scaled_max_range.h"
 
 #include "scene/scene.h"
 
@@ -220,10 +223,14 @@ bool Visualizer::Init(int width, int height) {
 		ImGui_ImplVulkan_InvalidateFontUploadObjects();
 	}
 
+	// Set up GUI variables
 	m_frameTime = 0.0;
 	m_fps = 0;
 	m_cumulativeFrameCounter = 0;
 	m_cumulativeFrameTime = 0.0;
+
+	m_selectedToneMapper = 0;
+	m_exposure = 0.0f;
 
 	return true;
 }
@@ -272,7 +279,7 @@ bool Visualizer::RenderFrame() {
 	ImGui::NewFrame();
 
 	ImGui::SetNextWindowPos(ImVec2(0, 0));
-	ImGui::Begin("Visualizer Stats", nullptr, ImVec2(0, 0), -1, ImGuiWindowFlags_AlwaysAutoResize);
+	ImGui::Begin("Visualizer Stats", nullptr, ImVec2(0, 0), -1, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse);
 	ImGui::Text("%.1f ms/frame (%u FPS)", m_frameTime, m_fps);
 	ImGui::End();
 
@@ -288,7 +295,7 @@ bool Visualizer::RenderFrame() {
 				const size_t index = offset + x;
 				m_accumulationFrameBuffer.ColorData[index] += m_currentFrameBuffer->ColorData[index];
 				m_accumulationFrameBuffer.Bounces[index] += m_currentFrameBuffer->Bounces[index];
-				m_accumulationFrameBuffer.Weights[index] += m_currentFrameBuffer->Weights[index];
+				m_accumulationFrameBuffer.ColorSampleCount[index] += m_currentFrameBuffer->ColorSampleCount[index];
 			}
 		}
 		m_currentFrameBuffer->Reset();
@@ -326,21 +333,25 @@ bool Visualizer::RenderFrame() {
 	}
 
 	// Copy Renderer data to the GPU
-	byte *mappedData = (byte *)frame->stagingBufferAllocInfo.pMappedData;
-	for (uint j = 0; j < m_accumulationFrameBuffer.Height; ++j) {
-		const size_t offset = j * m_accumulationFrameBuffer.Width;
-		for (uint i = 0; i < m_accumulationFrameBuffer.Width; ++i) {
-			const size_t frameBufferIndex = offset + i;
-			const size_t mappedDataIndex = frameBufferIndex * 4;
+	ImGui::Begin("Tone mapping", nullptr, ImVec2(0, 0), -1, 0);
+	{
+		ImGui::DragFloat("Exposure (2^x)", &m_exposure, 0.1f, -10.0f, 10.0f, "%.2f");
+		const char* toneMappers[] = {"Filmic", "Reinhard", "Clamp", "Scaled by Max Range"};
+		ImGui::Combo("Type", &m_selectedToneMapper, toneMappers, IM_ARRAYSIZE(toneMappers));
 
-			float3 *color = &m_accumulationFrameBuffer.ColorData[frameBufferIndex];
-			float weight = m_accumulationFrameBuffer.Weights[frameBufferIndex];
-			mappedData[mappedDataIndex + 0] = (byte)(std::max(0.0f, std::min(color->x / weight, 1.0f)) * 255.0f); // Red
-			mappedData[mappedDataIndex + 1] = (byte)(std::max(0.0f, std::min(color->y / weight, 1.0f)) * 255.0f); // Green
-			mappedData[mappedDataIndex + 2] = (byte)(std::max(0.0f, std::min(color->z / weight, 1.0f)) * 255.0f); // Blue
-			mappedData[mappedDataIndex + 3] = (byte)255; // Alpha
+		byte *mappedData = (byte *)frame->stagingBufferAllocInfo.pMappedData;
+		if (strcmp(toneMappers[m_selectedToneMapper], "Filmic") == 0) {
+			TonemapFilmic(&m_accumulationFrameBuffer, mappedData, powf(2.0f, m_exposure));
+		} else if (strcmp(toneMappers[m_selectedToneMapper], "Reinhard") == 0) {
+			TonemapReinhard(&m_accumulationFrameBuffer, mappedData, powf(2.0f, m_exposure));
+		} else if (strcmp(toneMappers[m_selectedToneMapper], "Clamp") == 0) {
+			TonemapClamp(&m_accumulationFrameBuffer, mappedData, powf(2.0f, m_exposure));
+		} else if (strcmp(toneMappers[m_selectedToneMapper], "Scaled by Max Range") == 0) {
+			TonemapScaledMaxRange(&m_accumulationFrameBuffer, mappedData, powf(2.0f, m_exposure));
 		}
 	}
+	ImGui::End();
+
 	{
 		// Flush to GPU
 		vk::MappedMemoryRange flushRange;

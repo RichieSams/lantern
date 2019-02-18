@@ -92,6 +92,14 @@ SetSourceGroup(NAME Visualizer
 	             visualizer/vulkan_function_loader.cpp
 )
 
+SetSourceGroup(NAME "Visualizer/Tone Mappers"
+	PREFIX LANTERN_CORE
+	SOURCE_FILES visualizer/tone_mappers/clamp.h
+	             visualizer/tone_mappers/filmic.h
+	             visualizer/tone_mappers/reinhard.h
+	             visualizer/tone_mappers/scaled_max_range.h
+)
+
 
 # Link all the sources into one
 set(LANTERN_CORE_SRC
@@ -105,7 +113,7 @@ set(LANTERN_CORE_SRC
 	${LANTERN_CORE_MATERIALS_TEXTURES}
 	${LANTERN_CORE_INTEGRATOR}
 	${LANTERN_CORE_VISUALIZER}
-	${LANTERN_CORE_VISUALIZER_SHADERS}
+	${LANTERN_CORE_VISUALIZER_TONE_MAPPERS}
 )
 
 # Create lib

@@ -26,8 +26,8 @@ public:
 	uint Height;
 
 	float3 *ColorData;
-	uint64 *Bounces;
-	float *Weights;
+	uint *Bounces;
+	uint *ColorSampleCount;
 
 public:
 	void Reset();

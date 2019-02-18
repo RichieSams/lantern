@@ -14,22 +14,22 @@ FrameBuffer::FrameBuffer(uint width, uint height)
       Width(width),
 	  Height(height),
       ColorData(new float3[width * height]),
-      Bounces(new uint64[width * height]),
-      Weights(new float[width * height]) {
+      Bounces(new uint[width * height]),
+      ColorSampleCount(new uint[width * height]) {
 	Reset();
 }
 
 FrameBuffer::~FrameBuffer() {
 	delete[] ColorData;
-	delete[] Weights;
+	delete[] ColorSampleCount;
 	delete[] Bounces;
 }
 
 void FrameBuffer::Reset() {
 	// We rely on the fact that 0x0000 == 0.0f
 	memset(&ColorData[0], 0, Width * Height * sizeof(float3));
-	memset(&Bounces[0], 0, Width * Height * sizeof(uint64));
-	memset(&Weights[0], 0, Width * Height * sizeof(float));
+	memset(&Bounces[0], 0, Width * Height * sizeof(uint));
+	memset(&ColorSampleCount[0], 0, Width * Height * sizeof(uint));
 	Empty = true;
 }
 

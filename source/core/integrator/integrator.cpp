@@ -246,7 +246,7 @@ void Integrator::RenderPixel(uint x, uint y, UniformSampler *sampler) const {
 
 	m_currentFrameBuffer->ColorData[index] += color;
 	m_currentFrameBuffer->Bounces[index] += bounces;
-	m_currentFrameBuffer->Weights[index] += 1.0f;
+	m_currentFrameBuffer->ColorSampleCount[index] += 1u;
 }
 
 float3 Integrator::SampleOneLight(UniformSampler *sampler, SurfaceInteraction interaction, BSDF *bsdf, Light *hitLight) const {

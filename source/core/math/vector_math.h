@@ -9,6 +9,7 @@
 #include "math/vector_types.h"
 
 #include <math.h>
+#include <algorithm>
 
 
 namespace Lantern {
@@ -64,6 +65,22 @@ inline bool AnyNan(float3a &a) {
 
 inline bool AnyNan(float2 &a) {
 	return std::isnan(a.x) || std::isnan(a.y);
+}
+
+inline float3 clamp(float3 &a, float min, float max) {
+	return float3(
+		std::max(std::min(a.x, max), min),
+		std::max(std::min(a.y, max), min),
+		std::max(std::min(a.z, max), min)
+	);
+}
+
+inline float3 max(float3 &a, float3 &b) {
+	return float3(
+		std::max(a.x, b.x),
+		std::max(a.y, b.y),
+		std::max(a.z, b.z)
+	);
 }
 
 } // End of namespace Lantern

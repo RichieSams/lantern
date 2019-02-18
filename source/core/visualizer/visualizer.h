@@ -97,8 +97,12 @@ private:
 	uint m_cumulativeFrameCounter;
 	double m_cumulativeFrameTime;
 
+	// GUI variables
 	double m_frameTime;
 	uint m_fps;
+
+	int m_selectedToneMapper;
+	float m_exposure;
 
 public:
 	bool Init(int width, int height);
