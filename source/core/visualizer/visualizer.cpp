@@ -224,10 +224,9 @@ bool Visualizer::Init(int width, int height) {
 	}
 
 	// Set up GUI variables
-	m_frameTime = 0.0;
-	m_fps = 0;
-	m_cumulativeFrameCounter = 0;
-	m_cumulativeFrameTime = 0.0;
+	memset(m_frameTime, 0, sizeof(m_frameTime[0]) * SizeOfArray(m_frameTime));
+	m_frameTimeSum = 0.0f;
+	m_frameTimeBin = 0;
 
 	m_selectedToneMapper = 0;
 	m_exposure = 0.0f;
@@ -280,7 +279,12 @@ bool Visualizer::RenderFrame() {
 
 	ImGui::SetNextWindowPos(ImVec2(0, 0));
 	ImGui::Begin("Visualizer Stats", nullptr, ImVec2(0, 0), -1, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse);
-	ImGui::Text("%.1f ms/frame (%u FPS)", m_frameTime, m_fps);
+	{
+		const float frameTime = m_frameTimeSum / SizeOfArray(m_frameTime);
+		const float fps = 1000.0f / frameTime;
+
+		ImGui::Text("%.1f ms/frame (%.0f FPS)", frameTime, fps);
+	}
 	ImGui::End();
 
 	// Rendering
@@ -422,17 +426,13 @@ bool Visualizer::RenderFrame() {
 	}
 
 	auto end = std::chrono::high_resolution_clock::now();
-	auto diff = std::chrono::duration<double, std::milli>(end - start).count();
-	++m_cumulativeFrameCounter;
-	m_cumulativeFrameTime += diff;
+	float diff = std::chrono::duration<float, std::milli>(end - start).count();
 
-	if (m_cumulativeFrameTime >= 250.0) {
-		m_frameTime = m_cumulativeFrameTime / (double)m_cumulativeFrameCounter;
-		m_fps = m_cumulativeFrameCounter * 4;
-
-		m_cumulativeFrameCounter = 0;
-		m_cumulativeFrameTime = 0.0;
-	}
+	size_t index = m_frameTimeBin & (SizeOfArray(m_frameTime) - 1);
+	m_frameTimeSum -= m_frameTime[index];
+	m_frameTime[index] = diff;
+	m_frameTimeSum += diff;
+	++m_frameTimeBin;
 
 	return true;
 }

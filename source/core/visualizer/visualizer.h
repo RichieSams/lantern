@@ -94,12 +94,10 @@ private:
 	vk::RenderPass m_mainRenderPass;
 	vk::RenderPass m_imguiRenderPass;
 
-	uint m_cumulativeFrameCounter;
-	double m_cumulativeFrameTime;
-
 	// GUI variables
-	double m_frameTime;
-	uint m_fps;
+	float m_frameTime[32];
+	size_t m_frameTimeBin;
+	float m_frameTimeSum;
 
 	int m_selectedToneMapper;
 	float m_exposure;
