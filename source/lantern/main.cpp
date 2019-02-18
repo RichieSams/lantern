@@ -70,9 +70,9 @@ int main(int argc, const char *argv[]) {
 	
 	std::atomic_bool quit(false);
 	std::thread rendererThread(
-		[](Lantern::Integrator *integrator, std::atomic_bool *quit) {
-			while (!quit->load(std::memory_order_relaxed)) {
-				integrator->RenderFrame();
+		[](Lantern::Integrator *_integrator, std::atomic_bool *_quit) {
+			while (!_quit->load(std::memory_order_relaxed)) {
+				_integrator->RenderFrame();
 			}
 	}, &integrator, &quit);
 
