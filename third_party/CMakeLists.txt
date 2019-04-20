@@ -1,9 +1,12 @@
 add_subdirectory(argparse)
 
-SET(EMBREE_ISPC_SUPPORT OFF CACHE BOOL "No ISPC support needed atm" )
-SET(EMBREE_TUTORIALS OFF CACHE BOOL "Only build lib" )
-SET(EMBREE_STATIC_LIB ON CACHE BOOL "Build Embree as a static lib")
+set( CMAKE_BUILD_TYPE_SAVED "${CMAKE_BUILD_TYPE}" )
+set( CMAKE_BUILD_TYPE "Release" )
+SET( EMBREE_ISPC_SUPPORT OFF CACHE BOOL "No ISPC support needed atm" )
+SET( EMBREE_TUTORIALS OFF CACHE BOOL "Only build lib" )
+SET( EMBREE_STATIC_LIB ON CACHE BOOL "Build Embree as a static lib" )
 add_subdirectory(embree)
+set( CMAKE_BUILD_TYPE ${CMAKE_BUILD_TYPE_SAVED} )
 target_include_directories(embree PUBLIC embree/include)
 target_include_directories(embree PUBLIC embree/common)
 
