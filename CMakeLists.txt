@@ -8,7 +8,10 @@ set(CMAKE_CXX_STANDARD 11) # C++11...
 set(CMAKE_CXX_STANDARD_REQUIRED ON) #...is required...
 set(CMAKE_CXX_EXTENSIONS OFF) #...without compiler extensions like gnu++11
 
+
 if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
+	# Force iterator debugging off so we can link libraries compiled in Release
+	add_definitions(-D_HAS_ITERATOR_DEBUGGING=0 -D_ITERATOR_DEBUG_LEVEL=0)
 	# Force all builds to use "Release" version of the runtime
 	foreach(flag_var
 	        CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_DEBUG CMAKE_CXX_FLAGS_RELEASE
