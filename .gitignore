@@ -3,6 +3,10 @@ build*/
 obj/
 *.pdb
 
+# Spir-V compiled files
+*.spv
+*.spv.cpp
+
 # MSVC Project files
 .vs/
 *.sdf

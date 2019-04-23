@@ -78,8 +78,11 @@ private:
 		vk::Framebuffer frameBuffer;
 
 		vk::Image stagingImage;
+		vk::ImageView stagingImageView;
 		VmaAllocation stagingBufferAllocation;
 		VmaAllocationInfo stagingBufferAllocInfo;
+
+		vk::DescriptorSet descriptorSet;
 	};
 	FrameData *m_frameData;
 
@@ -87,6 +90,9 @@ private:
 
 	vk::ShaderModule m_vertexShader;
 	vk::ShaderModule m_pixelShader;
+
+	vk::Sampler m_sampler;
+	vk::DescriptorSetLayout m_descriptorSetLayout;
 
 	vk::PipelineLayout m_mainPipelineLayout;
 	vk::Pipeline m_mainPipeline;

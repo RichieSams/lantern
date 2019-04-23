@@ -6,12 +6,10 @@
 
 #include "visualizer/visualizer.h"
 
-#include "visualizer/tone_mappers/clamp.h"
-#include "visualizer/tone_mappers/filmic.h"
-#include "visualizer/tone_mappers/reinhard.h"
-#include "visualizer/tone_mappers/scaled_max_range.h"
-
 #include "scene/scene.h"
+
+#include "visualizer/shaders/fullscreen_triangle_vs.spv.h"
+#include "visualizer/shaders/final_resolve_ps.spv.h"
 
 #define GLFW_INCLUDE_NONE
 #define GLFW_INCLUDE_VULKAN
@@ -241,7 +239,14 @@ void Visualizer::Shutdown() {
 	ImGui_ImplGlfw_Shutdown();
 	ImGui::DestroyContext();
 
-	//vmaDestroyAllocator(m_allocator);
+	m_device.destroyDescriptorSetLayout(m_descriptorSetLayout, nullptr);
+	m_device.destroySampler(m_sampler, nullptr);
+
+	m_device.destroyPipeline(m_mainPipeline, nullptr);
+	m_device.destroyPipelineLayout(m_mainPipelineLayout, nullptr);
+
+	m_device.destroyShaderModule(m_pixelShader, nullptr);
+	m_device.destroyShaderModule(m_vertexShader, nullptr);
 
 	m_device.destroyRenderPass(m_imguiRenderPass, nullptr);
 	m_device.destroyRenderPass(m_mainRenderPass, nullptr);
@@ -255,8 +260,13 @@ void Visualizer::Shutdown() {
 		m_device.destroySemaphore(data->imageAcquired, nullptr);
 		m_device.destroySemaphore(data->imguiRenderCompleted, nullptr);
 		m_device.destroyCommandPool(data->commandPool, nullptr); // This will clean up the associated command buffers
+
+		m_device.destroyImageView(data->stagingImageView, nullptr);
+		vmaDestroyImage(m_allocator, data->stagingImage, data->stagingBufferAllocation);
 	}
 	delete[] m_frameData;
+
+	vmaDestroyAllocator(m_allocator);
 
 	m_device.destroyDescriptorPool(m_descriptorPool, nullptr);
 	m_device.destroySwapchainKHR(m_swapchain, nullptr);
@@ -337,24 +347,20 @@ bool Visualizer::RenderFrame() {
 	}
 
 	// Copy Renderer data to the GPU
-	ImGui::Begin("Tone mapping", nullptr, ImVec2(0, 0), -1, 0);
-	{
-		ImGui::DragFloat("Exposure (2^x)", &m_exposure, 0.1f, -10.0f, 10.0f, "%.2f");
-		const char* toneMappers[] = {"Filmic", "Reinhard", "Clamp", "Scaled by Max Range"};
-		ImGui::Combo("Type", &m_selectedToneMapper, toneMappers, IM_ARRAYSIZE(toneMappers));
+	float *mappedData = (float *)frame->stagingBufferAllocInfo.pMappedData;
+	for (uint j = 0; j < m_accumulationFrameBuffer.Height; ++j) {
+		const size_t offset = j * m_accumulationFrameBuffer.Width;
+		for (uint i = 0; i < m_accumulationFrameBuffer.Width; ++i) {
+			const size_t frameBufferIndex = offset + i;
+			const size_t mappedDataIndex = frameBufferIndex * 3;
 
-		byte *mappedData = (byte *)frame->stagingBufferAllocInfo.pMappedData;
-		if (strcmp(toneMappers[m_selectedToneMapper], "Filmic") == 0) {
-			TonemapFilmic(&m_accumulationFrameBuffer, mappedData, powf(2.0f, m_exposure));
-		} else if (strcmp(toneMappers[m_selectedToneMapper], "Reinhard") == 0) {
-			TonemapReinhard(&m_accumulationFrameBuffer, mappedData, powf(2.0f, m_exposure));
-		} else if (strcmp(toneMappers[m_selectedToneMapper], "Clamp") == 0) {
-			TonemapClamp(&m_accumulationFrameBuffer, mappedData, powf(2.0f, m_exposure));
-		} else if (strcmp(toneMappers[m_selectedToneMapper], "Scaled by Max Range") == 0) {
-			TonemapScaledMaxRange(&m_accumulationFrameBuffer, mappedData, powf(2.0f, m_exposure));
+			float3 &color = m_accumulationFrameBuffer.ColorData[frameBufferIndex];
+			uint sampleCount = m_accumulationFrameBuffer.ColorSampleCount[frameBufferIndex];
+			mappedData[mappedDataIndex + 0] = color.x / float(sampleCount); // Red
+			mappedData[mappedDataIndex + 1] = color.y / float(sampleCount); // Green
+			mappedData[mappedDataIndex + 2] = color.z / float(sampleCount); // Blue
 		}
 	}
-	ImGui::End();
 
 	{
 		// Flush to GPU
@@ -743,14 +749,14 @@ bool Visualizer::InitVulkanWindow(int width, int height) {
 		dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
 		dependencies[0].dstSubpass = 0;
 		dependencies[0].srcStageMask = vk::PipelineStageFlagBits::eBottomOfPipe;
-		dependencies[0].dstStageMask = vk::PipelineStageFlagBits::eTransfer;
+		dependencies[0].dstStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput;
 		dependencies[0].srcAccessMask = vk::AccessFlags();
 		dependencies[0].dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
 		dependencies[0].dependencyFlags = vk::DependencyFlagBits::eByRegion;
 		// Image copy to external
 		dependencies[1].srcSubpass = 0;
 		dependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL;
-		dependencies[1].srcStageMask = vk::PipelineStageFlagBits::eTransfer;
+		dependencies[1].srcStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput;
 		dependencies[1].dstStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput;
 		dependencies[1].srcAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
 		dependencies[1].dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
@@ -816,6 +822,30 @@ bool Visualizer::InitVulkanWindow(int width, int height) {
 		}
 	}
 
+	// Load the shaders
+	{
+		vk::ShaderModuleCreateInfo info;
+		info.codeSize = fullscreen_triangle_vs_spv_len;
+		info.pCode = (uint32_t *)fullscreen_triangle_vs_spv;
+
+		result = m_device.createShaderModule(&info, nullptr, &m_vertexShader);
+		if (result != vk::Result::eSuccess) {
+			printf("Vulkan: Failed to load vertex shader. Error code: %d", result);
+			return false;
+		}
+	}
+	{
+		vk::ShaderModuleCreateInfo info;
+		info.codeSize = final_resolve_ps_spv_len;
+		info.pCode = (uint32_t *)final_resolve_ps_spv;
+
+		result = m_device.createShaderModule(&info, nullptr, &m_pixelShader);
+		if (result != vk::Result::eSuccess) {
+			printf("Vulkan: Failed to load vertex shader. Error code: %d", result);
+			return false;
+		}
+	}
+
 	// Create the backbuffer Views
 	{
 		vk::ImageViewCreateInfo info;
@@ -867,19 +897,79 @@ bool Visualizer::InitVulkanWindow(int width, int height) {
 
 	m_frameIndex = 0;
 
+	// Create texture sampler
+	{
+		vk::SamplerCreateInfo info;
+		info.magFilter = vk::Filter::eLinear;
+		info.minFilter = vk::Filter::eLinear;
+		info.addressModeU = vk::SamplerAddressMode::eRepeat;
+		info.addressModeV = vk::SamplerAddressMode::eRepeat;
+		info.addressModeW = vk::SamplerAddressMode::eRepeat;
+		info.anisotropyEnable = VK_FALSE;
+		info.unnormalizedCoordinates = VK_FALSE;
+		info.compareEnable = VK_FALSE;
+		info.mipmapMode = vk::SamplerMipmapMode::eLinear;
+		info.mipLodBias = 0.0f;
+		info.minLod = 0.0f;
+		info.maxLod = 0.0f;
+
+		result = m_device.createSampler(&info, nullptr, &m_sampler);
+		if (result != vk::Result::eSuccess) {
+			printf("Vulkan: Failed to create texture sampler. Error code: %d", result);
+			return false;
+		}
+	}
+
+	// Create descriptor set layout
+	{
+		vk::DescriptorSetLayoutBinding binding;
+		binding.binding = 0;
+		binding.descriptorCount = 1;
+		binding.descriptorType = vk::DescriptorType::eCombinedImageSampler;
+		binding.pImmutableSamplers = nullptr;
+		binding.stageFlags = vk::ShaderStageFlagBits::eFragment;
+
+		vk::DescriptorSetLayoutCreateInfo info;
+		info.bindingCount = 1;
+		info.pBindings = &binding;
+
+		result = m_device.createDescriptorSetLayout(&info, nullptr, &m_descriptorSetLayout);
+		if (result != vk::Result::eSuccess) {
+			printf("Vulkan: Failed to create descriptor set layout. Error code: %d", result);
+			return false;
+		}
+	}
+
+	// Create descriptor sets
+	std::vector<vk::DescriptorSet> descriptorSets(m_frameCount);
+	{
+		std::vector<vk::DescriptorSetLayout> layouts(m_frameCount, m_descriptorSetLayout);
+
+		vk::DescriptorSetAllocateInfo allocInfo;
+		allocInfo.descriptorPool = m_descriptorPool;
+		allocInfo.descriptorSetCount = m_frameCount;
+		allocInfo.pSetLayouts = layouts.data();
+		
+		result = m_device.allocateDescriptorSets(&allocInfo, descriptorSets.data());
+		if (result != vk::Result::eSuccess) {
+			printf("Vulkan: Failed to create descriptor sets. Error code: %d", result);
+			return false;
+		}
+	}
+
 	// Create staging images
 	{
 		vk::ImageCreateInfo imageInfo;
 		imageInfo.imageType = vk::ImageType::e2D;
-		imageInfo.format = vk::Format::eR8G8B8A8Unorm;
+		imageInfo.format = vk::Format::eR32G32B32Sfloat;
 		imageInfo.extent = vk::Extent3D(m_swapchainExtent.width, m_swapchainExtent.height, 1);
 		imageInfo.mipLevels = 1;
 		imageInfo.arrayLayers = 1;
 		imageInfo.samples = vk::SampleCountFlagBits::e1;
 		imageInfo.tiling = vk::ImageTiling::eLinear;
-		imageInfo.usage = vk::ImageUsageFlagBits::eTransferSrc;
+		imageInfo.usage = vk::ImageUsageFlagBits::eSampled;
 		imageInfo.sharingMode = vk::SharingMode::eExclusive;
-		imageInfo.initialLayout = vk::ImageLayout::eTransferSrcOptimal;
+		imageInfo.initialLayout = vk::ImageLayout::eUndefined;
 
 		VmaAllocationCreateInfo allocInfo{};
 		allocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
@@ -892,6 +982,193 @@ bool Visualizer::InitVulkanWindow(int width, int height) {
 				printf("Vulkan: Failed to create staging image");
 				return false;
 			}
+
+			// Transition image to Shader Read Only Optimal
+			{
+				vk::CommandBufferBeginInfo beginInfo;
+				beginInfo.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit;
+
+				result = frame->commandBuffer.begin(&beginInfo);
+				if (result != vk::Result::eSuccess) {
+					printf("Vulkan: Failed to begin command buffer. Error code: %d", result);
+					return false;
+				}
+
+				vk::ImageMemoryBarrier barrier;
+				barrier.srcAccessMask = (vk::AccessFlagBits)0;
+				barrier.dstAccessMask = vk::AccessFlagBits::eShaderRead;
+				barrier.oldLayout = vk::ImageLayout::eUndefined;
+				barrier.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+				barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+				barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+				barrier.image = frame->stagingImage;
+				barrier.subresourceRange = vk::ImageSubresourceRange(
+					vk::ImageAspectFlagBits::eColor,     // aspectMask 
+					0,                                   // baseMipLevel 
+					1,                                   // levelCount 
+					0,                                   // baseArrayLayer 
+					1                                    // layerCount 
+				);
+
+				frame->commandBuffer.pipelineBarrier(
+					vk::PipelineStageFlagBits::eTopOfPipe,         // srcStageMask 
+					vk::PipelineStageFlagBits::eFragmentShader,    // dstStageMask 
+					vk::DependencyFlagBits(),                      // dependencyFlags 
+					0,                                             // memoryBarrierCount 
+					nullptr,                                       // pMemoryBarriers 
+					0,                                             // bufferMemoryBarrierCount 
+					nullptr,                                       // pBufferMemoryBarriers 
+					1,                                             // imageMemoryBarrierCount 
+					&barrier                                       // pImageMemoryBarriers 
+				);
+
+				frame->commandBuffer.end();
+
+				vk::SubmitInfo submitInfo;
+				submitInfo.commandBufferCount = 1;
+				submitInfo.pCommandBuffers = &frame->commandBuffer;
+
+				m_graphicsQueue.submit(1, &submitInfo, vk::Fence());
+				m_graphicsQueue.waitIdle();
+			}
+
+			// Create image view
+			{
+				vk::ImageViewCreateInfo info;
+				info.image = frame->stagingImage;
+				info.viewType = vk::ImageViewType::e2D;
+				info.format = vk::Format::eR32G32B32Sfloat;
+				info.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eColor;
+				info.subresourceRange.baseMipLevel = 0;
+				info.subresourceRange.levelCount = 1;
+				info.subresourceRange.baseArrayLayer = 0;
+				info.subresourceRange.layerCount = 1;
+
+				result = m_device.createImageView(&info, nullptr, &frame->stagingImageView);
+				if (result != vk::Result::eSuccess) {
+					printf("Vulkan: Failed to create staging buffer image view. Error code: %d", result);
+					return false;
+				}
+			}
+
+			// Update descriptor sets
+			{
+				frame->descriptorSet = descriptorSets[i];
+
+				vk::DescriptorImageInfo info;
+				info.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+				info.imageView = frame->stagingImageView;
+				info.sampler = m_sampler;
+
+				vk::WriteDescriptorSet descriptorWrites[1];
+				descriptorWrites[0].dstSet = frame->descriptorSet;
+				descriptorWrites[0].dstBinding = 0;
+				descriptorWrites[0].dstArrayElement = 0;
+				descriptorWrites[0].descriptorType = vk::DescriptorType::eCombinedImageSampler;
+				descriptorWrites[0].descriptorCount = 1;
+				descriptorWrites[0].pImageInfo = &info;
+
+				m_device.updateDescriptorSets((uint32_t)SizeOfArray(descriptorWrites), descriptorWrites, 0, nullptr);
+			}
+		}
+	}
+
+	// Create the main graphics pipeline
+	{
+		vk::PipelineVertexInputStateCreateInfo vertexInput;
+		vertexInput.vertexBindingDescriptionCount = 0;
+		vertexInput.pVertexBindingDescriptions = nullptr;
+		vertexInput.vertexAttributeDescriptionCount = 0;
+		vertexInput.pVertexAttributeDescriptions = nullptr;
+
+		vk::PipelineInputAssemblyStateCreateInfo inputAssembly;
+		inputAssembly.topology = vk::PrimitiveTopology::eTriangleList;
+		inputAssembly.primitiveRestartEnable = VK_FALSE;
+
+		vk::Viewport viewport;
+		viewport.x = 0.0f;
+		viewport.y = 0.0f;
+		viewport.width = (float)m_swapchainExtent.width;
+		viewport.height = (float)m_swapchainExtent.height;
+		viewport.minDepth = 0.0f;
+		viewport.maxDepth = 1.0f;
+
+		vk::Rect2D scissor;
+		scissor.offset = vk::Offset2D(0, 0);
+		scissor.extent = m_swapchainExtent;
+
+		vk::PipelineViewportStateCreateInfo viewportState;
+		viewportState.viewportCount = 1;
+		viewportState.pViewports = &viewport;
+		viewportState.scissorCount = 1;
+		viewportState.pScissors = &scissor;
+
+		vk::PipelineRasterizationStateCreateInfo rasterizer;
+		rasterizer.depthClampEnable = VK_FALSE;
+		rasterizer.rasterizerDiscardEnable = VK_FALSE;
+		rasterizer.polygonMode = vk::PolygonMode::eFill;
+		rasterizer.lineWidth = 1.0f;
+		rasterizer.cullMode = vk::CullModeFlagBits::eBack;
+		rasterizer.frontFace = vk::FrontFace::eClockwise;
+
+		vk::PipelineMultisampleStateCreateInfo multisample;
+		multisample.sampleShadingEnable = VK_FALSE;
+		multisample.rasterizationSamples = vk::SampleCountFlagBits::e1;
+		multisample.minSampleShading = 1.0f;
+		multisample.pSampleMask = nullptr;
+		multisample.alphaToCoverageEnable = VK_FALSE;
+
+		vk::PipelineColorBlendAttachmentState colorBlendAttachment;
+		colorBlendAttachment.colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
+		colorBlendAttachment.blendEnable = VK_FALSE;
+
+		vk::PipelineColorBlendStateCreateInfo colorBlending;
+		colorBlending.logicOpEnable = VK_FALSE;
+		colorBlending.logicOp = vk::LogicOp::eCopy;
+		colorBlending.attachmentCount = 1;
+		colorBlending.pAttachments = &colorBlendAttachment;
+
+		vk::PipelineLayoutCreateInfo pipelineLayoutInfo;
+		pipelineLayoutInfo.setLayoutCount = 1;
+		pipelineLayoutInfo.pSetLayouts = &m_descriptorSetLayout;
+		pipelineLayoutInfo.pushConstantRangeCount = 0;
+		pipelineLayoutInfo.pPushConstantRanges = nullptr;
+
+		result = m_device.createPipelineLayout(&pipelineLayoutInfo, nullptr, &m_mainPipelineLayout);
+		if (result != vk::Result::eSuccess) {
+			printf("Vulkan: Failed to create main pipeline layout. Error code: %d", result);
+			return false;
+		}
+
+		vk::PipelineShaderStageCreateInfo shaderStages[2];
+		shaderStages[0].stage = vk::ShaderStageFlagBits::eVertex;
+		shaderStages[0].module = m_vertexShader;
+		shaderStages[0].pName = "main";
+		shaderStages[1].stage = vk::ShaderStageFlagBits::eFragment;
+		shaderStages[1].module = m_pixelShader;
+		shaderStages[1].pName = "main";
+
+		vk::GraphicsPipelineCreateInfo pipelineInfo;
+		pipelineInfo.stageCount = 2;
+		pipelineInfo.pStages = shaderStages;
+		pipelineInfo.pVertexInputState = &vertexInput;
+		pipelineInfo.pInputAssemblyState = &inputAssembly;
+		pipelineInfo.pViewportState = &viewportState;
+		pipelineInfo.pRasterizationState = &rasterizer;
+		pipelineInfo.pMultisampleState = &multisample;
+		pipelineInfo.pDepthStencilState = nullptr;
+		pipelineInfo.pColorBlendState = &colorBlending;
+		pipelineInfo.pDynamicState = nullptr;
+		pipelineInfo.layout = m_mainPipelineLayout;
+		pipelineInfo.renderPass = m_mainRenderPass;
+		pipelineInfo.subpass = 0;
+		pipelineInfo.basePipelineHandle = vk::Pipeline();
+		pipelineInfo.basePipelineIndex = -1;
+
+		result = m_device.createGraphicsPipelines(vk::PipelineCache(), 1, &pipelineInfo, nullptr, &m_mainPipeline);
+		if (result != vk::Result::eSuccess) {
+			printf("Vulkan: Failed to create main pipeline. Error code: %d", result);
+			return false;
 		}
 	}
 
@@ -955,7 +1232,7 @@ bool Visualizer::CreateSwapChain(int width, int height) {
 		return false;
 	}
 
-	result = m_device.getSwapchainImagesKHR(m_swapchain, &m_frameCount, nullptr);
+	result = m_device.getSwapchainImagesKHR(m_swapchain, &m_frameCount, (vk::Image *)nullptr);
 	if (result != vk::Result::eSuccess) {
 		printf("Vulkan: Failed to get swapchain image count. Error code: %d", result);
 		return false;
@@ -991,78 +1268,10 @@ bool Visualizer::RenderImage(FrameData *frame) {
 		frame->commandBuffer.beginRenderPass(&beginInfo, vk::SubpassContents::eInline);
 	}
 
-	// Transition image to Transfer Dest Optimal
-	{
-		vk::ImageMemoryBarrier barrier;
-		barrier.srcAccessMask = (vk::AccessFlagBits)0;
-		barrier.dstAccessMask = vk::AccessFlagBits::eTransferWrite;
-		barrier.oldLayout = vk::ImageLayout::eUndefined;
-		barrier.newLayout = vk::ImageLayout::eTransferDstOptimal;
-		barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		barrier.image = frame->backbuffer;
-		barrier.subresourceRange = vk::ImageSubresourceRange(
-			vk::ImageAspectFlagBits::eColor,     // aspectMask 
-			0,                                   // baseMipLevel 
-			1,                                   // levelCount 
-			0,                                   // baseArrayLayer 
-			1                                    // layerCount 
-		);
-
-		frame->commandBuffer.pipelineBarrier(
-			vk::PipelineStageFlagBits::eTopOfPipe,    // srcStageMask 
-			vk::PipelineStageFlagBits::eTransfer,     // dstStageMask 
-			vk::DependencyFlagBits(),                 // dependencyFlags 
-			0,                                        // memoryBarrierCount 
-			nullptr,                                  // pMemoryBarriers 
-			0,                                        // bufferMemoryBarrierCount 
-			nullptr,                                  // pBufferMemoryBarriers 
-			1,                                        // imageMemoryBarrierCount 
-			&barrier                                  // pImageMemoryBarriers 
-		);
-	}
-
-	{
-		vk::ImageBlit blitRegion{};
-		blitRegion.srcSubresource.aspectMask = vk::ImageAspectFlagBits::eColor;
-		blitRegion.srcSubresource.layerCount = 1;
-		blitRegion.srcOffsets[1] = vk::Offset3D(m_swapchainExtent.width, m_swapchainExtent.height, 1);
-		blitRegion.dstSubresource.aspectMask = vk::ImageAspectFlagBits::eColor;
-		blitRegion.dstSubresource.layerCount = 1;
-		blitRegion.dstOffsets[1] = vk::Offset3D(m_swapchainExtent.width, m_swapchainExtent.height, 1);
-		frame->commandBuffer.blitImage(frame->stagingImage, vk::ImageLayout::eTransferSrcOptimal, frame->backbuffer, vk::ImageLayout::eTransferDstOptimal, 1, &blitRegion, vk::Filter::eLinear);
-	}
-
-	// Transition image to eColorAttachmentOptimal
-	{
-		vk::ImageMemoryBarrier barrier;
-		barrier.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
-		barrier.dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
-		barrier.oldLayout = vk::ImageLayout::eTransferDstOptimal;
-		barrier.newLayout = vk::ImageLayout::eColorAttachmentOptimal;
-		barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		barrier.image = frame->backbuffer;
-		barrier.subresourceRange = vk::ImageSubresourceRange(
-			vk::ImageAspectFlagBits::eColor,     // aspectMask 
-			0,                                   // baseMipLevel 
-			1,                                   // levelCount 
-			0,                                   // baseArrayLayer 
-			1                                    // layerCount 
-		);
-
-		frame->commandBuffer.pipelineBarrier(
-			vk::PipelineStageFlagBits::eTransfer,                // srcStageMask 
-			vk::PipelineStageFlagBits::eColorAttachmentOutput,   // dstStageMask 
-			vk::DependencyFlagBits(),                            // dependencyFlags 
-			0,                                                   // memoryBarrierCount 
-			nullptr,                                             // pMemoryBarriers 
-			0,                                                   // bufferMemoryBarrierCount 
-			nullptr,                                             // pBufferMemoryBarriers 
-			1,                                                   // imageMemoryBarrierCount 
-			&barrier                                             // pImageMemoryBarriers 
-		);
-	}
+	// Draw a fullscreen triangle
+	frame->commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, m_mainPipeline);
+	frame->commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, m_mainPipelineLayout, 0, 1, &frame->descriptorSet, 0, nullptr);
+	frame->commandBuffer.draw(3, 1, 0, 0);
 
 	frame->commandBuffer.endRenderPass();
 
