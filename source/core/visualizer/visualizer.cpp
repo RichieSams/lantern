@@ -346,6 +346,10 @@ bool Visualizer::RenderFrame() {
 		return false;
 	}
 
+	uint minSPP = 0;
+	uint maxSPP = 0;
+	float sumSPP = 0.0f;
+
 	// Copy Renderer data to the GPU
 	float *mappedData = (float *)frame->stagingBufferAllocInfo.pMappedData;
 	for (uint j = 0; j < m_accumulationFrameBuffer.Height; ++j) {
@@ -359,6 +363,10 @@ bool Visualizer::RenderFrame() {
 			mappedData[mappedDataIndex + 0] = color.x / float(sampleCount); // Red
 			mappedData[mappedDataIndex + 1] = color.y / float(sampleCount); // Green
 			mappedData[mappedDataIndex + 2] = color.z / float(sampleCount); // Blue
+
+			minSPP = std::min(minSPP, sampleCount);
+			maxSPP = std::max(maxSPP, sampleCount);
+			sumSPP += sampleCount;
 		}
 	}
 
@@ -374,6 +382,15 @@ bool Visualizer::RenderFrame() {
 			return false;
 		}
 	}
+
+	ImGui::SetNextWindowPos(ImVec2(0, 50));
+	ImGui::Begin("Integrator Stats", nullptr, ImVec2(0, 0), -1, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse);
+	{
+		ImGui::Text("%u Min Samples Per Pixel", minSPP);
+		ImGui::Text("%u Max Samples Per Pixel", maxSPP);
+		ImGui::Text("%u Avg Samples Per Pixel", (uint)(sumSPP / (m_accumulationFrameBuffer.Width * m_accumulationFrameBuffer.Height)));
+	}
+	ImGui::End();
 
 	{
 		vk::CommandBufferBeginInfo beginInfo;
