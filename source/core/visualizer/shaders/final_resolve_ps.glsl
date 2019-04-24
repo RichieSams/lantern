@@ -1,3 +1,9 @@
+/* Lantern - A path tracer
+ *
+ * Lantern is the legal property of Adrian Astley
+ * Copyright Adrian Astley 2015 - 2016
+ */
+
 #version 450
 #extension GL_KHR_vulkan_glsl : enable
 
