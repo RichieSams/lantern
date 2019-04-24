@@ -226,7 +226,7 @@ bool Visualizer::Init(int width, int height) {
 	m_frameTimeSum = 0.0f;
 	m_frameTimeBin = 0;
 
-	m_selectedToneMapper = 0;
+	m_selectedToneMapper = 1;
 	m_exposure = 0.0f;
 
 	return true;
@@ -636,6 +636,11 @@ bool Visualizer::InitVulkan() {
 
 	return true;
 }
+
+struct PushConstants {
+	int SelectedToneMapper;
+	float Exposure;
+};
 
 bool Visualizer::InitVulkanWindow(int width, int height) {
 	vk::Result result;
@@ -1145,11 +1150,16 @@ bool Visualizer::InitVulkanWindow(int width, int height) {
 		colorBlending.attachmentCount = 1;
 		colorBlending.pAttachments = &colorBlendAttachment;
 
+		vk::PushConstantRange pushConstantRange;
+		pushConstantRange.stageFlags = vk::ShaderStageFlagBits::eFragment;
+		pushConstantRange.offset = 0;
+		pushConstantRange.size = sizeof(PushConstants);
+
 		vk::PipelineLayoutCreateInfo pipelineLayoutInfo;
 		pipelineLayoutInfo.setLayoutCount = 1;
 		pipelineLayoutInfo.pSetLayouts = &m_descriptorSetLayout;
-		pipelineLayoutInfo.pushConstantRangeCount = 0;
-		pipelineLayoutInfo.pPushConstantRanges = nullptr;
+		pipelineLayoutInfo.pushConstantRangeCount = 1;
+		pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
 
 		result = m_device.createPipelineLayout(&pipelineLayoutInfo, nullptr, &m_mainPipelineLayout);
 		if (result != vk::Result::eSuccess) {
@@ -1284,6 +1294,19 @@ bool Visualizer::RenderImage(FrameData *frame) {
 
 		frame->commandBuffer.beginRenderPass(&beginInfo, vk::SubpassContents::eInline);
 	}
+
+	ImGui::Begin("Tonemapping", nullptr, ImVec2(0, 0), -1, ImGuiWindowFlags_AlwaysAutoResize);
+	{
+		ImGui::Combo("Tonemapper", &m_selectedToneMapper, "Clamp\0Filmic\0\0");
+		ImGui::DragFloat("Exposure", &m_exposure, 0.1f, -10.0f, 10.0f, "%.1f");
+	}
+	ImGui::End();
+
+	// Push tonemapping constants
+	PushConstants constants;
+	constants.SelectedToneMapper = m_selectedToneMapper;
+	constants.Exposure = std::exp2f(m_exposure);
+	frame->commandBuffer.pushConstants(m_mainPipelineLayout, vk::ShaderStageFlagBits::eFragment, 0, sizeof(PushConstants), &constants);
 
 	// Draw a fullscreen triangle
 	frame->commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, m_mainPipeline);
