@@ -346,7 +346,7 @@ bool Visualizer::RenderFrame() {
 		return false;
 	}
 
-	uint minSPP = 0;
+	uint minSPP = 0xFFFFFFFF;
 	uint maxSPP = 0;
 	float sumSPP = 0.0f;
 
