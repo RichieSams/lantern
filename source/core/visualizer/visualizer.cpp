@@ -1297,7 +1297,7 @@ bool Visualizer::RenderImage(FrameData *frame) {
 
 	ImGui::Begin("Tonemapping", nullptr, ImVec2(0, 0), -1, ImGuiWindowFlags_AlwaysAutoResize);
 	{
-		ImGui::Combo("Tonemapper", &m_selectedToneMapper, "Clamp\0Filmic\0\0");
+		ImGui::Combo("Tonemapper", &m_selectedToneMapper, "Clamp\0Filmic\0Gamma\0\0");
 		ImGui::DragFloat("Exposure", &m_exposure, 0.1f, -10.0f, 10.0f, "%.1f");
 	}
 	ImGui::End();

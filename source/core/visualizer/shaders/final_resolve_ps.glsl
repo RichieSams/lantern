@@ -19,6 +19,7 @@ layout(location = 0) out vec4 outColor;
 
 #define CLAMP_TONEMAPPING 0
 #define FILMIC_TONEMAPPING 1
+#define GAMMA_TONEMAPPING 2
 
 
 vec4 ClampTonemapping(vec4 color) {
@@ -33,6 +34,12 @@ vec4 FilmicTonemapping(vec4 color) {
     return clamp(color, 0.0f, 1.0f);
 }
 
+vec4 GammaTonemapping(vec4 color) {
+	color = pow(color / (color + 1.0f), vec4(1.0f / 2.2f));
+	color.a = 1.0f;
+	return color;
+}
+
 void main() {
     vec4 color = toneMapperConstants.exposure * vec4(texture(inputTexture, texCoord).rgb, 1.0f);
     
@@ -40,5 +47,9 @@ void main() {
 		outColor = ClampTonemapping(color);
 	} else if (toneMapperConstants.selection == FILMIC_TONEMAPPING) {
 		outColor = FilmicTonemapping(color);
+	} else if (toneMapperConstants.selection == GAMMA_TONEMAPPING) {
+		outColor = GammaTonemapping(color);
+	} else {
+		outColor = vec4(1.0f, 0.0f, 1.0f, 1.0f);
 	}
 }
