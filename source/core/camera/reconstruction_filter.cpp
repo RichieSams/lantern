@@ -46,6 +46,7 @@ float ReconstructionFilter::Sample(float x) const {
 	//
 	// 0.0              0.5              1.0
 	// |----------------|----------------|
+	//      negative         positive
 	//
 	//
 	// 0.0              0.5
@@ -56,9 +57,9 @@ float ReconstructionFilter::Sample(float x) const {
 	// 0.0                               1.0
 	// |- - - - - - - - - - - - - - - - -|
 	// 
-	//
-	// 0.5              1.0
-	// |----------------|
+	// 
+	//                  0.5              1.0
+	//                  |----------------|
 	//
 	// (x - 0.5) * 2.0
 	//
