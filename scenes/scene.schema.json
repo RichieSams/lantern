@@ -11,19 +11,19 @@
 		"camera": {
 			"description": "",
 			"type": "object",
-			"required": [ "client_width", "client_height" ],
+			"required": [ "position", "target", "up", "client_width", "client_height" ],
 			"properties": {
-				"phi": {
+				"position": {
 					"description": "",
-					"type": "number"
+					"$ref": "#/definitions/float3"
 				},
-				"theta": {
+				"target": {
 					"description": "",
-					"type": "number"
+					"$ref": "#/definitions/float3"
 				},
-				"radius": {
+				"up": {
 					"description": "",
-					"type": "number"
+					"$ref": "#/definitions/float3"
 				},
 				"client_width": {
 					"description": "",
@@ -36,10 +36,6 @@
 				"fov": {
 					"description": "",
 					"type": "number"
-				},
-				"target": {
-					"description": "",
-					"$ref": "#/definitions/float3"
 				}
 			}
 		},

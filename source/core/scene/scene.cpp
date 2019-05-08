@@ -226,31 +226,18 @@ bool Scene::ParseJSON() {
 	// Get the camera values
 	nlohmann::json camera = j["camera"];
 
-	float phi = (float)M_PI_4;
-	float theta = 0.0f;
-	float cameraRadius = 10.0f;
-	float fov = (float)M_PI_4;
-	float3 target(0.0f);
-
+	float3 position = float3(camera["position"][0].get<float>(), camera["position"][1].get<float>(), camera["position"][2].get<float>());
+	float3 target = float3(camera["target"][0].get<float>(), camera["target"][1].get<float>(), camera["target"][2].get<float>());
+	float3 up = float3(camera["up"][0].get<float>(), camera["up"][1].get<float>(), camera["up"][2].get<float>());
 	uint clientWidth = camera["client_width"].get<uint>();
 	uint clientHeight = camera["client_height"].get<uint>();
-	if (camera.count("phi") == 1) {
-		phi = camera["phi"].get<float>();
-	}
-	if (camera.count("theta") == 1) {
-		theta = camera["theta"].get<float>();
-	}
-	if (camera.count("radius") == 1) {
-		cameraRadius = camera["radius"].get<float>();
-	}
+
+	float fov = (float)M_PI_4;
 	if (camera.count("fov") == 1) {
 		fov = camera["fov"].get<float>();
 	}
-	if (camera.count("target") == 1) {
-		target = float3(camera["target"][0].get<float>(), camera["target"][1].get<float>(), camera["target"][2].get<float>());
-	}
 
-	Camera = new PinholeCamera(phi, theta, cameraRadius, clientWidth, clientHeight, target, fov);
+	Camera = new PinholeCamera(position, target, up, clientWidth, clientHeight, fov);
 
 	std::unordered_map<std::string, BSDF *> bsdfMap;
 	std::unordered_map<std::string, Medium *> mediaMap;
