@@ -8,8 +8,6 @@
 
 #include "scene/mesh_elements.h"
 
-#include "materials/bsdfs/bsdf.h"
-
 #include <vector>
 
 

@@ -32,16 +32,11 @@ private:
 	ReconstructionFilter m_filter;
 
 	float3 m_position;
-	float3 m_target;
-	float3 m_up;
 
 	// Ray Transform Data
 	float m_tanFovXDiv2;
 	float m_tanFovYDiv2;
-
-	float3a m_matrixMulXAxis;
-	float3a m_matrixMulYAxis;
-	float3a m_matrixMulZAxis;
+	float3x3 m_transform;
 
 public:
 	/**
@@ -53,15 +48,7 @@ public:
 	RTCRay CalculateRayFromPixel(uint x, uint y, UniformSampler *sampler) const;
 
 private:
-	void UpdateCartesianCoordSystem() {
-		float3a zAxis = normalize(m_position - m_target);
-		float3a xAxis = normalize(cross(m_up, zAxis));
-		float3a yAxis = cross(zAxis, xAxis);
-
-		m_matrixMulXAxis = float3a(xAxis.x, yAxis.x, zAxis.x);
-		m_matrixMulYAxis = float3a(xAxis.y, yAxis.y, zAxis.y);
-		m_matrixMulZAxis = float3a(xAxis.z, yAxis.z, zAxis.z);
-	}
+	void UpdateCartesianCoordSystem(float3 target, float3 up);
 };
 
 } // End of namespace Lantern

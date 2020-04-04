@@ -16,10 +16,10 @@
 		"client_height": 720,
 		"fov": 0.7853981
 	},
-	"bsdfs": [
+	"materials": [
 		{
 			"name": "GroundInner",
-			"type": "lambert",
+			"type": "matte",
 			"albedo": {
 				"type": "constant",
 				"value": [ 0.456263, 0.456263, 0.456263 ]
@@ -27,7 +27,7 @@
 		},
 		{
 			"name": "GroundOuter",
-			"type": "lambert",
+			"type": "matte",
 			"albedo": {
 				"type": "constant",
 				"value": [ 0.456263, 0.456263, 0.456263 ]
@@ -35,7 +35,7 @@
 		},
 		{
 			"name": "Cloth",
-			"type": "lambert",
+			"type": "matte",
 			"albedo": {
 				"type": "constant",
 				"value": [ 0.456263, 0.456263, 0.456263 ]
@@ -43,7 +43,7 @@
 		},
 		{
 			"name": "Dragon",
-			"type": "lambert",
+			"type": "matte",
 			"albedo": {
 				"type": "constant",
 				"value": [ 0.79311, 0.79311, 0.79311 ]
@@ -51,7 +51,7 @@
 		},
 		{
 			"name": "Blade",
-			"type": "lambert",
+			"type": "matte",
 			"albedo": {
 				"type": "constant",
 				"value": [ 0.79311, 0.79311, 0.79311 ]
@@ -59,7 +59,7 @@
 		},
 		{
 			"name": "Sword",
-			"type": "lambert",
+			"type": "matte",
 			"albedo": {
 				"type": "constant",
 				"value": [ 0.79311, 0.79311, 0.79311 ]
@@ -67,7 +67,7 @@
 		},
 		{
 			"name": "Deco",
-			"type": "lambert",
+			"type": "matte",
 			"albedo": {
 				"type": "constant",
 				"value": [ 0.79311, 0.79311, 0.79311 ]
@@ -75,7 +75,7 @@
 		},
 		{
 			"name": "Diamond",
-			"type": "lambert",
+			"type": "matte",
 			"albedo": {
 				"type": "constant",
 				"value": [ 0.79311, 0.79311, 0.79311 ]
@@ -83,7 +83,7 @@
 		},
 		{
 			"name": "Deco2",
-			"type": "lambert",
+			"type": "matte",
 			"albedo": {
 				"type": "constant",
 				"value": [ 0.79311, 0.79311, 0.79311 ]
@@ -91,44 +91,6 @@
 		}
 	],
 	"media": [],
-	"materials": [
-		{
-			"name": "GroundInner",
-			"bsdf": "GroundInner"
-		},
-		{
-			"name": "GroundOuter",
-			"bsdf": "GroundOuter"
-		},
-		{
-			"name": "Cloth",
-			"bsdf": "Cloth"
-		},
-		{
-			"name": "Dragon",
-			"bsdf": "Dragon"
-		},
-		{
-			"name": "Blade",
-			"bsdf": "Blade"
-		},
-		{
-			"name": "Sword",
-			"bsdf": "Sword"
-		},
-		{
-			"name": "Deco",
-			"bsdf": "Deco"
-		},
-		{
-			"name": "Diamond",
-			"bsdf": "Diamond"
-		},
-		{
-			"name": "Deco2",
-			"bsdf": "Deco2"
-		}
-	],
 	"primitives": [
 		{
 			"name": "GroundOuter",

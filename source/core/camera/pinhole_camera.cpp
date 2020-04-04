@@ -14,11 +14,9 @@ PinholeCamera::PinholeCamera()
 		  FrameBufferHeight(0),
 		  m_filter(ReconstructionFilter::Type::Tent),
 		  m_position(0.0f, 0.0f, -10.0f),
-		  m_target(0.0f, 0.0f, 0.0f),
-		  m_up(1.0f),
 		  m_tanFovXDiv2(0.5773503f /* tan(60 degrees / 2) */),
 		  m_tanFovYDiv2(tanf(0.5235f /* 60 degrees / 2 */ * 720 / 1280)) {
-	UpdateCartesianCoordSystem();
+	UpdateCartesianCoordSystem(float3(0.0f), float3(0.0f, 1.0f, 0.0f));
 }
 
 PinholeCamera::PinholeCamera(float3 position, float3 target, float3 up, uint clientWidth, uint clientHeight, float fov, ReconstructionFilter::Type filterType)
@@ -26,11 +24,9 @@ PinholeCamera::PinholeCamera(float3 position, float3 target, float3 up, uint cli
 		  FrameBufferHeight(clientHeight),
 		  m_filter(filterType),
 		  m_position(position),
-		  m_target(target),
-		  m_up(up),
 		  m_tanFovXDiv2(tanf(fov * 0.5f)),
 		  m_tanFovYDiv2(tanf(fov * 0.5f * clientHeight / clientWidth)) {
-	UpdateCartesianCoordSystem();
+	UpdateCartesianCoordSystem(target, up);
 }
 
 RTCRay PinholeCamera::CalculateRayFromPixel(uint x, uint y, UniformSampler *sampler) const {
@@ -48,16 +44,26 @@ RTCRay PinholeCamera::CalculateRayFromPixel(uint x, uint y, UniformSampler *samp
 	float u = m_filter.Sample(sampler->NextFloat());
 	float v = m_filter.Sample(sampler->NextFloat());
 
-	float3a viewVector((((x + 0.5f + u) / FrameBufferWidth) * 2.0f - 1.0f) * m_tanFovXDiv2,
+	float3 viewVector(
+		(((x + 0.5f + u) / FrameBufferWidth) * 2.0f - 1.0f) * m_tanFovXDiv2,
 		-(((y + 0.5f + v) / FrameBufferHeight) * 2.0f - 1.0f) * m_tanFovYDiv2,
 		-1.0f);
 
-	// Matrix multiply
-	ray.dir_x = dot(viewVector, m_matrixMulXAxis);
-	ray.dir_y = dot(viewVector, m_matrixMulYAxis);
-	ray.dir_z = dot(viewVector, m_matrixMulZAxis);
+	// Transform to world
+	float3 world = m_transform * viewVector;
+	ray.dir_x = world.x;
+	ray.dir_y = world.y;
+	ray.dir_z = world.z;
 
 	return ray;
+}
+
+void PinholeCamera::UpdateCartesianCoordSystem(float3 target, float3 up) {
+	float3 f = normalize(m_position - target);
+	float3 r = normalize(cross(up, f));
+	float3 u = normalize(cross(r, f));
+
+	m_transform = float3x3(r, u, f);
 }
 
 } // End of namespace Lantern

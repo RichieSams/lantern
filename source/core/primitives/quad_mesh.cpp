@@ -1,0 +1,88 @@
+/* Lantern - A path tracer
+ *
+ * Lantern is the legal property of Adrian Astley
+ * Copyright Adrian Astley 2015 - 2016
+ */
+
+#include "primitives/quad_mesh.h"
+
+#include "io/lantern_model_file.h"
+
+
+namespace Lantern {
+
+void QuadMesh::Initialize(RTCDevice device, RTCScene scene, LanternModelFile *lmf, float3 emissiveColor, float radiantPower, float4x4 transform, BSDF *bsdf, Medium *medium) {
+	m_scene = scene;
+	
+	RTCGeometry geometry = rtcNewGeometry(device, RTC_GEOMETRY_TYPE_QUAD);
+	rtcSetGeometryBuildQuality(geometry, RTC_BUILD_QUALITY_HIGH);
+	rtcSetGeometryTimeStepCount(geometry, 1);
+
+	float3a *vertices = (float3a *)rtcSetNewGeometryBuffer(geometry, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT3, sizeof(float3a), lmf->Positions.size() / 3);
+	for (uint i = 0, j = 0; j < lmf->Positions.size() / 3; i += 3, ++j) {
+		float3a vertex(lmf->Positions[i], lmf->Positions[i + 1], lmf->Positions[i + 2], 1.0f);
+
+		vertices[j] = transform * vertex;
+	}
+
+	// Calculate the surface area
+	float surfaceArea = 0.0f;
+	for (std::size_t i = 0; i < lmf->Indices.size(); i += 4) {
+		float3a v0 = vertices[lmf->Indices[i]];
+		float3a v1 = vertices[lmf->Indices[i + 1]];
+		float3a v2 = vertices[lmf->Indices[i + 2]];
+		float3a v3 = vertices[lmf->Indices[i + 2]];
+
+		// Shoelace formula: https://en.wikipedia.org/wiki/Shoelace_formula
+		surfaceArea += 0.5f * length(cross(v0 - v1, v0 - v2)) + 0.5f * length(cross(v0 - v2, v0 - v3));
+	}
+
+	uint *indices = (uint *)rtcSetNewGeometryBuffer(geometry, RTC_BUFFER_TYPE_INDEX, 0, RTC_FORMAT_UINT4, 4 * sizeof(uint), lmf->Indices.size() / 4);
+	memcpy(indices, &lmf->Indices[0], lmf->Indices.size() * sizeof(uint));
+
+	rtcSetGeometryVertexAttributeCount(geometry, (lmf->Normals.size() > 0 ? 1 : 0) + (lmf->TexCoords.size() > 0 ? 1 : 0));
+
+	bool hasNormals = false;
+	if (lmf->Normals.size() > 0) {
+		float3 *normals = (float3 *)rtcSetNewGeometryBuffer(geometry, RTC_BUFFER_TYPE_VERTEX_ATTRIBUTE, 0, RTC_FORMAT_FLOAT3, sizeof(float3), lmf->Normals.size() / 3);
+		memcpy(normals, &lmf->Normals[0], lmf->Normals.size() * sizeof(float));
+
+		hasNormals = true;
+	}
+
+	bool hasTexCoords = false;
+	if (lmf->TexCoords.size() > 0) {
+		float2 *texCoords = (float2 *)rtcSetNewGeometryBuffer(geometry, RTC_BUFFER_TYPE_VERTEX_ATTRIBUTE, 1, RTC_FORMAT_FLOAT2, sizeof(float2), lmf->TexCoords.size() / 2);
+		memcpy(texCoords, &lmf->TexCoords[0], lmf->TexCoords.size() * sizeof(float));
+
+		hasTexCoords = true;
+	}
+
+	rtcCommitGeometry(geometry);
+	uint geometryId = rtcAttachGeometry(scene, geometry);
+	rtcReleaseGeometry(geometry);
+
+	Primitive::Initialize(emissiveColor * radiantPower * (float)M_1_PI / surfaceArea, bsdf, medium, surfaceArea, geometryId, hasNormals, hasTexCoords);
+}
+
+float3 QuadMesh::SampleDirectLighting(UniformSampler *sampler, SurfaceInteraction &interaction, float3 *direction, float *distance, float *pdf) const {
+	*pdf = 0.0f;
+
+	return float3(0.0f);
+}
+
+float3 QuadMesh::InterpolateNormal(uint primId, float u, float v) {
+	float3 normal;
+	rtcInterpolate1(rtcGetGeometry(m_scene, m_geometryId), primId, u, v, RTC_BUFFER_TYPE_VERTEX_ATTRIBUTE, 0, &normal.x, nullptr, nullptr, 3);
+
+	return normal;
+}
+
+float2 QuadMesh::InterpolateTexCoords(uint primId, float u, float v) {
+	float2 texCoord;
+	rtcInterpolate1(rtcGetGeometry(m_scene, m_geometryId), primId, u, v, RTC_BUFFER_TYPE_VERTEX_ATTRIBUTE, 1, &texCoord.x, nullptr, nullptr, 2);
+
+	return texCoord;
+}
+
+} // End of namespace Lantern

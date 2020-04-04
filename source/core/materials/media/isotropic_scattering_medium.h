@@ -40,7 +40,7 @@ public:
 	}
 	float3a SampleScatterDirection(UniformSampler *sampler, float3a &wo, float *pdf) const override {
 		*pdf = 0.25f * (float)M_1_PI; // 1 / (4 * PI)
-		return UniformSampleSphere(sampler);
+		return UniformSampleUnitSphere(sampler);
 	}
 
 	float ScatterDirectionPdf(float3a &wi, float3a &wo) const override {

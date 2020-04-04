@@ -15,7 +15,7 @@
 namespace Lantern {
 
 struct LanternModelFile {
-	byte VerticesPerPrimative;
+	byte VerticesPerPrimitive;
 
 	std::vector<float> Positions;
 	std::vector<uint32> Indices;

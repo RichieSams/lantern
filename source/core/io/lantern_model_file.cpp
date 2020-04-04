@@ -14,7 +14,7 @@ namespace Lantern {
 /*
 	struct LanternModelFile_FileFormat {
 		uint32 Magic;
-		byte VerticesPerPrimative;
+		byte VerticesPerPrimitive;
 		uint32 Flags;
 
 		uint64 NumPositions;
@@ -37,7 +37,7 @@ bool ReadLMF(FILE *file, LanternModelFile *lmf) {
 	}
 
 	// Read the rest of the header
-	lmf->VerticesPerPrimative = ReadByte(file);
+	lmf->VerticesPerPrimitive = ReadByte(file);
 	uint32 flags = ReadUInt32(file);
 
 	// Read the main data
@@ -67,7 +67,7 @@ bool ReadLMF(FILE *file, LanternModelFile *lmf) {
 bool WriteLFM(FILE *file, LanternModelFile *lmf) {
 	// Write the header
 	WriteUInt32(file, CreateMagicNumber('L', 'M', 'F', '\0'));
-	WriteByte(file, lmf->VerticesPerPrimative);
+	WriteByte(file, lmf->VerticesPerPrimitive);
 	
 	// Calculate the flags directly, rather than requiring the user to do it
 	uint32 flags = 0;

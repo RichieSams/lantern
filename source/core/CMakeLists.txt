@@ -35,13 +35,9 @@ SetSourceGroup(NAME Math
 
 SetSourceGroup(NAME Scene
 	PREFIX LANTERN_CORE
-	SOURCE_FILES scene/area_light.h
-	             scene/area_light.cpp
-	             scene/geometry_generator.h
-	             scene/geometry_generator.cpp
-	             scene/image_cache.h
+	SOURCE_FILES scene/image_cache.h
 	             scene/image_cache.cpp
-	             scene/light.h
+	             scene/json_parsing.cpp
 	             scene/mesh_elements.h
 	             scene/scene.h
 	             scene/scene.cpp
@@ -51,16 +47,19 @@ SetSourceGroup(NAME Scene
 
 SetSourceGroup(NAME Materials
 	PREFIX LANTERN_CORE
-	SOURCE_FILES materials/material.h
+	SOURCE_FILES materials/bsdf.h
+	             materials/bsdf.cpp
+	             materials/bsdf_lobe.h
+	             materials/bsdf_math.h
+	             materials/matte.h
 )
 
 SetSourceGroup(NAME Materials/BSDFs
 	PREFIX LANTERN_CORE
-	SOURCE_FILES materials/bsdfs/bsdf.h
-	             materials/bsdfs/lambert_bsdf.h
-	             materials/bsdfs/mirror_bsdf.h
-	             materials/bsdfs/bsdf_lobe.h
-	             materials/bsdfs/ideal_specular_dielectric.h
+	SOURCE_FILES materials/bxdfs/lambert.h
+	             materials/bxdfs/specular.h
+	             materials/bxdfs/mirror_bsdf.h
+	             materials/bxdfs/ideal_specular_dielectric.h
 )
 
 SetSourceGroup(NAME Materials/Textures
@@ -71,7 +70,7 @@ SetSourceGroup(NAME Materials/Textures
 	             materials/textures/uv_texture.h
 )
 
-SetSourceGroup(NAME "Materials/Media"
+SetSourceGroup(NAME Materials/Media
 	PREFIX LANTERN_CORE
 	SOURCE_FILES materials/media/medium.h
 	             materials/media/non_scattering_medium.h
@@ -92,7 +91,7 @@ SetSourceGroup(NAME Visualizer
 	             visualizer/vulkan_function_loader.cpp
 )
 
-SetSourceGroup(NAME "Visualizer/Shaders"
+SetSourceGroup(NAME Visualizer/Shaders
 	PREFIX LANTERN_CORE
 	SOURCE_FILES visualizer/shaders/fullscreen_triangle_vs.glsl
 	             visualizer/shaders/fullscreen_triangle_vs.spv.h
@@ -100,6 +99,19 @@ SetSourceGroup(NAME "Visualizer/Shaders"
 	             visualizer/shaders/final_resolve_ps.glsl
 	             visualizer/shaders/final_resolve_ps.spv.h
 	             visualizer/shaders/final_resolve_ps.spv.cpp
+)
+
+SetSourceGroup(NAME Primitives
+	PREFIX LANTERN_CORE
+	SOURCE_FILES primitives/primitive.h
+	             primitives/triangle_mesh.h
+	             primitives/triangle_mesh.cpp
+	             primitives/quad_mesh.h
+	             primitives/quad_mesh.cpp
+	             primitives/sphere.h
+	             primitives/sphere.cpp
+	             primitives/grid.h
+	             primitives/grid.cpp
 )
 
 
@@ -116,6 +128,7 @@ set(LANTERN_CORE_SRC
 	${LANTERN_CORE_INTEGRATOR}
 	${LANTERN_CORE_VISUALIZER}
 	${LANTERN_CORE_VISUALIZER_SHADERS}
+	${LANTERN_CORE_PRIMITIVES}
 )
 
 # Create lib

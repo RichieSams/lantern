@@ -10,25 +10,24 @@
 
 #include "camera/pinhole_camera.h"
 
-#include "scene/light.h"
 #include "scene/image_cache.h"
 
 #define EMBREE_STATIC_LIB
 #include "embree3/rtcore.h"
 
-#include <unordered_map>
-#include <experimental/filesystem>
-namespace fs = std::experimental::filesystem;
+#include "json.hpp"
 
+#include <unordered_map>
+#include <filesystem>
 
 namespace Lantern {
 
 class BSDF;
 class Medium;
-struct Material;
 struct Mesh;
 struct LanternModelFile;
 class Texture;
+class Primitive;
 
 class Scene {
 public:
@@ -40,29 +39,16 @@ public:
 	float3 BackgroundColor;
 
 private:
-	fs::path m_jsonPath;
+	std::filesystem::path m_jsonPath;
 	
 	std::vector<BSDF *> m_bsdfs;
 	std::vector<Medium *> m_media;
-	std::vector<Material *> m_materials;
 	std::vector<Texture *> m_textures;
-	std::vector<Light *> m_lights;
 
 	ImageCache m_imageCache;
 
-	struct Model {
-		Model() : material(nullptr), light(nullptr) { }
-		Model(Material *material, Light *light = nullptr)
-			: material(material),
-			  light(light) {
-		}
-
-		Material *material;
-		Light *light;
-		bool hasNormals;
-		bool hasTexCoords;
-	};
-	std::unordered_map<uint, Model> m_models;
+	std::unordered_map<uint, Primitive *> m_primitives;
+	std::vector<Primitive *> m_lights;
 
 	RTCDevice m_device;
 	RTCScene m_scene;
@@ -71,29 +57,22 @@ public:
 	bool LoadSceneFromJSON(const char *filePath);
 	bool ReloadSceneFromJSON();
 
-	Material *GetMaterial(uint modelId) {
-		return m_models[modelId].material;
-	}
-	Light *GetLight(uint modelId) {
-		return m_models[modelId].light;
+	Primitive *GetPrimitive(uint geometryId) {
+		return m_primitives[geometryId];
 	}
 	std::size_t NumLights() const { return m_lights.size(); }
-	Light *RandomOneLight(UniformSampler *sampler);
+	Primitive *RandomOneLight(UniformSampler *sampler);
 
-	void Intersect(RTCRayHit &ray) const;
-	bool HasNormals(uint meshId) {
-		return m_models[meshId].hasNormals;
-	}
-	float3 InterpolateNormal(uint meshId, uint primId, float u, float v) const;
-	bool HasTexCoords(uint meshId) {
-		return m_models[meshId].hasTexCoords;
-	}
-	float2 InterpolateTexCoord(uint meshId, uint primId, float u, float v) const;
+	void Intersect(RTCRayHit *ray) const;
+	void Occluded(RTCRay *ray) const;
 
 private:
 	bool ParseJSON();
-	uint AddMesh(Mesh *mesh, float4x4 &transform, float *out_surfaceArea, float4 *out_boundingSphere, bool *out_hasNormals, bool *out_hasTexCoords);
-	uint AddLMF(LanternModelFile *lmf, float4x4 &transform, float *out_surfaceArea, float4 *out_boundingSphere, bool *out_hasNormals, bool *out_hasTexCoords);
+	void ParseCamera(nlohmann::json &root);
+	void ParseMaterials(nlohmann::json &root, std::unordered_map<std::string, BSDF *> *bsdfMap);
+	void ParseMedia(nlohmann::json &root, std::unordered_map<std::string, Medium *> *mediaMap);
+	bool ParsePrimitives(nlohmann::json &root, std::unordered_map<std::string, BSDF *> &bsdfMap, std::unordered_map<std::string, Medium *> &mediaMap);
+	Texture *ParseTexture(nlohmann::json &root);
 	void CleanupScene();
 };
 

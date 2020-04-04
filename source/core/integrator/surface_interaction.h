@@ -8,26 +8,19 @@
 
 #include "math/vector_types.h"
 
-#include "materials/bsdfs/bsdf_lobe.h"
-
 
 namespace Lantern {
 
 struct SurfaceInteraction {
-	SurfaceInteraction()
-		: SampledLobe(BSDFLobe::Null), 
-		  IORi(0.0f), 
-		  IORo(0.0f) {
-	}
+	float3a Position = float3a(0.0f);
+	float3a Normal = float3a(0.0f);
+	float2 TexCoord = float2(0.0f);
 
-	float3a Position;
-	float3a Normal;
-	float2 TexCoord;
-	float3a InputDirection;
-	float3a OutputDirection;
-	BSDFLobe::Type SampledLobe;
-	float IORi;
-	float IORo;
+	struct {
+		float3a Normal;
+	} Shading;
+
+	float3 OutputDirection = float3(0.0f);
 };
 
 } // End of namespace Lantern

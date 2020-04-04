@@ -28,7 +28,7 @@ inline bool any(float3a &a) {
 	return a.x == 0.0f || a.y == 0.0f || a.z == 0.0f;
 }
 
-float3a RotateToWorld(float x, float y, float z, float3a &normal);
+float3x3 CreateCoordinateFrame(float3a &N);
 
 inline float3a reflect(const float3a &V, const float3a &N) {
 	return 2.0f * dot(V, N) * N - V;
@@ -81,6 +81,10 @@ inline float3 max(float3 &a, float3 &b) {
 		std::max(a.y, b.y),
 		std::max(a.z, b.z)
 	);
+}
+
+inline bool SameHemisphere(const float3 &w, const float3 &wp) {
+	return w.z * wp.z > 0;
 }
 
 } // End of namespace Lantern

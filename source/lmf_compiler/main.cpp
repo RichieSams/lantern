@@ -120,14 +120,14 @@ void ConvertObjToLMF(LMFCompilerOpts *opts) {
 		// Convert to LMF data
 		Lantern::LanternModelFile lmf;
 		
-		byte verticesPerPrimative = shape.mesh.num_vertices[0];
+		byte verticesPerPrimitive = shape.mesh.num_vertices[0];
 		for (std::size_t i = 1; i < shape.mesh.num_vertices.size(); ++i) {
-			if (shape.mesh.num_vertices[i] != verticesPerPrimative) {
-				printf("The number of vertices per primitive is not consistent across [%s]\nThe first face has %u vertices. Found %u vertices for face #%zu\n", shape.name.c_str(), verticesPerPrimative, shape.mesh.num_vertices[i], i / verticesPerPrimative);
+			if (shape.mesh.num_vertices[i] != verticesPerPrimitive) {
+				printf("The number of vertices per primitive is not consistent across [%s]\nThe first face has %u vertices. Found %u vertices for face #%zu\n", shape.name.c_str(), verticesPerPrimitive, shape.mesh.num_vertices[i], i / verticesPerPrimitive);
 				return;
 			}
 		}
-		lmf.VerticesPerPrimative = verticesPerPrimative;
+		lmf.VerticesPerPrimitive = verticesPerPrimitive;
 		
 		lmf.Positions = std::move(shape.mesh.positions);
 		lmf.Indices = std::move(shape.mesh.indices);

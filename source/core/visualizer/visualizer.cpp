@@ -15,6 +15,9 @@
 #define GLFW_INCLUDE_VULKAN
 #include "GLFW/glfw3.h"
 
+#include "stb_image_write.h"
+
+
 #include <cstdio>
 #include <cstdlib>
 #include <chrono>
@@ -350,19 +353,43 @@ bool Visualizer::RenderFrame() {
 	uint maxSPP = 0;
 	float sumSPP = 0.0f;
 
+	//byte* dest = (byte *)malloc(m_accumulationFrameBuffer.Width * m_accumulationFrameBuffer.Height * sizeof(byte) * 3);
+	//for (uint j = 0; j < m_accumulationFrameBuffer.Height; ++j) {
+	//	const size_t offset = j * m_accumulationFrameBuffer.Width;
+	//	for (uint i = 0; i < m_accumulationFrameBuffer.Width; ++i) {
+	//		const size_t frameBufferIndex = offset + i;
+
+	//		float3 color = m_accumulationFrameBuffer.ColorData[frameBufferIndex];
+	//		uint colorSampleCount = m_accumulationFrameBuffer.ColorSampleCount[frameBufferIndex];
+
+	//		color = color / float(colorSampleCount);
+
+	//		const size_t destIndex = frameBufferIndex * 3;
+	//		dest[destIndex + 0] = (byte)(color.x * 255.0f); // Red
+	//		dest[destIndex + 1] = (byte)(color.y * 255.0f); // Green
+	//		dest[destIndex + 2] = (byte)(color.z * 255.0f); // Blue
+	//	}
+	//}
+
+	//
+	//stbi_write_png("frame.png", m_accumulationFrameBuffer.Width, m_accumulationFrameBuffer.Height, 3, dest, m_accumulationFrameBuffer.Width * sizeof(byte) * 3);
+	//exit(0);
+
+	
 	// Copy Renderer data to the GPU
 	float *mappedData = (float *)frame->stagingBufferAllocInfo.pMappedData;
 	for (uint j = 0; j < m_accumulationFrameBuffer.Height; ++j) {
 		const size_t offset = j * m_accumulationFrameBuffer.Width;
 		for (uint i = 0; i < m_accumulationFrameBuffer.Width; ++i) {
 			const size_t frameBufferIndex = offset + i;
-			const size_t mappedDataIndex = frameBufferIndex * 3;
+			const size_t mappedDataIndex = frameBufferIndex * 4;
 
 			float3 &color = m_accumulationFrameBuffer.ColorData[frameBufferIndex];
 			uint sampleCount = m_accumulationFrameBuffer.ColorSampleCount[frameBufferIndex];
 			mappedData[mappedDataIndex + 0] = color.x / float(sampleCount); // Red
 			mappedData[mappedDataIndex + 1] = color.y / float(sampleCount); // Green
 			mappedData[mappedDataIndex + 2] = color.z / float(sampleCount); // Blue
+			mappedData[mappedDataIndex + 2] = 1.0f; // Alpha
 
 			minSPP = std::min(minSPP, sampleCount);
 			maxSPP = std::max(maxSPP, sampleCount);
@@ -983,7 +1010,7 @@ bool Visualizer::InitVulkanWindow(int width, int height) {
 	{
 		vk::ImageCreateInfo imageInfo;
 		imageInfo.imageType = vk::ImageType::e2D;
-		imageInfo.format = vk::Format::eR32G32B32Sfloat;
+		imageInfo.format = vk::Format::eR32G32B32A32Sfloat;
 		imageInfo.extent = vk::Extent3D(m_swapchainExtent.width, m_swapchainExtent.height, 1);
 		imageInfo.mipLevels = 1;
 		imageInfo.arrayLayers = 1;
@@ -1059,7 +1086,7 @@ bool Visualizer::InitVulkanWindow(int width, int height) {
 				vk::ImageViewCreateInfo info;
 				info.image = frame->stagingImage;
 				info.viewType = vk::ImageViewType::e2D;
-				info.format = vk::Format::eR32G32B32Sfloat;
+				info.format = vk::Format::eR32G32B32A32Sfloat;
 				info.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eColor;
 				info.subresourceRange.baseMipLevel = 0;
 				info.subresourceRange.levelCount = 1;

@@ -18,7 +18,7 @@ class UniformSampler;
 struct SurfaceInteraction;
 class BSDF;
 class Scene;
-class Light;
+class Primitive;
 class FrameBuffer;
 
 class Integrator {
@@ -46,8 +46,8 @@ public:
 private:
 	void RenderTile(uint index, uint width, uint height, uint numTilesX, uint numTilesY) const;
 	void RenderPixel(uint x, uint y, UniformSampler *sampler) const;
-	float3 SampleOneLight(UniformSampler *sampler, SurfaceInteraction interaction, BSDF *bsdf, Light *hitLight) const;
-	float3 EstimateDirect(Light *light, UniformSampler *sampler, SurfaceInteraction &interaction, BSDF *bsdf) const;
+	float3 SampleOneLight(UniformSampler *sampler, Scene *scene, SurfaceInteraction interaction, BSDF *bsdf, float IORi, Primitive *hitPrimitive) const;
+	float3 EstimateDirect(Primitive *light, UniformSampler *sampler, Scene *scene, SurfaceInteraction &interaction, BSDF *bsdf, float IORi) const;
 };
 
 } // End of namespace Lantern

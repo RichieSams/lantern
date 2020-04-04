@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include "math/linearspace3.h"
 #include "math/linearspace4.h"
 
 #include "math/vec2.h"
@@ -24,3 +25,4 @@ typedef embree::Vec3fa float3a;
 typedef embree::Vec2<unsigned int> uint2;
 
 typedef embree::LinearSpace4 float4x4;
+typedef embree::LinearSpace3f float3x3;

@@ -10,8 +10,8 @@
 
 #include "scene/scene.h"
 
-#include "materials/material.h"
-#include "materials/bsdfs/bsdf.h"
+#include "primitives/primitive.h"
+#include "materials/bsdf.h"
 #include "materials/media/medium.h"
 
 #include "math/uniform_sampler.h"
@@ -95,120 +95,139 @@ void Integrator::RenderTile(uint index, uint width, uint height, uint numTilesX,
 	}
 }
 
+enum class InteractionType {
+	None,
+	Surface,
+	Medium
+};
+
 void Integrator::RenderPixel(uint x, uint y, UniformSampler *sampler) const {
 	RTC_ALIGN(16) RTCRayHit rayHit;
 	rayHit.ray = m_scene->Camera->CalculateRayFromPixel(x, y, sampler);
+	
 	rayHit.hit.geomID = RTC_INVALID_GEOMETRY_ID;
 	rayHit.hit.instID[0] = RTC_INVALID_GEOMETRY_ID;
 	rayHit.hit.primID = RTC_INVALID_GEOMETRY_ID;
 
 	float3 color(0.0f);
 	float3 throughput(1.0f);
-	SurfaceInteraction interaction;
-	interaction.IORi = 1.0f; // Air
-	Medium *medium = nullptr;
-	bool hitSurface = false;
 
+	SurfaceInteraction interaction;
+	float currentIOR = 1.0f; // Air
+	Medium *medium = nullptr;
+	
+	bool specularBounce = false;
+
+	
 	// Bounce the ray around the scene
 	uint bounces = 0;
 	const uint maxBounces = 1500;
+	
 	for (; bounces < maxBounces; ++bounces) {
-		m_scene->Intersect(rayHit);
-
-		// The ray missed. Return the background color
-		if (rayHit.hit.geomID == RTC_INVALID_GEOMETRY_ID) {
-			color += throughput * m_scene->BackgroundColor;
-			break;
-		}
-
+		m_scene->Intersect(&rayHit);
 		float3a origin = float3a(rayHit.ray.org_x, rayHit.ray.org_y, rayHit.ray.org_z);
 		float3a direction = normalize(float3a(rayHit.ray.dir_x, rayHit.ray.dir_y, rayHit.ray.dir_z));
 
-		// We hit an object
-		hitSurface = true;
-		
-		// Calculate any transmission
-		if (medium != nullptr) {
-			float weight = 1.0f;
-			float pdf = 1.0f;
-			float distance = medium->SampleDistance(sampler, rayHit.ray.tfar, &weight, &pdf);
-			float3 transmission = medium->Transmission(distance);
-			throughput = throughput * weight * transmission;
+		InteractionType interactionType = InteractionType::None;
 
-			if (distance < rayHit.ray.tfar) {
-				// Create a scatter event
-				hitSurface = false;
+//		// Check if there is a transmission event
+//		if (medium != nullptr) {
+//			float weight = 1.0f;
+//			float pdf = 1.0f;
+//			float distance = medium->SampleDistance(sampler, rayHit.ray.tfar, &weight, &pdf);
+//			float3 transmission = medium->Transmission(distance);
+//			throughput = throughput * weight * transmission;
+//
+//			if (distance < rayHit.ray.tfar) {
+//				// Create a scatter event
+//				interactionType = InteractionType::Medium;
+//
+//				float3a newOrigin = origin + direction * distance;
+//				rayHit.ray.org_x = newOrigin.x;
+//				rayHit.ray.org_y = newOrigin.y;
+//				rayHit.ray.org_z = newOrigin.z;
+//
+//				// Reset the other ray properties
+//				float directionPdf;
+//				float3a newDirection = medium->SampleScatterDirection(sampler, direction, &directionPdf);
+//				rayHit.ray.dir_x = newDirection.x;
+//				rayHit.ray.dir_y = newDirection.y;
+//				rayHit.ray.dir_z = newDirection.z;
+//
+//				rayHit.ray.tnear = 0.001f;
+//				rayHit.ray.tfar = embree::inf;
+//				rayHit.ray.mask = 0xFFFFFFFF;
+//				rayHit.ray.time = 0.0f;
+//
+//				rayHit.hit.geomID = RTC_INVALID_GEOMETRY_ID;
+//				rayHit.hit.instID[0] = RTC_INVALID_GEOMETRY_ID;
+//				rayHit.hit.primID = RTC_INVALID_GEOMETRY_ID;
+//			}
+//		}
 
-				float3a newOrigin = origin + direction * distance;
-				rayHit.ray.org_x = newOrigin.x;
-				rayHit.ray.org_y = newOrigin.y;
-				rayHit.ray.org_z = newOrigin.z;
-
-				// Reset the other ray properties
-				float directionPdf;
-				float3a newDirection = medium->SampleScatterDirection(sampler, direction, &directionPdf);
-				rayHit.ray.dir_x = newDirection.x;
-				rayHit.ray.dir_y = newDirection.y;
-				rayHit.ray.dir_z = newDirection.z;
-
-				rayHit.ray.tnear = 0.001f;
-				rayHit.ray.tfar = embree::inf;
-				rayHit.ray.mask = 0xFFFFFFFF;
-				rayHit.ray.time = 0.0f;
-
-				rayHit.hit.geomID = RTC_INVALID_GEOMETRY_ID;
-				rayHit.hit.instID[0] = RTC_INVALID_GEOMETRY_ID;
-				rayHit.hit.primID = RTC_INVALID_GEOMETRY_ID;
+		// If we didn't scatter in the medium, check if we hit anything
+		if (interactionType == InteractionType::None) {
+			// Terminate the path if the ray escaped
+			if (rayHit.hit.geomID == RTC_INVALID_GEOMETRY_ID) {
+				// Before terminating the path, check if this is the first bounce or if we just had a specular bounce
+				// And add the environment lighting
+				if (bounces == 0 || specularBounce) {
+					color += throughput * m_scene->BackgroundColor;
+				}
+				break;
 			}
-		}
-
-		if (hitSurface) {
-			// Fetch the material
-			Material *material = m_scene->GetMaterial(rayHit.hit.geomID);
-			// The object might be emissive. If so, it will have a corresponding light
-			// Otherwise, GetLight will return nullptr
-			Light *light = m_scene->GetLight(rayHit.hit.geomID);
+			
+			interactionType = InteractionType::Surface;
+			Primitive *primitive = m_scene->GetPrimitive(rayHit.hit.geomID);
 
 			// If this is the first bounce or if we just had a specular bounce,
 			// we need to add the emmisive light
-			if ((bounces == 0 || (interaction.SampledLobe & BSDFLobe::Specular) != 0) && light != nullptr) {
-				color += throughput * light->Le();
+			if (bounces == 0 || specularBounce) {
+				// Add emitted light at path vertex or from the environment
+				color += throughput * primitive->m_emission;
 			}
 
+			// We hit an object. Calculate the surface interaction
 			interaction.Position = origin + direction * rayHit.ray.tfar;
-			if (m_scene->HasNormals(rayHit.hit.geomID)) {
-				interaction.Normal = normalize(m_scene->InterpolateNormal(rayHit.hit.geomID, rayHit.hit.primID, rayHit.hit.u, rayHit.hit.v));
+			interaction.Normal = normalize(float3a(rayHit.hit.Ng_x, rayHit.hit.Ng_y, rayHit.hit.Ng_z));
+			if (primitive->HasNormals()) {
+				interaction.Shading.Normal = normalize(primitive->InterpolateNormal(rayHit.hit.primID, rayHit.hit.u, rayHit.hit.v));
 			} else {
-				interaction.Normal = normalize(float3a());
+				interaction.Shading.Normal = interaction.Normal;
 			}
-			if (m_scene->HasTexCoords(rayHit.hit.geomID)) {
-				interaction.TexCoord = m_scene->InterpolateTexCoord(rayHit.hit.geomID, rayHit.hit.primID, rayHit.hit.u, rayHit.hit.v);
+			if (primitive->HasTexCoords()) {
+				interaction.TexCoord = primitive->InterpolateTexCoords(rayHit.hit.primID, rayHit.hit.u, rayHit.hit.v);
 			} else {
 				interaction.TexCoord = float2(0.0f, 0.0f);
 			}
 			interaction.OutputDirection = -direction;
-			interaction.IORo = 0.0f;
 
+			BSDF *bsdf = primitive->m_bsdf;
 
 			// Calculate the direct lighting
-			color += throughput * SampleOneLight(sampler, interaction, material->bsdf, light);
-
+			color += throughput * SampleOneLight(sampler, m_scene, interaction, bsdf, currentIOR, primitive);
 
 			// Get the new ray direction
-			// Choose the direction based on the bsdf		
-			material->bsdf->Sample(interaction, sampler);
-			float pdf = material->bsdf->Pdf(interaction);
+			// Choose the direction based on the bsdf
+			float3 inputDirection;
+			float pdf;
+			BSDFLobe::Type sampledLobe;
+			float IORo;
+			float3 f = bsdf->Sample(sampler, interaction, &inputDirection, &pdf, BSDFLobe::All, &sampledLobe, currentIOR, &IORo );
 
 			// Accumulate the weight
-			throughput = throughput * material->bsdf->Eval(interaction) / pdf;
+			throughput = throughput * f * abs(dot(inputDirection, interaction.Shading.Normal)) / pdf;
 
 			// Update the current IOR and medium if we refracted
-			if (interaction.SampledLobe == BSDFLobe::SpecularTransmission) {
-				interaction.IORi = interaction.IORo;
-				medium = material->medium;
+			if ((sampledLobe & BSDFLobe::Transmission) == BSDFLobe::Transmission) {
+				currentIOR = IORo;
+				medium = primitive->m_medium;
 			}
 
-			// Shoot a new ray
+			// Check for specular reflection
+			specularBounce = (sampledLobe & BSDFLobe::Specular) == BSDFLobe::Specular;
+
+			// Create the new ray
 
 			// Set the origin at the intersection point
 			rayHit.ray.org_x = interaction.Position.x;
@@ -216,10 +235,9 @@ void Integrator::RenderPixel(uint x, uint y, UniformSampler *sampler) const {
 			rayHit.ray.org_z = interaction.Position.z;
 
 			// Reset the other ray properties
-			float directionPdf;
-			rayHit.ray.dir_x = interaction.InputDirection.x;
-			rayHit.ray.dir_y = interaction.InputDirection.y;
-			rayHit.ray.dir_z = interaction.InputDirection.z;
+			rayHit.ray.dir_x = inputDirection.x;
+			rayHit.ray.dir_y = inputDirection.y;
+			rayHit.ray.dir_z = inputDirection.z;
 
 			rayHit.ray.tnear = 0.001f;
 			rayHit.ray.tfar = embree::inf;
@@ -249,66 +267,119 @@ void Integrator::RenderPixel(uint x, uint y, UniformSampler *sampler) const {
 	m_currentFrameBuffer->ColorSampleCount[index] += 1u;
 }
 
-float3 Integrator::SampleOneLight(UniformSampler *sampler, SurfaceInteraction interaction, BSDF *bsdf, Light *hitLight) const {
+float3 Integrator::SampleOneLight(UniformSampler *sampler, Scene *scene, SurfaceInteraction interaction, BSDF *bsdf, float IORi, Primitive *hitPrimitive) const {
 	std::size_t numLights = m_scene->NumLights();
 	
 	// Return black if there are no lights
 	// And don't let a light contribute light to itself
 	// Aka, if we hit a light
 	// This is the special case where there is only 1 light
-	if (numLights == 0 || numLights == 1 && hitLight != nullptr) {
+	if (numLights == 0 || numLights == 1 && hitPrimitive->IsEmissive()) {
 		return float3(0.0f);
 	}
 
 	// Don't let a light contribute light to itself
 	// Choose another one
-	Light *light;
+	Primitive *light;
 	do {
 		light = m_scene->RandomOneLight(sampler);
-	} while (light == hitLight);
+	} while (light == hitPrimitive);
 
-	return (float)numLights * EstimateDirect(light, sampler, interaction, bsdf);
+	const float lightPdf = 1.0f / numLights;
+	return EstimateDirect(light, sampler, scene, interaction, bsdf, IORi) / lightPdf;
 }
 
-float3 Integrator::EstimateDirect(Light *light, UniformSampler *sampler, SurfaceInteraction &interaction, BSDF *bsdf) const {
+float3 Integrator::EstimateDirect(Primitive *light, UniformSampler *sampler, Scene *scene, SurfaceInteraction &interaction, BSDF *bsdf, float IORi) const {
+	BSDFLobe::Type allowedLobes = BSDFLobe::Type(BSDFLobe::All & ~BSDFLobe::Specular);
+	
 	float3 directLighting = float3(0.0f);
-	float3 f;
+	float3 inputDirection;
 	float lightPdf, scatteringPdf;
 
-
 	// Sample lighting with multiple importance sampling
-	// Only sample if the BRDF is non-specular 
-	if ((bsdf->SupportedLobes & ~BSDFLobe::Specular) != 0) {
-		float3 Li = light->SampleLi(sampler, m_scene, interaction, &lightPdf);
+	float distance;
+	float3 Li = light->SampleDirectLighting(sampler, interaction, &inputDirection, &distance, &lightPdf);
+	if (lightPdf > 0.0f && !all(Li)) {
+		// Evaluate BSDF for sampled input direction
+		float3 f = bsdf->Eval(interaction, inputDirection, allowedLobes);
+		scatteringPdf = bsdf->Pdf(interaction, inputDirection, allowedLobes);
 
-		// Make sure the pdf isn't zero and the radiance isn't black
-		if (lightPdf != 0.0f && !all(Li)) {
-			// Calculate the brdf value
-			f = bsdf->Eval(interaction);
-			scatteringPdf = bsdf->Pdf(interaction);
+		if (!all(f)) {
+			// Check visibility from the intersection to the sampled location on the light
+			RTC_ALIGN(16) RTCRay ray;
+			memset(&ray, 0, sizeof(ray));
 
-			if (scatteringPdf != 0.0f && !all(f)) {
+			ray.org_x = interaction.Position.x;
+			ray.org_y = interaction.Position.y;
+			ray.org_z = interaction.Position.z;
+
+			ray.tnear = 0.001f;
+			ray.tfar = distance - 0.001f;
+			ray.mask = 0xFFFFFFFF;
+			scene->Occluded(&ray);
+
+			if (ray.tfar != distance - 0.001f) {
+				Li = float3(0.0f);
+			}
+
+			// Add the light's contribution to the reflected radiance
+			if (!all(Li)) {
 				float weight = PowerHeuristic(1, lightPdf, 1, scatteringPdf);
 				directLighting += f * Li * weight / lightPdf;
 			}
 		}
 	}
 
+	// Sample BSDF with multiple importance sampling
+	BSDFLobe::Type sampledLobe;
+	float IORo;
+	float3 f = bsdf->Sample(sampler, interaction, &inputDirection, &scatteringPdf, allowedLobes, &sampledLobe, IORi, &IORo);
+	f *= std::abs(dot(inputDirection, interaction.Shading.Normal));
+	bool sampledSpecular = sampledLobe & BSDFLobe::Specular;
 
-	// Sample brdf with multiple importance sampling
-	bsdf->Sample(interaction, sampler);
-	f = bsdf->Eval(interaction);
-	scatteringPdf = bsdf->Pdf(interaction);
-	if (scatteringPdf != 0.0f && !all(f)) {
-		lightPdf = light->PdfLi(m_scene, interaction);
-		if (lightPdf == 0.0f) {
-			// We didn't hit anything, so ignore the brdf sample
-			return directLighting;
+	if (!all(f) && scatteringPdf > 0.0f) {
+		// Account for light contributions along the sampled inputDirection
+		float weight = 1.0f;
+		if (!sampledSpecular) {
+			lightPdf = light->PdfDirectLighting(scene, interaction, inputDirection);
+			if (lightPdf == 0.0f) {
+				return directLighting;
+			}
+
+			weight = PowerHeuristic(1, scatteringPdf, 1, lightPdf);
 		}
 
-		float weight = PowerHeuristic(1, scatteringPdf, 1, lightPdf);
-		float3 Li = light->Le();
-		directLighting += f * Li * weight / scatteringPdf;
+		// Check if the ray hits the light at all
+		RTC_ALIGN(16) RTCRayHit rayHit;
+		rayHit.ray.org_x = interaction.Position.x;
+		rayHit.ray.org_y = interaction.Position.y;
+		rayHit.ray.org_z = interaction.Position.z;
+
+		rayHit.ray.dir_x = -inputDirection.x;
+		rayHit.ray.dir_y = -inputDirection.y;
+		rayHit.ray.dir_z = -inputDirection.z;
+
+		rayHit.ray.tnear = 0.001f;
+		rayHit.ray.tfar = embree::inf;
+		rayHit.ray.mask = 0xFFFFFFFF;
+		rayHit.ray.time = 0.0f;
+
+		rayHit.hit.geomID = RTC_INVALID_GEOMETRY_ID;
+		rayHit.hit.instID[0] = RTC_INVALID_GEOMETRY_ID;
+		rayHit.hit.primID = RTC_INVALID_GEOMETRY_ID;
+
+		scene->Intersect(&rayHit);
+
+		Li = float3(0.0f);
+		if (rayHit.hit.geomID != RTC_INVALID_GEOMETRY_ID) {
+			if (scene->GetPrimitive(rayHit.hit.geomID) == light) {
+				Li = light->m_emission;
+			}
+		}
+
+		if (!all(Li)) {
+			directLighting += f * Li * weight / scatteringPdf;
+		}
 	}
 
 	return directLighting;

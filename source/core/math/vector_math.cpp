@@ -9,29 +9,15 @@
 
 namespace Lantern {
 
-float3a RotateToWorld(float x, float y, float z, float3a &normal) {
-	// Find an axis that is not parallel to normal
-	float3a majorAxis;
-	if (abs(normal.x) < 0.57735026919f /* 1 / sqrt(3) */) {
-		majorAxis = float3a(1, 0, 0);
-	} else if (abs(normal.y) < 0.57735026919f /* 1 / sqrt(3) */) {
-		majorAxis = float3a(0, 1, 0);
-	} else {
-		majorAxis = float3a(0, 0, 1);
-	}
+float3x3 CreateCoordinateFrame(float3a &N) {
+	// [Duff et al. 17] Building An Orthonormal Basis, Revisited. JCGT. 2017.
+	float sign = copysignf(1.0f, N.z);
+	const float a = -1.0f / (sign + N.z);
+	const float b = N.x * N.y * a;
+	float3 tangent(1.0f + sign * N.x * N.x * a, sign * b, -sign * N.x);
+	float3 bitangent(b, sign + N.y * N.y * a, -N.y);
 
-	// Use majorAxis to create a coordinate system relative to world space
-	float3a u = normalize(cross(normal, majorAxis));
-	float3a v = cross(normal, u);
-	float3a w = normal;
-
-
-	// Transform from local coordinates to world coordinates
-	return u * x +
-	       v * y +
-	       w * z;
+	return float3x3(tangent, bitangent, N);
 }
-
-
 
 } // End of namespace Lantern
