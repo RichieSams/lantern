@@ -33,7 +33,7 @@ void Scene::ParseCamera(nlohmann::json &root) {
 	uint clientWidth = camera["client_width"].get<uint>();
 	uint clientHeight = camera["client_height"].get<uint>();
 
-	float fov = (float)M_PI_4;
+	float fov = kInv4Pi;
 	if (camera.count("fov") == 1) {
 		fov = camera["fov"].get<float>();
 	}
@@ -98,7 +98,7 @@ bool Scene::ParsePrimitives(nlohmann::json &root, std::unordered_map<std::string
 	for (auto &primitive : root["primitives"]) {
 		std::string name = primitive["name"].get<std::string>();
 
-		float4x4 transform = embree::one;
+		float4x4 transform = linalg::identity;
 		float3 emissiveColor = float3(0.0f);
 		float radiantPower = 0.0f;
 		Medium* medium = nullptr;
@@ -116,10 +116,11 @@ bool Scene::ParsePrimitives(nlohmann::json &root, std::unordered_map<std::string
 		// Optional parameters
 		if (primitive.count("transform") == 1) {
 			nlohmann::json t = primitive["transform"];
-			transform = float4x4(t[0].get<float>(), t[1].get<float>(), t[2].get<float>(), t[3].get<float>(),
-				t[4].get<float>(), t[5].get<float>(), t[6].get<float>(), t[7].get<float>(),
-				t[8].get<float>(), t[9].get<float>(), t[10].get<float>(), t[11].get<float>(),
-				t[12].get<float>(), t[13].get<float>(), t[14].get<float>(), t[15].get<float>());
+			transform = float4x4{
+				{t[0].get<float>(), t[4].get<float>(),  t[8].get<float>(), t[12].get<float>()},
+				{t[1].get<float>(), t[5].get<float>(),  t[9].get<float>(), t[13].get<float>()},
+				{t[2].get<float>(), t[6].get<float>(), t[10].get<float>(), t[14].get<float>()},
+				{t[3].get<float>(), t[7].get<float>(), t[11].get<float>(), t[15].get<float>()}};
 		}
 
 		if (primitive.count("emission") == 1) {

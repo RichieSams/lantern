@@ -22,7 +22,7 @@ public:
 
 public:
 	float3 Eval(float3 outputDirection, float3 inputDirection, float2 texCoord) const override {
-		return m_albedo->Sample(texCoord) * (float)M_1_PI;
+		return m_albedo->Sample(texCoord) * kPi;
 	}
 
 	float3 Sample(UniformSampler *sampler, float3 outputDirection, float3 *inputDirection, float *pdf, float IORi, float *IORo, float2 texCoord) const override {
@@ -31,8 +31,8 @@ public:
 		return Eval(outputDirection, *inputDirection, texCoord);
 	}
 
-	float Pdf(float3a outputDirection, float3a inputDirection, float2 texCoord) const override {
-		return SameHemisphere(outputDirection, inputDirection) ? AbsCosTheta(inputDirection) * (float)M_1_PI : 0.0f;
+	float Pdf(float3 outputDirection, float3 inputDirection, float2 texCoord) const override {
+		return SameHemisphere(outputDirection, inputDirection) ? AbsCosTheta(inputDirection) * kInvPi : 0.0f;
 	}
 };
 

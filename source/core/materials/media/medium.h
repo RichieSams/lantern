@@ -6,9 +6,8 @@
 
 #pragma once
 
-#include "math/vector_types.h"
-
-#include <cmath>
+#include "linalg.h"
+using namespace linalg::aliases;
 
 
 namespace Lantern {
@@ -24,13 +23,13 @@ public:
 	virtual ~Medium() = default;
 
 protected:
-	const float3a m_absorptionCoefficient;
+	const float3 m_absorptionCoefficient;
 
 public:
 	virtual float SampleDistance(UniformSampler *sampler, float tFar, float *weight, float *pdf) const = 0;
 
-	virtual float3a SampleScatterDirection(UniformSampler *sampler, float3a &wo, float *pdf) const = 0;
-	virtual float ScatterDirectionPdf(float3a &wi, float3a &wo) const = 0;
+	virtual float3 SampleScatterDirection(UniformSampler *sampler, float3 &wo, float *pdf) const = 0;
+	virtual float ScatterDirectionPdf(float3 &wi, float3 &wo) const = 0;
 
 	virtual float3 Transmission(float distance) const = 0;
 };

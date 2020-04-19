@@ -70,132 +70,77 @@
 		{
 			"name": "floor",
 			"type": "grid",
-			"width": 50.0,
-			"depth": 50.0,
+			"width": 10.0,
+			"depth": 10.0,
+			"n": 2,
+			"m": 2,
+			"material": "gray",
+			"transform": [
+				1, 0, 0,  0,
+				0, 1, 0, -6,
+				0, 0, 1,  0,
+				0, 0, 0,  1
+			]
+		},
+	  {
+			"name": "ceiling",
+			"type": "grid",
+			"width": 10.0,
+			"depth": 10.0,
 			"n": 2,
 			"m": 2,
 			"material": "gray",
 			"transform": [
 				1, 0, 0, 0,
-				0, 1, 0, -6,
+				0, 1, 0, 6,
 				0, 0, 1, 0,
 				0, 0, 0, 1
 			]
 		},
-		{
-			"name": "emissive_ball",
-			"type": "sphere",
-			"radius": 2.0,
-			"n": 3,
-			"material": "black",
-			"emission": {
-				"color": [ 1.0, 1.0, 1.0 ],
-				"radiant_power": 800.0
-			}
+    {
+			"name": "right",
+			"type": "grid",
+			"width": 10.0,
+			"depth": 10.0,
+			"n": 2,
+			"m": 2,
+			"material": "gray",
+			"transform": [
+				0.0, -1.0, 0.0, 6.0,
+				1.0,  0.0, 0.0, 0.0,
+				0.0,  0.0, 1.0, 0.0,
+				0.0,  0.0, 0.0, 1.0
+      ]
 		},
 		{
-			"name": "left_top_front",
-			"type": "sphere",
-			"radius": 2.0,
-			"n": 3,
-			"material": "green",
+			"name": "left",
+			"type": "grid",
+			"width": 10.0,
+			"depth": 10.0,
+			"n": 2,
+			"m": 2,
+			"material": "gray",
 			"transform": [
-				1, 0, 0, -4,
-				0, 1, 0, 4,
-				0, 0, 1, 4,
-				0, 0, 0, 1
-			]
-		},
-		{
-			"name": "right_top_front",
-			"type": "sphere",
-			"radius": 2.0,
-			"n": 3,
-			"material": "glass",
-			"transform": [
-				1, 0, 0, 4,
-				0, 1, 0, 4,
-				0, 0, 1, 4,
-				0, 0, 0, 1
-			]
-		},
-		{
-			"name": "left_bottom_front",
-			"type": "sphere",
-			"radius": 2.0,
-			"n": 3,
-			"material": "orange",
-			"transform": [
-				1, 0, 0, -4,
-				0, 1, 0, -4,
-				0, 0, 1, 4,
-				0, 0, 0, 1
-			]
-		},
-		{
-			"name": "right_bottom_front",
-			"type": "sphere",
-			"radius": 2.0,
-			"n": 3,
-			"material": "blue",
-			"transform": [
-				1, 0, 0, 4,
-				0, 1, 0, -4,
-				0, 0, 1, 4,
-				0, 0, 0, 1
-			]
-		},
-		{
-			"name": "left_top_back",
-			"type": "sphere",
-			"radius": 2.0,
-			"n": 3,
-			"material": "blue",
-			"transform": [
-				1, 0, 0, -4,
-				0, 1, 0, 4,
-				0, 0, 1, -4,
-				0, 0, 0, 1
-			]
-		},
-		{
-			"name": "right_top_back",
-			"type": "sphere",
-			"radius": 2.0,
-			"n": 3,
-			"material": "orange",
-			"transform": [
-				1, 0, 0, 4,
-				0, 1, 0, 4,
-				0, 0, 1, -4,
-				0, 0, 0, 1
-			]
-		},
-		{
-			"name": "left_bottom_back",
-			"type": "sphere",
-			"radius": 2.0,
-			"n": 3,
-			"material": "mirror",
-			"transform": [
-				1, 0, 0, -4, 
-				0, 1, 0, -4,
-				0, 0, 1, -4,
-				0, 0, 0, 1
-			]
-		},
-		{
-			"name": "right_bottom_back",
-			"type": "sphere",
-			"radius": 2.0,
-			"n": 3,
-			"material": "green",
-			"transform": [
-				1, 0, 0, 4,
-				0, 1, 0, -4,
-				0, 0, 1, -4,
-				0, 0, 0, 1
-			]
-		}
-	]
+				 0.0, 1.0, 0.0, -6.0,
+				-1.0, 0.0, 0.0,  0.0,
+				 0.0, 0.0, 1.0,  0.0,
+         0.0, 0.0, 0.0,  1.0
+      ]
+    },
+    {
+      "name": "far_left",
+      "type": "grid",
+      "width": 10.0,
+      "depth": 10.0,
+      "n": 2,
+      "m": 2,
+      "material": "gray",
+      "transform": [
+				0.0, -1.0, 0.0, -11.0,
+				1.0,  0.0, 0.0,   0.0,
+				0.0,  0.0, 1.0,   0.0,
+				6.0,  0.0, 0.0,   1.0
+      ]
+    }
+  ]
 }

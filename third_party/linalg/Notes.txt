@@ -1,0 +1,3 @@
+Source: https://github.com/sgorsten/linalg/tree/v3
+Branch: v3
+Commit: 70b9a8a3546a739a0558a8359e88fa8b97852595

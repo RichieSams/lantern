@@ -6,8 +6,6 @@
 
 #pragma once
 
-#include "math/vector_types.h"
-
 #include "scene/scene.h"
 
 #include "integrator/surface_interaction.h"
@@ -16,6 +14,9 @@
 #include "materials/media/medium.h"
 
 #include "embree3/rtcore.h"
+
+#include "linalg.h"
+using namespace linalg::aliases;
 
 
 namespace Lantern {
@@ -69,7 +70,7 @@ public:
 		rayHit.ray.dir_z = -inputDirection.z;
 
 		rayHit.ray.tnear = 0.001f;
-		rayHit.ray.tfar = embree::inf;
+		rayHit.ray.tfar = std::numeric_limits<float>::infinity();
 		rayHit.ray.mask = 0xFFFFFFFF;
 		rayHit.ray.time = 0.0f;
 
@@ -84,7 +85,7 @@ public:
 		}
 
 		float3 intersectionPoint = interaction.Position - inputDirection * rayHit.ray.tfar;
-		float distanceSquared = sqr_length(intersectionPoint - interaction.Position);
+		float distanceSquared = distance2(interaction.Position, intersectionPoint);
 
 		// Convert light sample weight to solid angle measure
 		float pdf = distanceSquared / (std::abs(dot(normalize(float3(rayHit.hit.Ng_x, rayHit.hit.Ng_y, rayHit.hit.Ng_z)), -inputDirection)) * m_surfaceArea);

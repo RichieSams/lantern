@@ -18,9 +18,9 @@ void TriangleMesh::Initialize(RTCDevice device, RTCScene scene, LanternModelFile
 	rtcSetGeometryBuildQuality(geometry, RTC_BUILD_QUALITY_HIGH);
 	rtcSetGeometryTimeStepCount(geometry, 1);
 
-	float3a *vertices = (float3a *)rtcSetNewGeometryBuffer(geometry, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT3, sizeof(float3a), lmf->Positions.size() / 3);
+	float4 *vertices = (float4 *)rtcSetNewGeometryBuffer(geometry, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT3, sizeof(float4), lmf->Positions.size() / 3);
 	for (uint i = 0, j = 0; j < lmf->Positions.size() / 3; i += 3, ++j) {
-		float3a vertex(lmf->Positions[i], lmf->Positions[i + 1], lmf->Positions[i + 2], 1.0f);
+		float4 vertex(lmf->Positions[i], lmf->Positions[i + 1], lmf->Positions[i + 2], 1.0f);
 
 		vertices[j] = transform * vertex;
 	}
@@ -28,12 +28,12 @@ void TriangleMesh::Initialize(RTCDevice device, RTCScene scene, LanternModelFile
 	// Calculate the surface area
 	float surfaceArea = 0.0f;
 	for (std::size_t i = 0; i < lmf->Indices.size(); i += 3) {
-		float3a v0 = vertices[lmf->Indices[i]];
-		float3a v1 = vertices[lmf->Indices[i + 1]];
-		float3a v2 = vertices[lmf->Indices[i + 2]];
+		float4 v0 = vertices[lmf->Indices[i]];
+		float4 v1 = vertices[lmf->Indices[i + 1]];
+		float4 v2 = vertices[lmf->Indices[i + 2]];
 
 		// Calculate the area of a triangle using the half cross product: https://math.stackexchange.com/a/128999
-		surfaceArea += 0.5f * length(cross(v0 - v1, v0 - v2));
+		surfaceArea += 0.5f * length(cross(v0.xyz() - v1.xyz(), v0.xyz() - v2.xyz()));
 	}
 
 	uint *indices = (uint *)rtcSetNewGeometryBuffer(geometry, RTC_BUFFER_TYPE_INDEX, 0, RTC_FORMAT_UINT3, 3 * sizeof(uint), lmf->Indices.size() / 3);
@@ -61,7 +61,7 @@ void TriangleMesh::Initialize(RTCDevice device, RTCScene scene, LanternModelFile
 	uint geometryId = rtcAttachGeometry(scene, geometry);
 	rtcReleaseGeometry(geometry);
 
-	Primitive::Initialize(emissiveColor * radiantPower * (float)M_1_PI / surfaceArea, bsdf, medium, surfaceArea, geometryId, hasNormals, hasTexCoords);
+	Primitive::Initialize(emissiveColor * radiantPower * kInvPi / surfaceArea, bsdf, medium, surfaceArea, geometryId, hasNormals, hasTexCoords);
 }
 
 float3 TriangleMesh::SampleDirectLighting(UniformSampler *sampler, SurfaceInteraction &interaction, float3 *direction, float *distance, float *pdf) const {

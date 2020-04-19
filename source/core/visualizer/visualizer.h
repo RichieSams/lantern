@@ -15,7 +15,7 @@
 #include "imgui_impl_vulkan.h"
 
 #define VULKAN_HPP_NO_EXCEPTIONS
-#include <vulkan/vulkan.hpp>
+#include "vulkan/vulkan.hpp"
 
 #include "vk_mem_alloc.h"
 

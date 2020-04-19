@@ -24,7 +24,7 @@ bool BSDF::AddLobe(BxDF *lobe) {
 
 float3 BSDF::Eval(SurfaceInteraction &interaction, float3 inputDirection, BSDFLobe::Type allowedLobes) const {
 	float3x3 frame = CreateCoordinateFrame(interaction.Shading.Normal);
-	float3x3 inverseFrame = frame.inverse();
+	float3x3 inverseFrame = inverse(frame);
 
 	float3 localInputDirection = inverseFrame * inputDirection;
 	float3 localOutputDirection = inverseFrame * interaction.OutputDirection;
@@ -73,7 +73,7 @@ float3 BSDF::Sample(UniformSampler *sampler, SurfaceInteraction &interaction, fl
 
 	// Create the change of coordinate matrix
 	float3x3 frame = CreateCoordinateFrame(interaction.Shading.Normal);
-	float3x3 inverseFrame = frame.inverse();
+	float3x3 inverseFrame = inverse(frame);
 
 	float3 localOutputDirection = inverseFrame * interaction.OutputDirection;
 	if (localOutputDirection.z == 0.0f) {
@@ -132,7 +132,7 @@ float BSDF::Pdf(SurfaceInteraction &interaction, float3 inputDirection, BSDFLobe
 
 	// Create the change of coordinate matrix
 	float3x3 frame = CreateCoordinateFrame(interaction.Shading.Normal);
-	float3x3 inverseFrame = frame.inverse();
+	float3x3 inverseFrame = inverse(frame);
 
 	float3 localInputDirection = inverseFrame * inputDirection;
 	float3 localOutputDirection = inverseFrame * interaction.OutputDirection;

@@ -7,8 +7,8 @@
 #pragma once
 
 #include "math/int_types.h"
-#include "math/vector_types.h"
 #include "math/uniform_sampler.h"
+#include "math/math_const.h"
 
 #include "camera/frame_buffer.h"
 #include "camera/reconstruction_filter.h"
@@ -16,13 +16,16 @@
 #define EMBREE_STATIC_LIB
 #include "embree3/rtcore.h"
 
+#include "linalg.h"
+using namespace linalg::aliases;
+
 
 namespace Lantern {
 
 class PinholeCamera {
 public:
 	PinholeCamera();
-	PinholeCamera(float3 position, float3 target, float3 up, uint clientWidth, uint clientHeight, float fov = M_PI_2, ReconstructionFilter::Type filterType = ReconstructionFilter::Type::Tent);
+	PinholeCamera(float3 position, float3 target, float3 up, uint clientWidth, uint clientHeight, float fov = kPiOver2, ReconstructionFilter::Type filterType = ReconstructionFilter::Type::Tent);
 
 public:
 	uint FrameBufferWidth;

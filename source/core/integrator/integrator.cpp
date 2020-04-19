@@ -125,8 +125,8 @@ void Integrator::RenderPixel(uint x, uint y, UniformSampler *sampler) const {
 	
 	for (; bounces < maxBounces; ++bounces) {
 		m_scene->Intersect(&rayHit);
-		float3a origin = float3a(rayHit.ray.org_x, rayHit.ray.org_y, rayHit.ray.org_z);
-		float3a direction = normalize(float3a(rayHit.ray.dir_x, rayHit.ray.dir_y, rayHit.ray.dir_z));
+		float3 origin = float3(rayHit.ray.org_x, rayHit.ray.org_y, rayHit.ray.org_z);
+		float3 direction = normalize(float3(rayHit.ray.dir_x, rayHit.ray.dir_y, rayHit.ray.dir_z));
 
 		InteractionType interactionType = InteractionType::None;
 
@@ -189,18 +189,26 @@ void Integrator::RenderPixel(uint x, uint y, UniformSampler *sampler) const {
 
 			// We hit an object. Calculate the surface interaction
 			interaction.Position = origin + direction * rayHit.ray.tfar;
-			interaction.Normal = normalize(float3a(rayHit.hit.Ng_x, rayHit.hit.Ng_y, rayHit.hit.Ng_z));
+			interaction.Normal = normalize(float3(rayHit.hit.Ng_x, rayHit.hit.Ng_y, rayHit.hit.Ng_z));
+			interaction.OutputDirection = -direction;
+
 			if (primitive->HasNormals()) {
 				interaction.Shading.Normal = normalize(primitive->InterpolateNormal(rayHit.hit.primID, rayHit.hit.u, rayHit.hit.v));
-			} else {
+			}
+			else {
 				interaction.Shading.Normal = interaction.Normal;
 			}
+			const bool backface = dot(interaction.Normal, interaction.OutputDirection) < 0;
+			if (backface) {
+				interaction.Normal *= -1.0f;
+				interaction.Shading.Normal *= -1.0f;
+			}
+			
 			if (primitive->HasTexCoords()) {
 				interaction.TexCoord = primitive->InterpolateTexCoords(rayHit.hit.primID, rayHit.hit.u, rayHit.hit.v);
 			} else {
 				interaction.TexCoord = float2(0.0f, 0.0f);
 			}
-			interaction.OutputDirection = -direction;
 
 			BSDF *bsdf = primitive->m_bsdf;
 
@@ -240,7 +248,7 @@ void Integrator::RenderPixel(uint x, uint y, UniformSampler *sampler) const {
 			rayHit.ray.dir_z = inputDirection.z;
 
 			rayHit.ray.tnear = 0.001f;
-			rayHit.ray.tfar = embree::inf;
+			rayHit.ray.tfar = std::numeric_limits<float>::infinity();
 			rayHit.ray.mask = 0xFFFFFFFF;
 			rayHit.ray.time = 0.0f;
 
@@ -251,7 +259,7 @@ void Integrator::RenderPixel(uint x, uint y, UniformSampler *sampler) const {
 
 		// Russian Roulette
 		if (bounces > 3) {
-			float p = std::max(throughput.x, std::max(throughput.y, throughput.z));
+			float p = std::max((float)throughput.x, std::max((float)throughput.y, (float)throughput.z));
 			if (sampler->NextFloat() > p) {
 				break;
 			}
@@ -360,7 +368,7 @@ float3 Integrator::EstimateDirect(Primitive *light, UniformSampler *sampler, Sce
 		rayHit.ray.dir_z = -inputDirection.z;
 
 		rayHit.ray.tnear = 0.001f;
-		rayHit.ray.tfar = embree::inf;
+		rayHit.ray.tfar = std::numeric_limits<float>::infinity();
 		rayHit.ray.mask = 0xFFFFFFFF;
 		rayHit.ray.time = 0.0f;
 

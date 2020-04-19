@@ -7,7 +7,9 @@
 #pragma once
 
 #include "math/int_types.h"
-#include "math/vector_types.h"
+
+#include "linalg.h"
+using namespace linalg::aliases;
 
 #include <atomic>
 

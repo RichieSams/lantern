@@ -6,9 +6,12 @@
 
 #pragma once
 
-#include "math/vector_types.h"
 #include "math/uniform_sampler.h"
 #include "math/vector_math.h"
+#include "math/math_const.h"
+
+#include "linalg.h"
+using namespace linalg::aliases;
 
 
 namespace Lantern {
@@ -30,7 +33,7 @@ inline float PowerHeuristic(uint numf, float fPdf, uint numg, float gPdf, uint n
 
 inline float2 UniformSampleDisc(UniformSampler *sampler) {
 	float r = sqrt(sampler->NextFloat());
-	float theta = 2.0f * (float)M_PI * sampler->NextFloat();
+	float theta = k2Pi * sampler->NextFloat();
 	return float2(r * cosf(theta), r * sinf(theta));
 }
 
@@ -50,10 +53,10 @@ inline float2 ConcentricSampleDisk(UniformSampler *sampler) {
 	float r;
 	if (abs(uOffset.x) > abs(uOffset.y)) {
 		r = uOffset.x;
-		theta = (float)M_PI_4 * (uOffset.y / uOffset.x);
+		theta = kPiOver4 * (uOffset.y / uOffset.x);
 	} else {
 		r = uOffset.y;
-		theta = (float)M_PI_2 - (float)M_PI_4 * (uOffset.x / uOffset.y);
+		theta = kPiOver2 - kPiOver4 * (uOffset.x / uOffset.y);
 	}
 
 	return r * float2(cosf(theta), sinf(theta));
@@ -65,7 +68,7 @@ inline float2 ConcentricSampleDisk(UniformSampler *sampler) {
 * @param sampler    The sampler to use for internal random number generation
 * @return           A cosine weighted random direction in the hemisphere
 */
-inline float3a CosineSampleHemisphere(UniformSampler *sampler) {
+inline float3 CosineSampleHemisphere(UniformSampler *sampler) {
 	// Create coordinates in the local coordinate system
 	float2 d = ConcentricSampleDisk(sampler);
 
@@ -75,10 +78,10 @@ inline float3a CosineSampleHemisphere(UniformSampler *sampler) {
 	return normalize(float3(d.x, d.y, z));
 }
 
-inline float3a UniformSampleHemisphere(float3a &normal, UniformSampler *sampler) {
+inline float3 UniformSampleHemisphere(float3 &normal, UniformSampler *sampler) {
 	float cosPhi = sampler->NextFloat();
 	float sinPhi = sqrt(1.0f - cosPhi * cosPhi);
-	float theta = 2 * (float)M_PI * sampler->NextFloat();
+	float theta = k2Pi * sampler->NextFloat();
 
 	float x = sinPhi * sinf(theta);
 	float y = cosPhi;
@@ -89,38 +92,38 @@ inline float3a UniformSampleHemisphere(float3a &normal, UniformSampler *sampler)
 }
 
 inline float UniformHemispherePdf() {
-	return 1.0f / (2.0f * (float)M_PI);
+	return kInv2Pi;
 }
 
-inline float3a UniformSampleUnitSphere(UniformSampler *sampler) {
+inline float3 UniformSampleUnitSphere(UniformSampler *sampler) {
 	float cosPhi = 2.0f * sampler->NextFloat() - 1.0f;
 	float sinPhi = std::sqrt(1.0f - cosPhi * cosPhi);
-	float theta = 2 * (float)M_PI * sampler->NextFloat();
+	float theta = k2Pi * sampler->NextFloat();
 
 	float x = sinPhi * sinf(theta);
 	float y = cosPhi;
 	float z = sinPhi * cosf(theta);
 
-	return float3a(x, y, z);
+	return float3(x, y, z);
 }
 
 inline float UniformUnitSpherePdf() {
-	return 1.0f / (4.0f * (float)M_PI);
+	return kInv4Pi;
 }
 
-inline float3a UniformSampleSphericalCap(float3a &normal, UniformSampler *sampler, float cosThetaMax) {
+inline float3 UniformSampleSphericalCap(float3 &normal, UniformSampler *sampler, float cosThetaMax) {
 	float2 rand = sampler->NextFloat2();
 
 	float cosTheta = (1.0f - rand.x) + rand.x * cosThetaMax;
 	float sinTheta = std::sqrtf(1.0f - cosTheta * cosTheta);
-	float phi = rand.y * (float)M_2_PI;
+	float phi = rand.y * k2Pi;
 
 	float3x3 frame = CreateCoordinateFrame(normal);
 	return normalize(frame * float3(std::cosf(phi) * sinTheta, std::sin(phi) * sinTheta, cosTheta));
 }
 
 inline float UniformSphericalCapPdf(float cosThetaMax) {
-	return 1.0f / ((float)M_2_PI * (1.0f - cosThetaMax));
+	return 1.0f / (k2Pi * (1.0f - cosThetaMax));
 }
 
 } // End of namespace Lantern

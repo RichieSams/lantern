@@ -24,13 +24,11 @@ SetSourceGroup(NAME Math
 	PREFIX LANTERN_CORE
 	SOURCE_FILES math/sampling.h
 	             math/uniform_sampler.h
-	             math/vector_types.h
 	             math/vector_math.h
 	             math/vector_math.cpp
 	             math/int_types.h
 	             math/float_math.h
 	             math/align.h
-	             math/linearspace4.h
 )
 
 SetSourceGroup(NAME Scene
@@ -133,5 +131,5 @@ set(LANTERN_CORE_SRC
 
 # Create lib
 add_library(lantern_core STATIC ${LANTERN_CORE_SRC})
-target_link_libraries(lantern_core glfw ${VULKAN_LIBRARY} imgui tbb_static tbbmalloc_static embree json json_schema_validator tiny_obj_loader stb vk_mem_alloc)
+target_link_libraries(lantern_core glfw ${VULKAN_LIBRARY} imgui tbb_static tbbmalloc_static embree json json_schema_validator tiny_obj_loader stb vk_mem_alloc linalg)
 target_include_directories(lantern_core PUBLIC ${VULKAN_INCLUDE_DIR})

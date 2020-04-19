@@ -6,7 +6,8 @@
 
 #pragma once
 
-#include "math/vector_types.h"
+#include "linalg.h"
+using namespace linalg::aliases;
 
 
 namespace Lantern {

@@ -6,9 +6,10 @@
 
 #pragma once
 
-#include "math/vector_types.h"
-
 #include "materials/bsdf_lobe.h"
+
+#include "linalg.h"
+using namespace linalg::aliases;
 
 
 namespace Lantern {
@@ -33,7 +34,7 @@ protected:
 public:
 	virtual float3 Eval(float3 outputDirection, float3 inputDirection, float2 texCoord) const = 0;
 	virtual float3 Sample(UniformSampler *sampler, float3 outputDirection, float3 *inputDirection, float *pdf, float IORi, float *IORo, float2 texCoord) const = 0;
-	virtual float Pdf(float3a outputDirection, float3a inputDirection, float2 texCoord) const = 0;
+	virtual float Pdf(float3 outputDirection, float3 inputDirection, float2 texCoord) const = 0;
 	bool MatchesType(BSDFLobe::Type allowedLobes) const { return (allowedLobes & LobeType) == LobeType; }
 };
 

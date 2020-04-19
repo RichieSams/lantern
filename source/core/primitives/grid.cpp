@@ -19,29 +19,28 @@ bool Grid::Initialize(RTCDevice device, RTCScene scene, float width, float depth
 	m_x = (transform * float4(1.0f, 0.0f, 0.0f, 1.0f)).xyz();
 	m_z = (transform * float4(0.0f, 0.0f, 1.0f, 1.0f)).xyz();
 	
-	RTCGeometry geometry = rtcNewGeometry(device, RTC_GEOMETRY_TYPE_GRID);
+	RTCGeometry geometry = rtcNewGeometry(device, RTC_GEOMETRY_TYPE_QUAD);
 	rtcSetGeometryBuildQuality(geometry, RTC_BUILD_QUALITY_HIGH);
 	rtcSetGeometryTimeStepCount(geometry, 1);
 
-	float3a *vertices = (float3a *)rtcSetNewGeometryBuffer(geometry, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT3, sizeof(float3a), 4);
-	vertices[0] = transform * float3a(-width * 0.5f, 0.0f, -depth * 0.5f, 1.0f);
-	vertices[1] = transform * float3a( width * 0.5f, 0.0f, -depth * 0.5f, 1.0f);
-	vertices[2] = transform * float3a(-width * 0.5f, 0.0f,  depth * 0.5f, 1.0f);
-	vertices[3] = transform * float3a( width * 0.5f, 0.0f,  depth * 0.5f, 1.0f);
+	float4 *vertices = (float4 *)rtcSetNewGeometryBuffer(geometry, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT3, sizeof(float4), 4);
+	vertices[0] = transform * float4(-width * 0.5f, 0.0f, -depth * 0.5f, 1.0f);
+	vertices[1] = transform * float4(-width * 0.5f, 0.0f,  depth * 0.5f, 1.0f);
+	vertices[2] = transform * float4( width * 0.5f, 0.0f,  depth * 0.5f, 1.0f);
+	vertices[3] = transform * float4( width * 0.5f, 0.0f, -depth * 0.5f, 1.0f);
 
-	RTCGrid *grid = (RTCGrid *)rtcSetNewGeometryBuffer(geometry, RTC_BUFFER_TYPE_GRID, 0, RTC_FORMAT_GRID, sizeof(RTCGrid), 1);
-	memset(grid, 0, sizeof(grid));
-	grid->startVertexID = 0;
-	grid->stride = 2;
-	grid->width = 2;
-	grid->height = 2;
-
+	uint* indices = (uint*)rtcSetNewGeometryBuffer(geometry, RTC_BUFFER_TYPE_INDEX, 0, RTC_FORMAT_UINT4, 4 * sizeof(uint), 1);
+	indices[0] = 0;
+	indices[1] = 1;
+	indices[2] = 2;
+	indices[3] = 3;
+	
 	rtcCommitGeometry(geometry);
 	uint geometryId = rtcAttachGeometry(scene, geometry);
 	rtcReleaseGeometry(geometry);
 
 	const float surfaceArea = length(m_x) * length(m_z);
-	Primitive::Initialize(emissiveColor * radiantPower * (float)M_1_PI / surfaceArea, bsdf, medium, surfaceArea, geometryId, false, false);
+	Primitive::Initialize(emissiveColor * radiantPower * kInvPi / surfaceArea, bsdf, medium, surfaceArea, geometryId, false, false);
 
 	return true;
 }

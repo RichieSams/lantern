@@ -12,8 +12,6 @@
 #include "math/uniform_sampler.h"
 #include "math/sampling.h"
 
-#include <cmath>
-
 
 namespace Lantern {
 
@@ -38,13 +36,13 @@ public:
 		*pdf = std::exp(-m_scatteringCoefficient * distance);
 		return distance;
 	}
-	float3a SampleScatterDirection(UniformSampler *sampler, float3a &wo, float *pdf) const override {
-		*pdf = 0.25f * (float)M_1_PI; // 1 / (4 * PI)
+	float3 SampleScatterDirection(UniformSampler *sampler, float3 &wo, float *pdf) const override {
+		*pdf = kInv4Pi;
 		return UniformSampleUnitSphere(sampler);
 	}
 
-	float ScatterDirectionPdf(float3a &wi, float3a &wo) const override {
-		return 0.25f * (float)M_1_PI; // 1 / (4 * PI)
+	float ScatterDirectionPdf(float3 &wi, float3 &wo) const override {
+		return kInv4Pi;
 	}
 	float3 Transmission(float distance) const override {
 		return exp(-m_absorptionCoefficient * distance);

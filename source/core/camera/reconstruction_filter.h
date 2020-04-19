@@ -6,11 +6,8 @@
 
 #pragma once
 
-#include "math/vector_types.h"
-
 
 namespace Lantern {
-
 
 /**
  * A class for filtering the FrameBuffer

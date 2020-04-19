@@ -38,7 +38,7 @@ RTCRay PinholeCamera::CalculateRayFromPixel(uint x, uint y, UniformSampler *samp
 	ray.org_z = m_position.z;
 
 	ray.tnear = 0.0f;
-	ray.tfar = embree::inf;
+	ray.tfar = std::numeric_limits<float>::infinity();
 	ray.mask = 0xFFFFFFFF;
 
 	float u = m_filter.Sample(sampler->NextFloat());
@@ -61,9 +61,11 @@ RTCRay PinholeCamera::CalculateRayFromPixel(uint x, uint y, UniformSampler *samp
 void PinholeCamera::UpdateCartesianCoordSystem(float3 target, float3 up) {
 	float3 f = normalize(m_position - target);
 	float3 r = normalize(cross(up, f));
-	float3 u = normalize(cross(r, f));
+	float3 u = normalize(cross(f, r));
 
-	m_transform = float3x3(r, u, f);
+	m_transform = float3x3{{r.x, u.x, f.x},
+	                       {r.y, u.y, f.y},
+	                       {r.z, u.z, f.z}};
 }
 
 } // End of namespace Lantern

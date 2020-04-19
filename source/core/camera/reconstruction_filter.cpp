@@ -9,6 +9,7 @@
 #include "math/int_types.h"
 
 #include <algorithm>
+#include <cmath>
 
 
 namespace Lantern {
@@ -96,7 +97,7 @@ float ReconstructionFilter::Evaluate(float x) const {
 	case Type::Gaussian: 
 		{
 			float alpha = 2.0f;
-			return std::exp(-alpha * x * x) - std::exp(-alpha * m_width * m_width);
+			return std::expf(-alpha * x * x) - std::expf(-alpha * m_width * m_width);
 		}
 	case Type::Dirac:
 	default: 

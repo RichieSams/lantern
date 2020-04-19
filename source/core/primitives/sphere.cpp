@@ -30,13 +30,13 @@ void Sphere::Initialize(RTCDevice device, RTCScene scene, float radius, float3 e
 	uint geometryId = rtcAttachGeometry(scene, geometry);
 	rtcReleaseGeometry(geometry);
 
-	const float surfaceArea = 4.0f * (float)M_PI * m_radius * m_radius;
-	Primitive::Initialize(emissiveColor * radiantPower * (float)M_1_PI / surfaceArea, bsdf, medium, surfaceArea, geometryId, false, false);
+	const float surfaceArea = 4.0f * kPi * m_radius * m_radius;
+	Primitive::Initialize(emissiveColor * radiantPower * kInvPi / surfaceArea, bsdf, medium, surfaceArea, geometryId, false, false);
 }
 
 float3 Sphere::SampleDirectLighting(UniformSampler *sampler, SurfaceInteraction &interaction, float3 *direction, float *distance, float *pdf) const {
 	// Using the method and notations from PBRT: http://www.pbr-book.org/3ed-2018/Light_Transport_I_Surface_Reflection/Sampling_Light_Sources.html#fragment-SphereMethodDefinitions-5
-	float distanceSquared = sqr_length(m_origin - interaction.Position);
+	float distanceSquared = distance2(interaction.Position, m_origin);
 
 	// If we're inside the sphere, just uniformly sample from the sphere
 	if (distanceSquared <= m_radius * m_radius) {
@@ -57,31 +57,31 @@ float3 Sphere::SampleDirectLighting(UniformSampler *sampler, SurfaceInteraction 
 	float2 rand = sampler->NextFloat2();
 	float distanceToOrigin = std::sqrtf(distanceSquared);
 
-	// Compute theta
+	// Compute theta and phi values for sample in cone
 	float sinThetaMax = m_radius / distanceToOrigin;
 	float sinThetaMaxSquared = sinThetaMax * sinThetaMax;
+	float invSinThetaMax = 1 / sinThetaMax;
 	float cosThetaMax = std::sqrtf(std::max(0.0f, 1.0f - sinThetaMaxSquared));
 
 	float cosTheta = (cosThetaMax - 1.0f) * rand.x + 1.0f;
 	float sinThetaSquared = 1.0f - cosTheta * cosTheta;
 
-	if (sinThetaSquared < 0.00068523f /* sin^2(1.5 def) */) {
+	if (sinThetaMaxSquared < 0.00068523f /* sin^2(1.5 deg) */) {
 		// Fall back to a Taylor series expansion for small angles, where
 		// the standard approach suffers from severe cancellation errors
 		sinThetaSquared = sinThetaMaxSquared * rand.x;
 		cosTheta = std::sqrtf(1.0f - sinThetaSquared);
 	}
 
-	// Use theta to calculate angle alpha from center of sphere to sampled point on surface
-	float cosAlpha = sinThetaSquared / sinThetaMax + cosTheta * std::sqrtf(std::max(0.0f, 1.0f - sinThetaSquared / (sinThetaMax * sinThetaMax)));
+	// Compute angle alpha from center of sphere to sampled point on surface
+	float cosAlpha = sinThetaSquared * invSinThetaMax + cosTheta * std::sqrtf(std::max(0.0f, 1.0f - sinThetaSquared * invSinThetaMax * invSinThetaMax));
 	float sinAlpha = std::sqrtf(std::max(0.0f, 1.0f - cosAlpha * cosAlpha));
 
 	// Phi is just a random point in 2 Pi
-	float phi = rand.y * (float)M_2_PI;
-	
+	float phi = rand.y * k2Pi;
 
 	float3 localPosition = m_radius * float3(std::cosf(phi) * sinAlpha, std::sin(phi) * sinAlpha, cosAlpha);
-	float3a normalizedDirectionToOrigin = normalize(m_origin - interaction.Position);
+	float3 normalizedDirectionToOrigin = normalize(m_origin - interaction.Position);
 	float3x3 frame = CreateCoordinateFrame(normalizedDirectionToOrigin);
 	float3 globalPosition = frame * localPosition;
 
@@ -89,13 +89,13 @@ float3 Sphere::SampleDirectLighting(UniformSampler *sampler, SurfaceInteraction 
 
 	*direction = normalize(L);
 	*distance = length(L);
-	*pdf = 1.0f / ((float)M_2_PI * (1.0f - cosThetaMax));
+	*pdf = 1.0f / (k2Pi * (1.0f - sinThetaMax));
 
 	return m_emission;
 }
 
 float Sphere::PdfDirectLighting(Scene *scene, SurfaceInteraction &interaction, float3 inputDirection) const {
-	float distanceSquared = sqr_length(m_origin - interaction.Position);
+	float distanceSquared = distance2(interaction.Position, m_origin);
 
 	// Return uniform PDF if point is inside sphere
 	if (distanceSquared <= m_radius * m_radius) {
@@ -105,7 +105,7 @@ float Sphere::PdfDirectLighting(Scene *scene, SurfaceInteraction &interaction, f
 	// Compute general sphere pdf
 	float sinThetaMaxSquared = m_radius * m_radius / distanceSquared;
 	float cosThetaMax = std::sqrtf(std::max(0.0f, 1.0f - sinThetaMaxSquared));
-	return 1.0f / ((float)M_2_PI * (1.0f - cosThetaMax));
+	return 1.0f / (k2Pi * (1.0f - cosThetaMax));
 }
 
 } // End of namespace Lantern

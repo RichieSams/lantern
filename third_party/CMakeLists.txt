@@ -19,6 +19,7 @@ add_subdirectory(glfw)
 add_subdirectory(imgui)
 add_subdirectory(json)
 add_subdirectory(json_schema_validator)
+add_subdirectory(linalg)
 add_subdirectory(stb)
 
 set( TBB_BUILD_SHARED OFF CACHE BOOL  "Only build TBB static" )

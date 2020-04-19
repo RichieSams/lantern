@@ -4,6 +4,7 @@
  * Copyright Adrian Astley 2015 - 2016
  */
 
+#define NOMINMAX
 #include "visualizer/visualizer.h"
 
 #include "scene/scene.h"

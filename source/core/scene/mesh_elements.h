@@ -6,7 +6,8 @@
 
 #pragma once
 
-#include "math/vector_types.h"
+#include "linalg.h"
+using namespace linalg::aliases;
 
 #include <vector>
 
@@ -14,7 +15,7 @@
 namespace Lantern {
 
 struct Mesh {
-	std::vector<float3a> Positions;
+	std::vector<float3> Positions;
 	std::vector<float3> Normals;
 	std::vector<float3> Tangents;
 	std::vector<float2> TexCoords;

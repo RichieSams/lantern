@@ -6,11 +6,10 @@
 
 #pragma once
 
-#include "math/vector_types.h"
-
 #include "materials/media/medium.h"
 
-#include <cmath>
+#include "linalg.h"
+using namespace linalg::aliases;
 
 
 namespace Lantern {
@@ -27,10 +26,10 @@ public:
 		return tFar;
 	}
 	
-	float3a SampleScatterDirection(UniformSampler *sampler, float3a &wo, float *pdf) const override {
+	float3 SampleScatterDirection(UniformSampler *sampler, float3 &wo, float *pdf) const override {
 		return wo;
 	}
-	float ScatterDirectionPdf(float3a &wi, float3a &wo) const override {
+	float ScatterDirectionPdf(float3 &wi, float3 &wo) const override {
 		return 1.0f;
 	}
 
