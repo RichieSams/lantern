@@ -387,10 +387,10 @@ bool Visualizer::RenderFrame() {
 
 			float3 &color = m_accumulationFrameBuffer.ColorData[frameBufferIndex];
 			uint sampleCount = m_accumulationFrameBuffer.ColorSampleCount[frameBufferIndex];
-			mappedData[mappedDataIndex + 0] = color.x / float(sampleCount); // Red
-			mappedData[mappedDataIndex + 1] = color.y / float(sampleCount); // Green
-			mappedData[mappedDataIndex + 2] = color.z / float(sampleCount); // Blue
-			mappedData[mappedDataIndex + 2] = 1.0f; // Alpha
+			mappedData[mappedDataIndex + 0] = color.r / float(sampleCount); // Red
+			mappedData[mappedDataIndex + 1] = color.g / float(sampleCount); // Green
+			mappedData[mappedDataIndex + 2] = color.b / float(sampleCount); // Blue
+			mappedData[mappedDataIndex + 3] = 1.0f; // Alpha
 
 			minSPP = std::min(minSPP, sampleCount);
 			maxSPP = std::max(maxSPP, sampleCount);
