@@ -24,10 +24,9 @@ bool BSDF::AddLobe(BxDF *lobe) {
 
 float3 BSDF::Eval(SurfaceInteraction &interaction, float3 inputDirection, BSDFLobe::Type allowedLobes) const {
 	float3x3 frame = CreateCoordinateFrame(interaction.Shading.Normal);
-	float3x3 inverseFrame = inverse(frame);
 
-	float3 localInputDirection = inverseFrame * inputDirection;
-	float3 localOutputDirection = inverseFrame * interaction.OutputDirection;
+	float3 localInputDirection = frame * inputDirection;
+	float3 localOutputDirection = frame * interaction.OutputDirection;
 	if (localOutputDirection.z == 0.0f) {
 		return float3(0.0f);
 	}
@@ -75,7 +74,7 @@ float3 BSDF::Sample(UniformSampler *sampler, SurfaceInteraction &interaction, fl
 	float3x3 frame = CreateCoordinateFrame(interaction.Shading.Normal);
 	float3x3 inverseFrame = inverse(frame);
 
-	float3 localOutputDirection = inverseFrame * interaction.OutputDirection;
+	float3 localOutputDirection = frame * interaction.OutputDirection;
 	if (localOutputDirection.z == 0.0f) {
 		*pdf = 0.0f;
 		*sampledLobe = BSDFLobe::Null;
@@ -93,7 +92,7 @@ float3 BSDF::Sample(UniformSampler *sampler, SurfaceInteraction &interaction, fl
 		return float3(0.0f);
 	}
 
-	*inputDirection = frame * localInputDirection;
+	*inputDirection = inverseFrame * localInputDirection;
 
 	// Compute the overall pdf by adding the pdfs of the non-sampled BxDFs
 	// But only if non-specular
@@ -132,10 +131,9 @@ float BSDF::Pdf(SurfaceInteraction &interaction, float3 inputDirection, BSDFLobe
 
 	// Create the change of coordinate matrix
 	float3x3 frame = CreateCoordinateFrame(interaction.Shading.Normal);
-	float3x3 inverseFrame = inverse(frame);
 
-	float3 localInputDirection = inverseFrame * inputDirection;
-	float3 localOutputDirection = inverseFrame * interaction.OutputDirection;
+	float3 localInputDirection = frame * inputDirection;
+	float3 localOutputDirection = frame * interaction.OutputDirection;
 	if (localOutputDirection.z == 0.0f) {
 		return 0.0f;
 	}

@@ -83,7 +83,9 @@ float3 Sphere::SampleDirectLighting(UniformSampler *sampler, SurfaceInteraction 
 	float3 localPosition = m_radius * float3(std::cosf(phi) * sinAlpha, std::sin(phi) * sinAlpha, cosAlpha);
 	float3 normalizedDirectionToOrigin = normalize(m_origin - interaction.Position);
 	float3x3 frame = CreateCoordinateFrame(normalizedDirectionToOrigin);
-	float3 globalPosition = frame * localPosition;
+	float3x3 inverseFrame = inverse(frame);
+	
+	float3 globalPosition = inverseFrame * localPosition;
 
 	float3 L = globalPosition - interaction.Position;
 

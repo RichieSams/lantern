@@ -88,7 +88,9 @@ inline float3 UniformSampleHemisphere(float3 &normal, UniformSampler *sampler) {
 	float z = sinPhi * cosf(theta);
 
 	float3x3 frame = CreateCoordinateFrame(normal);
-	return normalize(frame * float3(x, y, z));
+	float3x3 inverseFrame = inverse(frame);
+	
+	return normalize(inverseFrame * float3(x, y, z));
 }
 
 inline float UniformHemispherePdf() {
@@ -119,7 +121,9 @@ inline float3 UniformSampleSphericalCap(float3 &normal, UniformSampler *sampler,
 	float phi = rand.y * k2Pi;
 
 	float3x3 frame = CreateCoordinateFrame(normal);
-	return normalize(frame * float3(std::cosf(phi) * sinTheta, std::sin(phi) * sinTheta, cosTheta));
+	float3x3 inverseFrame = inverse(frame);
+	
+	return normalize(inverseFrame * float3(std::cosf(phi) * sinTheta, std::sin(phi) * sinTheta, cosTheta));
 }
 
 inline float UniformSphericalCapPdf(float cosThetaMax) {
