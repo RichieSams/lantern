@@ -22,7 +22,7 @@ public:
 
 public:
 	float3 Eval(float3 outputDirection, float3 inputDirection, float2 texCoord) const override {
-		return m_albedo->Sample(texCoord) * kPi;
+		return m_albedo->Sample(texCoord) * kInvPi;
 	}
 
 	float3 Sample(UniformSampler *sampler, float3 outputDirection, float3 *inputDirection, float *pdf, float IORi, float *IORo, float2 texCoord) const override {
