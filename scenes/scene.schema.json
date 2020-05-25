@@ -4,11 +4,7 @@
 	"type": "object",
 	"required": [ "camera" ],
 	"properties": {
-		"background_color": {
-			"description": "",
-			"$ref": "#/definitions/float3"
-		},
-		"camera": {
+    "camera": {
 			"description": "",
 			"type": "object",
 			"required": [ "position", "target", "up", "client_width", "client_height" ],
@@ -65,7 +61,8 @@
 				"oneOf": [
 					{ "$ref": "#/definitions/lantern_model_file" },
 					{ "$ref": "#/definitions/grid" },
-					{ "$ref": "#/definitions/sphere" }
+					{ "$ref": "#/definitions/sphere" },
+					{ "$ref": "#/definitions/uniform_infinite_sphere" }
 				]
 			}
 		}
@@ -358,6 +355,36 @@
 					}
 				}
 			}
-		}
+		},
+    "uniform_infinite_sphere": {
+      "type": "object",
+      "required": [ "name", "type", "emission" ],
+      "properties": {
+        "name": {
+          "description": "",
+          "type": "string"
+        },
+        "type": {
+          "description": "",
+          "type": "string",
+					"enum": [ "uniform_infinite_sphere" ]
+        },
+        "emission": {
+          "description": "",
+          "type": "object",
+					"required": [ "color", "radiance" ],
+          "properties": {
+            "color": {
+              "description": "",
+              "$ref": "#/definitions/float3"
+            },
+            "radiance": {
+              "description": "",
+              "type": "number"
+            }
+          }
+        }
+      }
+    }
 	}
 }

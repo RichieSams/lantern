@@ -169,11 +169,6 @@ void Integrator::RenderPixel(uint x, uint y, UniformSampler *sampler) const {
 		if (interactionType == InteractionType::None) {
 			// Terminate the path if the ray escaped
 			if (rayHit.hit.geomID == RTC_INVALID_GEOMETRY_ID) {
-				// Before terminating the path, check if this is the first bounce or if we just had a specular bounce
-				// And add the environment lighting
-				if (bounces == 0 || specularBounce) {
-					color += throughput * m_scene->BackgroundColor;
-				}
 				break;
 			}
 			

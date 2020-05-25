@@ -1,62 +1,61 @@
 {
-	"background_color": [ 0.846, 0.933, 0.949 ],
-	"camera": {
-		"position": [ 0.0, 0.0, 40.0 ],
-		"target": [ 0.0, 0.0, 0.0 ],
-		"up": [ 0.0, 1.0, 0.0 ],
-		"client_width": 1280,
-		"client_height": 720,
-		"fov": 0.7853981
-	},
-	"materials": [
-		{
-			"name": "green",
-			"type": "matte",
-			"albedo": {
-				"type": "constant",
-				"value": [ 0.408, 0.741, 0.467 ]
-			}
-		},
-		{
-			"name": "blue",
-			"type": "matte",
-			"albedo": {
-				"type": "constant",
-				"value": [ 0.392, 0.584, 0.929 ]
-			}
-		},
-		{
-			"name": "orange",
-			"type": "matte",
-			"albedo": {
-				"type": "constant",
-				"value": [ 1.0, 0.498, 0.314 ]
-			}
-		},
-		{
-			"name": "black",
-			"type": "matte",
-			"albedo": {
-				"type": "constant",
-				"value": [ 0.0, 0.0, 0.0 ]
-			}
-		},
-		{
-			"name": "gray",
-			"type": "matte",
-			"albedo": {
-				"type": "constant",
-				"value": [ 0.9, 0.9, 0.9 ]
-			}
-		},
-		{
-			"name": "glass",
-			"type": "matte",
-			"albedo": {
-				"type": "constant",
-				"value": [ 0.9, 0.9, 0.9 ]
-			}
-		},
+  "camera": {
+    "position": [ 5.0, 0.0, 40.0 ],
+    "target": [ 0.0, 0.0, 0.0 ],
+    "up": [ 0.0, 1.0, 0.0 ],
+    "client_width": 1280,
+    "client_height": 720,
+    "fov": 0.7853981
+  },
+  "materials": [
+    {
+      "name": "green",
+      "type": "matte",
+      "albedo": {
+        "type": "constant",
+        "value": [ 0.408, 0.741, 0.467 ]
+      }
+    },
+    {
+      "name": "blue",
+      "type": "matte",
+      "albedo": {
+        "type": "constant",
+        "value": [ 0.392, 0.584, 0.929 ]
+      }
+    },
+    {
+      "name": "orange",
+      "type": "matte",
+      "albedo": {
+        "type": "constant",
+        "value": [ 1.0, 0.498, 0.314 ]
+      }
+    },
+    {
+      "name": "black",
+      "type": "matte",
+      "albedo": {
+        "type": "constant",
+        "value": [ 0.0, 0.0, 0.0 ]
+      }
+    },
+    {
+      "name": "gray",
+      "type": "matte",
+      "albedo": {
+        "type": "constant",
+        "value": [ 0.9, 0.9, 0.9 ]
+      }
+    },
+    {
+      "name": "glass",
+      "type": "matte",
+      "albedo": {
+        "type": "constant",
+        "value": [ 0.9, 0.9, 0.9 ]
+      }
+    },
     {
       "name": "mirror",
       "type": "matte",
@@ -65,82 +64,140 @@
         "value": [ 0.9, 0.9, 0.9 ]
       }
     }
-	],
-	"primitives": [
-		{
-			"name": "floor",
-			"type": "grid",
-			"width": 10.0,
-			"depth": 10.0,
-			"n": 2,
-			"m": 2,
-			"material": "gray",
-			"transform": [
-				1, 0, 0,  0,
-				0, 1, 0, -6,
-				0, 0, 1,  0,
-				0, 0, 0,  1
-			]
-		},
-	  {
-			"name": "ceiling",
-			"type": "grid",
-			"width": 10.0,
-			"depth": 10.0,
-			"n": 2,
-			"m": 2,
-			"material": "gray",
-			"transform": [
-				1, 0, 0, 0,
-				0, 1, 0, 6,
-				0, 0, 1, 0,
-				0, 0, 0, 1
-			]
-		},
+  ],
+  "primitives": [
     {
-			"name": "right",
-			"type": "grid",
-			"width": 10.0,
-			"depth": 10.0,
-			"n": 2,
-			"m": 2,
-			"material": "gray",
-			"transform": [
-				0.0, -1.0, 0.0, 6.0,
-				1.0,  0.0, 0.0, 0.0,
-				0.0,  0.0, 1.0, 0.0,
-				0.0,  0.0, 0.0, 1.0
-      ]
-		},
-		{
-			"name": "left",
-			"type": "grid",
-			"width": 10.0,
-			"depth": 10.0,
-			"n": 2,
-			"m": 2,
-			"material": "gray",
-			"transform": [
-				 0.0, 1.0, 0.0, -6.0,
-				-1.0, 0.0, 0.0,  0.0,
-				 0.0, 0.0, 1.0,  0.0,
-         0.0, 0.0, 0.0,  1.0
-      ]
-    },
-    {
-      "name": "far_left",
+      "name": "floor",
       "type": "grid",
-      "width": 10.0,
-      "depth": 10.0,
+      "width": 50.0,
+      "depth": 50.0,
       "n": 2,
       "m": 2,
       "material": "gray",
       "transform": [
-				0.0, -1.0, 0.0, -11.0,
-				1.0,  0.0, 0.0,   0.0,
-				0.0,  0.0, 1.0,   0.0,
-				6.0,  0.0, 0.0,   1.0
+        1, 0, 0, 0,
+        0, 1, 0, -6,
+        0, 0, 1, 0,
+        0, 0, 0, 1
       ]
+    },
+    {
+      "name": "emissive_ball",
+      "type": "sphere",
+      "radius": 2.0,
+      "n": 3,
+      "material": "black"
+    },
+    {
+      "name": "left_top_front",
+      "type": "sphere",
+      "radius": 2.0,
+      "n": 3,
+      "material": "green",
+      "transform": [
+        1, 0, 0, -4,
+        0, 1, 0, 4,
+        0, 0, 1, 4,
+        0, 0, 0, 1
+      ]
+    },
+    {
+      "name": "right_top_front",
+      "type": "sphere",
+      "radius": 2.0,
+      "n": 3,
+      "material": "glass",
+      "transform": [
+        1, 0, 0, 4,
+        0, 1, 0, 4,
+        0, 0, 1, 4,
+        0, 0, 0, 1
+      ]
+    },
+    {
+      "name": "left_bottom_front",
+      "type": "sphere",
+      "radius": 2.0,
+      "n": 3,
+      "material": "orange",
+      "transform": [
+        1, 0, 0, -4,
+        0, 1, 0, -4,
+        0, 0, 1, 4,
+        0, 0, 0, 1]
+    },
+    {
+      "name": "right_bottom_front",
+      "type": "sphere",
+      "radius": 2.0,
+      "n": 3,
+      "material": "blue",
+      "transform": [
+        1, 0, 0, 4,
+        0, 1, 0, -4,
+        0, 0, 1, 4,
+        0, 0, 0, 1
+      ]
+    },
+    {
+      "name": "left_top_back",
+      "type": "sphere",
+      "radius": 2.0,
+      "n": 3,
+      "material": "blue",
+      "transform": [
+        1, 0, 0, -4,
+        0, 1, 0, 4,
+        0, 0, 1, -4,
+        0, 0, 0, 1
+      ]
+    },
+    {
+      "name": "right_top_back",
+      "type": "sphere",
+      "radius": 2.0,
+      "n": 3,
+      "material": "orange",
+      "transform": [
+        1, 0, 0, 4,
+        0, 1, 0, 4,
+        0, 0, 1, -4,
+        0, 0, 0, 1
+      ]
+    },
+    {
+      "name": "left_bottom_back",
+      "type": "sphere",
+      "radius": 2.0,
+      "n": 3,
+      "material": "mirror",
+      "transform": [
+        1, 0, 0, -4, 
+        0, 1, 0, -4,
+        0, 0, 1, -4,
+        0, 0, 0, 1
+      ]
+    },
+    {
+      "name": "right_bottom_back",
+      "type": "sphere",
+      "radius": 2.0,
+      "n": 3,
+      "material": "green",
+      "transform": [
+        1, 0, 0, 4,
+        0, 1, 0, -4,
+        0, 0, 1, -4,
+        0, 0, 0, 1
+      ]
+    },
+    {
+      "name": "environment_light",
+      "type": "uniform_infinite_sphere",
+      "emission": {
+        "color": [ 0.846, 0.933, 0.949 ],
+        "radiance": 0.8
+      }
     }
   ]
 }

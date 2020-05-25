@@ -36,7 +36,6 @@ namespace Lantern {
 
 Scene::Scene()
 	: Camera(nullptr),
-	  BackgroundColor(0.0f),
 	  m_device(rtcNewDevice(nullptr)),
 	  m_scene(nullptr) {
 }
@@ -169,12 +168,6 @@ bool Scene::ParseJSON() {
 	} catch (std::exception &e) {
 		printf("Schema validation failed: %s at offset %zu\n", e.what(), ifs.tellg());
 		return false;
-	}
-
-	if (j.count("background_color") == 1) {
-		BackgroundColor.x = j["background_color"][0].get<float>();
-		BackgroundColor.y = j["background_color"][1].get<float>();
-		BackgroundColor.z = j["background_color"][2].get<float>();
 	}
 
 	if (j.count("camera") != 1) {

@@ -20,6 +20,7 @@
 #include "primitives/quad_mesh.h"
 #include "primitives/sphere.h"
 #include "primitives/triangle_mesh.h"
+#include "primitives/uniform_infinite_sphere.h"
 
 
 namespace Lantern {
@@ -90,111 +91,228 @@ void Scene::ParseMedia(nlohmann::json &root, std::unordered_map<std::string, Med
 	}
 }
 
+bool ParseLMF(nlohmann::json &jsonNode, Primitive **primitive, RTCDevice device, RTCScene scene, std::unordered_map<std::string, BSDF *> &bsdfMap, std::unordered_map<std::string, Medium *> &mediaMap, std::filesystem::path rootPath) {
+	std::string name = jsonNode["name"].get<std::string>();
+
+	float4x4 transform = linalg::identity;
+	float3 emissiveColor = float3(0.0f);
+	float radiantPower = 0.0f;
+	Medium* medium = nullptr;
+
+	// Required parameters
+	const std::string materialStr = jsonNode["material"].get<std::string>();
+	auto materialIter = bsdfMap.find(materialStr);
+	if (materialIter == bsdfMap.end()) {
+		printf("Failed to find material `%s` for primitive `%s`\n", materialStr.c_str(), name.c_str());
+		return false;
+	}
+	BSDF* bsdf = materialIter->second;
+
+
+	// Optional parameters
+	if (jsonNode.count("transform") == 1) {
+		nlohmann::json t = jsonNode["transform"];
+		transform = float4x4{
+			{t[0].get<float>(), t[4].get<float>(),  t[8].get<float>(), t[12].get<float>()},
+			{t[1].get<float>(), t[5].get<float>(),  t[9].get<float>(), t[13].get<float>()},
+			{t[2].get<float>(), t[6].get<float>(), t[10].get<float>(), t[14].get<float>()},
+			{t[3].get<float>(), t[7].get<float>(), t[11].get<float>(), t[15].get<float>()} };
+	}
+
+	if (jsonNode.count("emission") == 1) {
+		emissiveColor = float3(jsonNode["emission"]["color"][0].get<float>(), jsonNode["emission"]["color"][1].get<float>(), jsonNode["emission"]["color"][2].get<float>());
+		radiantPower = jsonNode["emission"]["radiant_power"].get<float>();
+	}
+
+	if (jsonNode.count("medium") == 1) {
+		medium = mediaMap[jsonNode["medium"].get<std::string>()];
+	}
+
+	std::string lmfFilePathString = jsonNode["file_path"].get<std::string>();
+	std::filesystem::path lmfFilePath(lmfFilePathString);
+	if (lmfFilePath.is_relative()) {
+		lmfFilePath = rootPath / lmfFilePath;
+	}
+
+	FILE* file = fopen(lmfFilePath.u8string().c_str(), "rb");
+	if (!file) {
+		printf("Unable to open \"%s\" for reading\n", lmfFilePath.u8string().c_str());
+		return false;
+	}
+
+	LanternModelFile lmf;
+	if (!ReadLMF(file, &lmf)) {
+		return false;
+	}
+	fclose(file);
+
+	switch (lmf.VerticesPerPrimitive) {
+	case 3:
+	{
+		TriangleMesh* triangleMesh = new TriangleMesh();
+		triangleMesh->Initialize(device, scene, &lmf, emissiveColor, radiantPower, transform, bsdf, medium);
+		*primitive = triangleMesh;
+	}
+	case 4:
+	{
+		QuadMesh* quadMesh = new QuadMesh();
+		quadMesh->Initialize(device, scene, &lmf, emissiveColor, radiantPower, transform, bsdf, medium);
+		*primitive = quadMesh;
+	}
+	default:
+		printf("Invalid LMF file. Supported VerticesPerPrimitive: [3, 4]. Given: %c", lmf.VerticesPerPrimitive);
+		return false;
+	}
+
+	return true;
+}
+
+bool ParseGrid(nlohmann::json& jsonNode, Primitive** primitive, RTCDevice device, RTCScene scene, std::unordered_map<std::string, BSDF*>& bsdfMap, std::unordered_map<std::string, Medium*>& mediaMap) {
+	std::string name = jsonNode["name"].get<std::string>();
+
+	float4x4 transform = linalg::identity;
+	float3 emissiveColor = float3(0.0f);
+	float radiantPower = 0.0f;
+	Medium* medium = nullptr;
+
+	// Required parameters
+	const std::string materialStr = jsonNode["material"].get<std::string>();
+	auto materialIter = bsdfMap.find(materialStr);
+	if (materialIter == bsdfMap.end()) {
+		printf("Failed to find material `%s` for primitive `%s`\n", materialStr.c_str(), name.c_str());
+		return false;
+	}
+	BSDF* bsdf = materialIter->second;
+
+
+	// Optional parameters
+	if (jsonNode.count("transform") == 1) {
+		nlohmann::json t = jsonNode["transform"];
+		transform = float4x4{
+			{t[0].get<float>(), t[4].get<float>(),  t[8].get<float>(), t[12].get<float>()},
+			{t[1].get<float>(), t[5].get<float>(),  t[9].get<float>(), t[13].get<float>()},
+			{t[2].get<float>(), t[6].get<float>(), t[10].get<float>(), t[14].get<float>()},
+			{t[3].get<float>(), t[7].get<float>(), t[11].get<float>(), t[15].get<float>()} };
+	}
+
+	if (jsonNode.count("emission") == 1) {
+		emissiveColor = float3(jsonNode["emission"]["color"][0].get<float>(), jsonNode["emission"]["color"][1].get<float>(), jsonNode["emission"]["color"][2].get<float>());
+		radiantPower = jsonNode["emission"]["radiant_power"].get<float>();
+	}
+
+	if (jsonNode.count("medium") == 1) {
+		medium = mediaMap[jsonNode["medium"].get<std::string>()];
+	}
+
+
+	float width = jsonNode["width"].get<float>();
+	float depth = jsonNode["depth"].get<float>();
+
+	Grid* grid = new Grid();
+	bool result = grid->Initialize(device, scene, width, depth, emissiveColor, radiantPower, transform, bsdf, medium);
+	*primitive = grid;
+
+	return result;
+}
+
+bool ParseSphere(nlohmann::json& jsonNode, Primitive** primitive, RTCDevice device, RTCScene scene, std::unordered_map<std::string, BSDF*>& bsdfMap, std::unordered_map<std::string, Medium*>& mediaMap) {
+	std::string name = jsonNode["name"].get<std::string>();
+
+	float4x4 transform = linalg::identity;
+	float3 emissiveColor = float3(0.0f);
+	float radiantPower = 0.0f;
+	Medium* medium = nullptr;
+
+	// Required parameters
+	const std::string materialStr = jsonNode["material"].get<std::string>();
+	auto materialIter = bsdfMap.find(materialStr);
+	if (materialIter == bsdfMap.end()) {
+		printf("Failed to find material `%s` for primitive `%s`\n", materialStr.c_str(), name.c_str());
+		return false;
+	}
+	BSDF* bsdf = materialIter->second;
+
+
+	// Optional parameters
+	if (jsonNode.count("transform") == 1) {
+		nlohmann::json t = jsonNode["transform"];
+		transform = float4x4{
+			{t[0].get<float>(), t[4].get<float>(),  t[8].get<float>(), t[12].get<float>()},
+			{t[1].get<float>(), t[5].get<float>(),  t[9].get<float>(), t[13].get<float>()},
+			{t[2].get<float>(), t[6].get<float>(), t[10].get<float>(), t[14].get<float>()},
+			{t[3].get<float>(), t[7].get<float>(), t[11].get<float>(), t[15].get<float>()} };
+	}
+
+	if (jsonNode.count("emission") == 1) {
+		emissiveColor = float3(jsonNode["emission"]["color"][0].get<float>(), jsonNode["emission"]["color"][1].get<float>(), jsonNode["emission"]["color"][2].get<float>());
+		radiantPower = jsonNode["emission"]["radiant_power"].get<float>();
+	}
+
+	if (jsonNode.count("medium") == 1) {
+		medium = mediaMap[jsonNode["medium"].get<std::string>()];
+	}
+
+	float radius = jsonNode["radius"].get<float>();
+
+	Sphere* sphere = new Sphere();
+	sphere->Initialize(device, scene, radius, emissiveColor, radiantPower, transform, bsdf, medium);
+	*primitive = sphere;
+
+	return true;
+}
+
+bool ParseUniformInfiniteSphere(nlohmann::json& jsonNode, Primitive** primitive) {
+	float3 emissiveColor = float3(jsonNode["emission"]["color"][0].get<float>(), jsonNode["emission"]["color"][1].get<float>(), jsonNode["emission"]["color"][2].get<float>());
+	float radiance = jsonNode["emission"]["radiance"].get<float>();
+
+	UniformInfiniteSphere *sphere = new UniformInfiniteSphere();
+	sphere->Initialize(emissiveColor, radiance);
+	*primitive = sphere;
+
+	return true;
+}
+
 bool Scene::ParsePrimitives(nlohmann::json &root, std::unordered_map<std::string, BSDF *> &bsdfMap, std::unordered_map<std::string, Medium *> &mediaMap) {
 	if (root.count("primitives") == 0) {
 		return true;
 	}
+
+	// We use the geometry id for the lookup in m_primitives
+	// But some primitives don't have an ID because they're not represented in the world
+	// (IE. Embree doens't know about them). So we give them id's from the end of the range
+	// Exploiting the fact that Embree allocates IDs from zero and increments linearly
+	// We skip (uint)-1 , because that's RTC_INVALID_GEOMETRY_ID
+	uint nonPhysicalGeometryId = (uint)-2;
 	
-	for (auto &primitive : root["primitives"]) {
-		std::string name = primitive["name"].get<std::string>();
-
-		float4x4 transform = linalg::identity;
-		float3 emissiveColor = float3(0.0f);
-		float radiantPower = 0.0f;
-		Medium* medium = nullptr;
-
-		// Required parameters
-		const std::string materialStr = primitive["material"].get<std::string>();
-		auto materialIter = bsdfMap.find(materialStr);
-		if (materialIter == bsdfMap.end()) {
-			printf("Failed to find material `%s` for primitive `%s`\n", materialStr.c_str(), name.c_str());
-			return false;
-		}
-		BSDF* bsdf = materialIter->second;
-
-
-		// Optional parameters
-		if (primitive.count("transform") == 1) {
-			nlohmann::json t = primitive["transform"];
-			transform = float4x4{
-				{t[0].get<float>(), t[4].get<float>(),  t[8].get<float>(), t[12].get<float>()},
-				{t[1].get<float>(), t[5].get<float>(),  t[9].get<float>(), t[13].get<float>()},
-				{t[2].get<float>(), t[6].get<float>(), t[10].get<float>(), t[14].get<float>()},
-				{t[3].get<float>(), t[7].get<float>(), t[11].get<float>(), t[15].get<float>()}};
-		}
-
-		if (primitive.count("emission") == 1) {
-			emissiveColor = float3(primitive["emission"]["color"][0].get<float>(), primitive["emission"]["color"][1].get<float>(), primitive["emission"]["color"][2].get<float>());
-			radiantPower = primitive["emission"]["radiant_power"].get<float>();
-		}
-
-		if (primitive.count("medium") == 1) {
-			medium = mediaMap[primitive["medium"].get<std::string>()];
-		}
-
-
+	for (auto &primitiveNode : root["primitives"]) {
 		// Initialize the primitive based on the type
-		std::string type = primitive["type"].get<std::string>();
+		std::string type = primitiveNode["type"].get<std::string>();
+
+		Primitive *primitive;
 		if (type == "lmf") {
-			std::string lmfFilePathString = primitive["file_path"].get<std::string>();
-			std::filesystem::path lmfFilePath(lmfFilePathString);
-			if (lmfFilePath.is_relative()) {
-				lmfFilePath = m_jsonPath.parent_path() / lmfFilePath;
-			}
-
-			FILE* file = fopen(lmfFilePath.u8string().c_str(), "rb");
-			if (!file) {
-				perror("Error");
-				printf("Unable to open \"%s\" for reading\n", lmfFilePath.u8string().c_str());
-				continue;
-			}
-
-			LanternModelFile lmf;
-			if (!ReadLMF(file, &lmf)) {
-				continue;
-			}
-			fclose(file);
-
-			switch (lmf.VerticesPerPrimitive) {
-			case 3:
-			{
-				TriangleMesh* primitive = new TriangleMesh();
-				primitive->Initialize(m_device, m_scene, &lmf, emissiveColor, radiantPower, transform, bsdf, medium);
-				m_primitives[primitive->m_geometryId] = primitive;
-				break;
-			}
-			case 4:
-			{
-				QuadMesh* primitive = new QuadMesh();
-				primitive->Initialize(m_device, m_scene, &lmf, emissiveColor, radiantPower, transform, bsdf, medium);
-
-				m_primitives[primitive->m_geometryId] = primitive;
-				break;
-			}
-			default:
-				printf("Invalid LMF file. Supported VerticesPerPrimitive: [3, 4]. Given: %c", lmf.VerticesPerPrimitive);
+			if (!ParseLMF(primitiveNode, &primitive, m_device, m_scene, bsdfMap, mediaMap, m_jsonPath.parent_path())) {
 				return false;
 			}
-		}
-		else if (type == "grid") {
-			float width = primitive["width"].get<float>();
-			float depth = primitive["depth"].get<float>();
-
-			Grid* primitive = new Grid();
-			primitive->Initialize(m_device, m_scene, width, depth, emissiveColor, radiantPower, transform, bsdf, medium);
-			m_primitives[primitive->m_geometryId] = primitive;
-		}
-		else if (type == "sphere") {
-			float radius = primitive["radius"].get<float>();
-
-			Sphere* primitive = new Sphere();
-			primitive->Initialize(m_device, m_scene, radius, emissiveColor, radiantPower, transform, bsdf, medium);
-			m_primitives[primitive->m_geometryId] = primitive;
-		}
-		else {
+		} else if (type == "grid") {
+			if (!ParseGrid(primitiveNode, &primitive, m_device, m_scene, bsdfMap, mediaMap)) {
+				return false;
+			}
+		} else if (type == "sphere") {
+			if (!ParseSphere(primitiveNode, &primitive, m_device, m_scene, bsdfMap, mediaMap)) {
+				return false;
+			}
+		} else if (type == "uniform_infinite_sphere") {
+			if (!ParseUniformInfiniteSphere(primitiveNode, &primitive)) {
+				return false;
+			}
+			// Assign a non physical id
+			primitive->m_geometryId = nonPhysicalGeometryId--;
+		} else {
 			printf("Unknown primitive type: [%s]\n", type.c_str());
-			continue;
+			return false;
 		}
+
+		m_primitives[primitive->m_geometryId] = primitive;
 	}
 
 	for (auto& keyValue : m_primitives) {

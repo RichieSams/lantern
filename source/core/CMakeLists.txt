@@ -110,6 +110,8 @@ SetSourceGroup(NAME Primitives
 	             primitives/sphere.cpp
 	             primitives/grid.h
 	             primitives/grid.cpp
+	             primitives/uniform_infinite_sphere.h
+	             primitives/uniform_infinite_sphere.cpp
 )
 
 

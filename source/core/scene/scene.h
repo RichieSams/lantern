@@ -36,7 +36,6 @@ public:
 
 public:
 	PinholeCamera *Camera;
-	float3 BackgroundColor;
 
 private:
 	std::filesystem::path m_jsonPath;
