@@ -42,6 +42,14 @@ inline bool AnyNan(float2 &a) {
 	return std::isnan(a.x) || std::isnan(a.y);
 }
 
+inline bool AnyZero(float3 &a) {
+	return a.x == 0.0f || a.y == 0.0f || a.z == 0.0f;
+}
+
+inline bool AllZero(float3 &a) {
+	return a.x == 0.0f && a.y == 0.0f && a.z == 0.0f;
+}
+
 inline bool SameHemisphere(const float3 &w, const float3 &wp) {
 	return w.z * wp.z > 0;
 }

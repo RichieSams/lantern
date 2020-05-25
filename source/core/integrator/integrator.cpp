@@ -307,12 +307,12 @@ float3 Integrator::EstimateDirect(Primitive *light, UniformSampler *sampler, Sce
 	// Sample lighting with multiple importance sampling
 	float distance;
 	float3 Li = light->SampleDirectLighting(sampler, interaction, &inputDirection, &distance, &lightPdf);
-	if (lightPdf > 0.0f && !all(Li)) {
+	if (lightPdf > 0.0f && !AllZero(Li)) {
 		// Evaluate BSDF for sampled input direction
 		float3 f = bsdf->Eval(interaction, inputDirection, allowedLobes);
 		scatteringPdf = bsdf->Pdf(interaction, inputDirection, allowedLobes);
 
-		if (!all(f)) {
+		if (!AllZero(f)) {
 			// Check visibility from the intersection to the sampled location on the light
 			RTC_ALIGN(16) RTCRay ray;
 			memset(&ray, 0, sizeof(ray));
@@ -331,7 +331,7 @@ float3 Integrator::EstimateDirect(Primitive *light, UniformSampler *sampler, Sce
 			}
 
 			// Add the light's contribution to the reflected radiance
-			if (!all(Li)) {
+			if (!AllZero(Li)) {
 				float weight = PowerHeuristic(1, lightPdf, 1, scatteringPdf);
 				directLighting += f * Li * weight / lightPdf;
 			}
@@ -345,7 +345,7 @@ float3 Integrator::EstimateDirect(Primitive *light, UniformSampler *sampler, Sce
 	f *= std::abs(dot(inputDirection, interaction.Shading.Normal));
 	bool sampledSpecular = sampledLobe & BSDFLobe::Specular;
 
-	if (!all(f) && scatteringPdf > 0.0f) {
+	if (!AllZero(f) && scatteringPdf > 0.0f) {
 		// Account for light contributions along the sampled inputDirection
 		float weight = 1.0f;
 		if (!sampledSpecular) {
@@ -385,7 +385,7 @@ float3 Integrator::EstimateDirect(Primitive *light, UniformSampler *sampler, Sce
 			}
 		}
 
-		if (!all(Li)) {
+		if (!AllZero(Li)) {
 			directLighting += f * Li * weight / scatteringPdf;
 		}
 	}
