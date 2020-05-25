@@ -62,7 +62,7 @@ void QuadMesh::Initialize(RTCDevice device, RTCScene scene, LanternModelFile *lm
 	uint geometryId = rtcAttachGeometry(scene, geometry);
 	rtcReleaseGeometry(geometry);
 
-	Primitive::Initialize(emissiveColor * radiantPower * kInvPi / surfaceArea, bsdf, medium, surfaceArea, geometryId, hasNormals, hasTexCoords);
+	Primitive::Initialize(emissiveColor * radiantPower / surfaceArea, bsdf, medium, surfaceArea, geometryId, hasNormals, hasTexCoords);
 }
 
 float3 QuadMesh::SampleDirectLighting(UniformSampler *sampler, SurfaceInteraction &interaction, float3 *direction, float *distance, float *pdf) const {

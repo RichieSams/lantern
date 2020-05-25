@@ -61,7 +61,7 @@ void TriangleMesh::Initialize(RTCDevice device, RTCScene scene, LanternModelFile
 	uint geometryId = rtcAttachGeometry(scene, geometry);
 	rtcReleaseGeometry(geometry);
 
-	Primitive::Initialize(emissiveColor * radiantPower * kInvPi / surfaceArea, bsdf, medium, surfaceArea, geometryId, hasNormals, hasTexCoords);
+	Primitive::Initialize(emissiveColor * radiantPower / surfaceArea, bsdf, medium, surfaceArea, geometryId, hasNormals, hasTexCoords);
 }
 
 float3 TriangleMesh::SampleDirectLighting(UniformSampler *sampler, SurfaceInteraction &interaction, float3 *direction, float *distance, float *pdf) const {

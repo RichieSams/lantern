@@ -40,7 +40,7 @@ bool Grid::Initialize(RTCDevice device, RTCScene scene, float width, float depth
 	rtcReleaseGeometry(geometry);
 
 	const float surfaceArea = length(m_x) * length(m_z);
-	Primitive::Initialize(emissiveColor * radiantPower * kInvPi / surfaceArea, bsdf, medium, surfaceArea, geometryId, false, false);
+	Primitive::Initialize(emissiveColor * radiantPower / surfaceArea, bsdf, medium, surfaceArea, geometryId, false, false);
 
 	return true;
 }
