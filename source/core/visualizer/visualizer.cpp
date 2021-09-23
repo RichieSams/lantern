@@ -23,7 +23,7 @@
 namespace Lantern {
 
 static const char *const kValidationLayers[] = {
-    "VK_LAYER_LUNARG_standard_validation"};
+    "VK_LAYER_KHRONOS_validation"};
 
 static const char *const kDeviceExtensions[] = {
     "VK_KHR_swapchain"};
@@ -52,7 +52,8 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(
 Visualizer *g_visualizer;
 
 Visualizer::Visualizer()
-        : m_window(nullptr) {
+        : m_window(nullptr),
+          m_allocator(nullptr) {
 	g_visualizer = this;
 }
 
@@ -148,6 +149,10 @@ bool Visualizer::Init(int width, int height) {
 	initInfo.Queue = (VkQueue)m_graphicsQueue;
 	initInfo.PipelineCache = VK_NULL_HANDLE;
 	initInfo.DescriptorPool = (VkDescriptorPool)m_descriptorPool;
+	initInfo.Subpass = 0;
+	initInfo.MinImageCount = m_frameCount;
+	initInfo.ImageCount = m_frameCount;
+	initInfo.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
 	initInfo.Allocator = nullptr;
 	initInfo.CheckVkResultFn = [](VkResult err) {
 		if (err == 0) {
@@ -155,6 +160,7 @@ bool Visualizer::Init(int width, int height) {
 		}
 		printf("VkResult %d\n", err);
 	};
+
 	ImGui_ImplVulkan_Init(&initInfo, (VkRenderPass)m_imguiRenderPass);
 
 	// Setup style
@@ -204,7 +210,7 @@ bool Visualizer::Init(int width, int height) {
 			return false;
 		}
 
-		ImGui_ImplVulkan_InvalidateFontUploadObjects();
+		ImGui_ImplVulkan_DestroyFontUploadObjects();
 	}
 
 	// Set up GUI variables
@@ -274,7 +280,7 @@ bool Visualizer::RenderFrame() {
 	ImGui::NewFrame();
 
 	ImGui::SetNextWindowPos(ImVec2(0, 0));
-	ImGui::Begin("Visualizer Stats", nullptr, ImVec2(0, 0), -1, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse);
+	ImGui::Begin("Visualizer Stats", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse);
 	{
 		const float frameTime = m_frameTimeSum / SizeOfArray(m_frameTime);
 		const float fps = 1000.0f / frameTime;
@@ -338,21 +344,21 @@ bool Visualizer::RenderFrame() {
 	//	}
 	//}
 
-	{
-		// Flush to GPU
-		vk::MappedMemoryRange flushRange;
-		flushRange.memory = (vk::DeviceMemory)frame->stagingBufferAllocInfo.deviceMemory;
-		flushRange.offset = 0;
-		flushRange.size = vk::DeviceSize(VK_WHOLE_SIZE);
+	//{
+	//	// Flush to GPU
+	//	vk::MappedMemoryRange flushRange;
+	//	flushRange.memory = (vk::DeviceMemory)frame->stagingBufferAllocInfo.deviceMemory;
+	//	flushRange.offset = 0;
+	//	flushRange.size = vk::DeviceSize(VK_WHOLE_SIZE);
 
-		if (m_device.flushMappedMemoryRanges(flushRange) != vk::Result::eSuccess) {
-			printf("Vulkan: Failed to flush staging buffer");
-			return false;
-		}
-	}
+	//	if (m_device.flushMappedMemoryRanges(flushRange) != vk::Result::eSuccess) {
+	//		printf("Vulkan: Failed to flush staging buffer");
+	//		return false;
+	//	}
+	//}
 
 	ImGui::SetNextWindowPos(ImVec2(0, 50));
-	ImGui::Begin("Integrator Stats", nullptr, ImVec2(0, 0), -1, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse);
+	ImGui::Begin("Integrator Stats", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse);
 	{
 		//ImGui::Text("%u Min Samples Per Pixel", minSPP);
 		//ImGui::Text("%u Max Samples Per Pixel", maxSPP);
@@ -649,6 +655,7 @@ bool Visualizer::InitVulkanWindow(int width, int height) {
 	VmaAllocatorCreateInfo allocatorCreateInfo = {};
 	allocatorCreateInfo.physicalDevice = static_cast<VkPhysicalDevice>(m_physicalDevice);
 	allocatorCreateInfo.device = static_cast<VkDevice>(m_device);
+	allocatorCreateInfo.instance = static_cast<VkInstance>(m_instance);
 
 	vmaCreateAllocator(&allocatorCreateInfo, &m_allocator);
 
@@ -718,9 +725,9 @@ bool Visualizer::InitVulkanWindow(int width, int height) {
 		vk::AttachmentDescription attachment;
 		attachment.format = m_surfaceFormat.format;
 		attachment.samples = vk::SampleCountFlagBits::e1;
-		attachment.loadOp = vk::AttachmentLoadOp::eDontCare;
+		attachment.loadOp = vk::AttachmentLoadOp::eClear;
 		attachment.storeOp = vk::AttachmentStoreOp::eStore;
-		attachment.stencilLoadOp = vk::AttachmentLoadOp::eDontCare;
+		attachment.stencilLoadOp = vk::AttachmentLoadOp::eClear;
 		attachment.stencilStoreOp = vk::AttachmentStoreOp::eDontCare;
 		attachment.initialLayout = vk::ImageLayout::eUndefined;
 		attachment.finalLayout = vk::ImageLayout::eColorAttachmentOptimal;
@@ -1253,33 +1260,17 @@ bool Visualizer::CreateSwapChain(int width, int height) {
 
 bool Visualizer::RenderImage(FrameData *frame) {
 	{
+		vk::ClearValue clearValue(vk::ClearColorValue{std::array<float, 4>({0.846f, 0.933f, 0.949f, 1.0f})});
+
 		vk::RenderPassBeginInfo beginInfo;
 		beginInfo.renderPass = m_mainRenderPass;
 		beginInfo.framebuffer = frame->frameBuffer;
 		beginInfo.renderArea.extent = m_swapchainExtent;
-		beginInfo.clearValueCount = 0;
-		beginInfo.pClearValues = nullptr;
+		beginInfo.clearValueCount = 1;
+		beginInfo.pClearValues = &clearValue;
 
 		frame->commandBuffer.beginRenderPass(&beginInfo, vk::SubpassContents::eInline);
 	}
-
-	ImGui::Begin("Tonemapping", nullptr, ImVec2(0, 0), -1, ImGuiWindowFlags_AlwaysAutoResize);
-	{
-		ImGui::Combo("Tonemapper", &m_selectedToneMapper, "Clamp\0Filmic\0Gamma\0\0");
-		ImGui::DragFloat("Exposure", &m_exposure, 0.1f, -10.0f, 10.0f, "%.1f");
-	}
-	ImGui::End();
-
-	// Push tonemapping constants
-	PushConstants constants;
-	constants.SelectedToneMapper = m_selectedToneMapper;
-	constants.Exposure = std::exp2f(m_exposure);
-	frame->commandBuffer.pushConstants(m_mainPipelineLayout, vk::ShaderStageFlagBits::eFragment, 0, sizeof(PushConstants), &constants);
-
-	// Draw a fullscreen triangle
-	frame->commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, m_mainPipeline);
-	frame->commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, m_mainPipelineLayout, 0, 1, &frame->descriptorSet, 0, nullptr);
-	frame->commandBuffer.draw(3, 1, 0, 0);
 
 	frame->commandBuffer.endRenderPass();
 

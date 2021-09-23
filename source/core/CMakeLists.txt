@@ -1,4 +1,4 @@
-find_package(Vulkan)
+find_package(Vulkan REQUIRED)
 
 
 set(LANTERN_CORE_VISUALIZER
@@ -25,5 +25,5 @@ set(LANTERN_CORE_SRC
 
 # Create lib
 add_library(lantern_core STATIC ${LANTERN_CORE_SRC})
-target_link_libraries(lantern_core glfw ${VULKAN_LIBRARY} imgui vk_mem_alloc)
-target_include_directories(lantern_core PUBLIC ${VULKAN_INCLUDE_DIR})
+target_link_libraries(lantern_core glfw ${Vulkan_LIBRARIES} imgui VulkanMemoryAllocator)
+target_include_directories(lantern_core PUBLIC ${Vulkan_INCLUDE_DIRS})

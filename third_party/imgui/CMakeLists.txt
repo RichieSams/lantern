@@ -1,5 +1,7 @@
 project(imgui)
 
+find_package(Vulkan REQUIRED)
+
 set(IMGUI_SRC
    impl/imgui_impl_glfw.cpp
    impl/imgui_impl_glfw.h
@@ -13,6 +15,7 @@ set(IMGUI_SRC
    source/imgui.cpp
    source/imgui_demo.cpp
    source/imgui_draw.cpp
+   source/imgui_tables.cpp
    source/imgui_internal.h
    source/imgui_widgets.cpp
 )
@@ -20,5 +23,5 @@ set(IMGUI_SRC
 add_library(imgui STATIC ${IMGUI_SRC})
 target_include_directories(imgui PUBLIC impl include PRIVATE source)
 
-target_link_libraries(imgui glfw ${VULKAN_LIBRARY})
-target_include_directories(imgui PUBLIC ${VULKAN_INCLUDE_DIR})
+target_link_libraries(imgui glfw ${Vulkan_LIBRARIES})
+target_include_directories(imgui PUBLIC ${Vulkan_INCLUDE_DIRS})
