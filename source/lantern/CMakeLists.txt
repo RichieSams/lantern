@@ -1,8 +1,5 @@
-include(SetSourceGroup)
-
-SetSourceGroup(NAME Root
-	PREFIX LANTERN
-	SOURCE_FILES main.cpp
+set(LANTERN_ROOT
+	main.cpp
 )
 
 # Create exe

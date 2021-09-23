@@ -6,10 +6,6 @@
 
 #pragma once
 
-#include "math/int_types.h"
-
-#include "camera/frame_buffer.h"
-
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_vulkan.h"
@@ -21,7 +17,6 @@
 
 #include <atomic>
 
-
 struct GLFWwindow;
 
 namespace Lantern {
@@ -30,17 +25,10 @@ class Scene;
 
 class Visualizer {
 public:
-	Visualizer(Scene *scene, FrameBuffer *currentFrameBuffer, std::atomic<FrameBuffer *> *swapFrameBuffer);
+	Visualizer();
 	~Visualizer();
 
 private:
-	Scene *m_scene;
-
-	FrameBuffer *m_currentFrameBuffer;
-	std::atomic<FrameBuffer *> *m_swapFrameBuffer;
-
-	FrameBuffer m_accumulationFrameBuffer;
-
 	GLFWwindow *m_window;
 
 	vk::Instance m_instance;
@@ -52,7 +40,7 @@ private:
 	vk::Device m_device;
 
 	VmaAllocator m_allocator;
-	
+
 	vk::DescriptorPool m_descriptorPool;
 
 	vk::SurfaceFormatKHR m_surfaceFormat;
@@ -117,7 +105,7 @@ public:
 	static void CursorPosCallback(GLFWwindow *window, double xpos, double ypos);
 	static void ScrollCallback(GLFWwindow *window, double xoffset, double yoffset);
 	static void KeyCallback(GLFWwindow *window, int key, int scancode, int action, int mods);
-	static void CharCallback(GLFWwindow *window, unsigned int c);
+	static void CharCallback(GLFWwindow *window, unsigned c);
 
 private:
 	bool RenderFrame();

@@ -1,15 +1,5 @@
 add_subdirectory(argparse)
 
-set( CMAKE_BUILD_TYPE_SAVED "${CMAKE_BUILD_TYPE}" )
-set( CMAKE_BUILD_TYPE "Release" )
-SET( EMBREE_ISPC_SUPPORT OFF CACHE BOOL "No ISPC support needed atm" )
-SET( EMBREE_TUTORIALS OFF CACHE BOOL "Only build lib" )
-SET( EMBREE_STATIC_LIB ON CACHE BOOL "Build Embree as a static lib" )
-add_subdirectory(embree)
-set( CMAKE_BUILD_TYPE ${CMAKE_BUILD_TYPE_SAVED} )
-target_include_directories(embree PUBLIC embree/include)
-target_include_directories(embree PUBLIC embree/common)
-
 set( GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE )
 set( GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE )
 set( GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE )
@@ -17,16 +7,5 @@ set( GLFW_INSTALL OFF CACHE BOOL "" FORCE )
 add_subdirectory(glfw)
 
 add_subdirectory(imgui)
-add_subdirectory(json)
-add_subdirectory(json_schema_validator)
-add_subdirectory(linalg)
-add_subdirectory(stb)
 
-set( TBB_BUILD_SHARED OFF CACHE BOOL  "Only build TBB static" )
-set( TBB_BUILD_TBBMALLOC_PROXY OFF CACHE BOOL  "Don't need tbbmalloc_proxy" )
-set( TBB_BUILD_TESTS OFF CACHE BOOL  "Build TBB lib only" )
-add_subdirectory(tbb)
-target_include_directories(tbb_static PUBLIC tbb/include)
-
-add_subdirectory(tiny_obj_loader)
 add_subdirectory(vk_mem_alloc)
