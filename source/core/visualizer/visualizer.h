@@ -88,6 +88,8 @@ private:
 	vk::RenderPass m_mainRenderPass;
 	vk::RenderPass m_imguiRenderPass;
 
+	size_t m_frameNumber;
+
 	// GUI variables
 	float m_frameTime[32];
 	size_t m_frameTimeBin;

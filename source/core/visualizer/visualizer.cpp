@@ -15,6 +15,7 @@
 #include "GLFW/glfw3.h"
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
@@ -323,46 +324,67 @@ bool Visualizer::RenderFrame() {
 		return false;
 	}
 
+	// 16 color palette
+	std::array<float, 3> palette[] = {
+	    {1.000f, 1.000f, 1.000f}, // White
+	    {0.984f, 0.953f, 0.020f}, // Yellow - #fbf305
+	    {1.000f, 0.392f, 0.012f}, // Orange - #ff6403
+	    {0.867f, 0.035f, 0.027f}, // Red - #dd0907
+	    {0.949f, 0.031f, 0.518f}, // Magenta - #f20884
+	    {0.278f, 0.000f, 0.647f}, // Purple - #4700a5
+	    {0.000f, 0.000f, 0.827f}, // Blue - #0000d3
+	    {0.008f, 0.671f, 0.918f}, // Cyan - #02abea
+	    {0.122f, 0.718f, 0.078f}, // Green - #1fb714
+	    {0.000f, 0.392f, 0.071f}, // Dark Green - #006412
+	    {0.337f, 0.173f, 0.020f}, // Brown - #562c05
+	    {0.565f, 0.443f, 0.227f}, // Tan - #90713a
+	    {0.753f, 0.753f, 0.753f}, // Light Gray - #C0C0C0
+	    {0.502f, 0.502f, 0.502f}, // Medium Gray - #808080
+	    {0.251f, 0.251f, 0.251f}, // Dark Gray - #404040
+	    {0.000f, 0.000f, 0.000f}, // Black
+	};
+
+	const size_t frameOffset = m_frameNumber / 60;
+
 	// Copy Renderer data to the GPU
-	//float *mappedData = (float *)frame->stagingBufferAllocInfo.pMappedData;
-	//for (uint j = 0; j < m_accumulationFrameBuffer.Height; ++j) {
-	//	const size_t offset = j * m_accumulationFrameBuffer.Width;
-	//	for (uint i = 0; i < m_accumulationFrameBuffer.Width; ++i) {
-	//		const size_t frameBufferIndex = offset + i;
-	//		const size_t mappedDataIndex = frameBufferIndex * 4;
+	const size_t width = m_swapchainExtent.width;
+	const size_t height = m_swapchainExtent.height;
+	float *mappedData = (float *)frame->stagingBufferAllocInfo.pMappedData;
+	for (size_t y = 0; y < height; ++y) {
+		const size_t offset = y * width;
+		for (size_t x = 0; x < width; ++x) {
+			size_t xColorIndex = x / 32;
+			size_t yColorIndex = y / 32;
 
-	//		float3 &color = m_accumulationFrameBuffer.ColorData[frameBufferIndex];
-	//		uint sampleCount = m_accumulationFrameBuffer.ColorSampleCount[frameBufferIndex];
-	//		mappedData[mappedDataIndex + 0] = color.r / float(sampleCount); // Red
-	//		mappedData[mappedDataIndex + 1] = color.g / float(sampleCount); // Green
-	//		mappedData[mappedDataIndex + 2] = color.b / float(sampleCount); // Blue
-	//		mappedData[mappedDataIndex + 3] = 1.0f;                         // Alpha
+			auto color = palette[(frameOffset + xColorIndex + yColorIndex) % 16];
 
-	//		minSPP = std::min(minSPP, sampleCount);
-	//		maxSPP = std::max(maxSPP, sampleCount);
-	//		sumSPP += sampleCount;
-	//	}
-	//}
+			const size_t frameBufferIndex = offset + x;
+			const size_t mappedDataIndex = frameBufferIndex * 4;
 
-	//{
-	//	// Flush to GPU
-	//	vk::MappedMemoryRange flushRange;
-	//	flushRange.memory = (vk::DeviceMemory)frame->stagingBufferAllocInfo.deviceMemory;
-	//	flushRange.offset = 0;
-	//	flushRange.size = vk::DeviceSize(VK_WHOLE_SIZE);
+			mappedData[mappedDataIndex + 0] = color[0]; // Red
+			mappedData[mappedDataIndex + 1] = color[1]; // Green
+			mappedData[mappedDataIndex + 2] = color[2]; // Blue
+			mappedData[mappedDataIndex + 3] = 1.0f;     // Alpha
+		}
+	}
 
-	//	if (m_device.flushMappedMemoryRanges(flushRange) != vk::Result::eSuccess) {
-	//		printf("Vulkan: Failed to flush staging buffer");
-	//		return false;
-	//	}
-	//}
+	{
+		// Flush to GPU
+		vk::MappedMemoryRange flushRange;
+		flushRange.memory = (vk::DeviceMemory)frame->stagingBufferAllocInfo.deviceMemory;
+		flushRange.offset = 0;
+		flushRange.size = vk::DeviceSize(VK_WHOLE_SIZE);
+
+		if (m_device.flushMappedMemoryRanges(flushRange) != vk::Result::eSuccess) {
+			printf("Vulkan: Failed to flush staging buffer");
+			return false;
+		}
+	}
 
 	ImGui::SetNextWindowPos(ImVec2(0, 50));
-	ImGui::Begin("Integrator Stats", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse);
+	ImGui::Begin("Frame Buffer", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse);
 	{
-		//ImGui::Text("%u Min Samples Per Pixel", minSPP);
-		//ImGui::Text("%u Max Samples Per Pixel", maxSPP);
-		//ImGui::Text("%u Avg Samples Per Pixel", (uint)(sumSPP / (m_accumulationFrameBuffer.Width * m_accumulationFrameBuffer.Height)));
+		ImGui::Image((ImTextureID)frame->descriptorSet, ImVec2(width * 0.5, height * 0.5));
 	}
 	ImGui::End();
 
@@ -430,6 +452,7 @@ bool Visualizer::RenderFrame() {
 	m_frameTime[index] = diff;
 	m_frameTimeSum += diff;
 	++m_frameTimeBin;
+	++m_frameNumber;
 
 	return true;
 }
@@ -893,6 +916,7 @@ bool Visualizer::InitVulkanWindow(int width, int height) {
 	}
 
 	m_frameIndex = 0;
+	m_frameNumber = 0;
 
 	// Create texture sampler
 	{
