@@ -8,4 +8,6 @@ add_subdirectory(glfw)
 
 add_subdirectory(imgui)
 
+add_subdirectory(linalg)
+
 add_subdirectory(vk_mem_alloc)

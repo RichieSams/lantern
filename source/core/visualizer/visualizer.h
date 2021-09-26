@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "frame_data/frame_data.h"
+
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_vulkan.h"
@@ -19,18 +21,19 @@
 
 struct GLFWwindow;
 
-namespace Lantern {
+namespace lantern {
 
 class Scene;
 
 class Visualizer {
 public:
-	Visualizer();
+	Visualizer(FrameData *startingFrameData, std::atomic<FrameData *> *swapFrameData);
 	~Visualizer();
 
 private:
 	GLFWwindow *m_window;
 
+	// Vulkan variables
 	vk::Instance m_instance;
 	vk::DebugReportCallbackEXT m_debugCallback;
 
@@ -51,8 +54,8 @@ private:
 	vk::SwapchainKHR m_swapchain;
 	vk::Extent2D m_swapchainExtent;
 
-	uint32_t m_frameCount;
-	struct FrameData {
+	uint32_t m_frameBufferCount;
+	struct VulkanFrameData {
 		vk::CommandPool commandPool;
 		vk::CommandBuffer commandBuffer;
 
@@ -72,7 +75,7 @@ private:
 
 		vk::DescriptorSet descriptorSet;
 	};
-	FrameData *m_frameData;
+	VulkanFrameData *m_vulkanFrameData;
 
 	uint32_t m_frameIndex;
 
@@ -88,15 +91,15 @@ private:
 	vk::RenderPass m_mainRenderPass;
 	vk::RenderPass m_imguiRenderPass;
 
-	size_t m_frameNumber;
+	// Data from integrator
+	FrameData m_accumulationBuffer;
+	FrameData *m_currentIntegrationFrameData;
+	std::atomic<FrameData *> *m_swapIntegrationFrameData;
 
 	// GUI variables
 	float m_frameTime[32];
 	size_t m_frameTimeBin;
 	float m_frameTimeSum;
-
-	int m_selectedToneMapper;
-	float m_exposure;
 
 public:
 	bool Init(int width, int height);
@@ -112,12 +115,12 @@ public:
 private:
 	bool RenderFrame();
 
-	bool RenderImage(FrameData *frame);
-	bool RenderImGui(FrameData *frame);
+	bool RenderImage(VulkanFrameData *frame);
+	bool RenderImGui(VulkanFrameData *frame);
 
 	bool InitVulkan();
 	bool InitVulkanWindow(int width, int height);
 	bool CreateSwapChain(int width, int height);
 };
 
-} // End of namespace Lantern
+} // End of namespace lantern

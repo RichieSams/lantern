@@ -1,6 +1,15 @@
 find_package(Vulkan REQUIRED)
 
 
+set(LANTERN_CORE_FRAME_DATA
+	frame_data/frame_data.h
+)
+
+set(LANTERN_CORE_INTEGRATOR
+	integrator/integrator.cpp
+	integrator/integrator.h
+)
+
 set(LANTERN_CORE_VISUALIZER
 	visualizer/visualizer.h
 	visualizer/visualizer.cpp
@@ -19,11 +28,13 @@ set(LANTERN_CORE_VISUALIZER_SHADERS
 
 # Link all the sources into one
 set(LANTERN_CORE_SRC
+	${LANTERN_CORE_FRAME_DATA}
+	${LANTERN_CORE_INTEGRATOR}
 	${LANTERN_CORE_VISUALIZER}
 	${LANTERN_CORE_VISUALIZER_SHADERS}
 )
 
 # Create lib
 add_library(lantern_core STATIC ${LANTERN_CORE_SRC})
-target_link_libraries(lantern_core glfw ${Vulkan_LIBRARIES} imgui VulkanMemoryAllocator)
+target_link_libraries(lantern_core glfw ${Vulkan_LIBRARIES} imgui VulkanMemoryAllocator linalg)
 target_include_directories(lantern_core PUBLIC ${Vulkan_INCLUDE_DIRS})
