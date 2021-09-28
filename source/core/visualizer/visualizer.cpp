@@ -78,7 +78,10 @@ void Visualizer::Run() {
 	}
 
 	// Wait for the queues to flush before shutting down
-	m_device.waitIdle();
+	vk::Result result = m_device.waitIdle();
+	if (result != vk::Result::eSuccess) {
+		printf("Vulkan: Failed to wait for device idle in preparation for shutdown. Error: %s", vk::to_string(result).c_str());
+	}
 }
 
 void Visualizer::MouseButtonCallback(GLFWwindow *window, int button, int action, int mods) {
@@ -178,7 +181,7 @@ bool Visualizer::Init(int width, int height) {
 
 		vk::Result result = m_device.resetCommandPool(commandPool, {});
 		if (result != vk::Result::eSuccess) {
-			printf("Vulkan: Failed to reset command pool. Error code: %d", result);
+			printf("Vulkan: Failed to reset command pool. Error: %s", vk::to_string(result).c_str());
 			return false;
 		}
 
@@ -187,7 +190,7 @@ bool Visualizer::Init(int width, int height) {
 
 		result = commandBuffer.begin(beginInfo);
 		if (result != vk::Result::eSuccess) {
-			printf("Vulkan: Failed to begin command buffer. Error code: %d", result);
+			printf("Vulkan: Failed to begin command buffer. Error: %s", vk::to_string(result).c_str());
 			return false;
 		}
 
@@ -199,18 +202,18 @@ bool Visualizer::Init(int width, int height) {
 
 		result = commandBuffer.end();
 		if (result != vk::Result::eSuccess) {
-			printf("Vulkan: Failed to end command buffer. Error code: %d", result);
+			printf("Vulkan: Failed to end command buffer. Error: %s", vk::to_string(result).c_str());
 			return false;
 		}
 		result = m_graphicsQueue.submit(1, &submitInfo, vk::Fence(nullptr));
 		if (result != vk::Result::eSuccess) {
-			printf("Vulkan: Failed to submit command buffer. Error code: %d", result);
+			printf("Vulkan: Failed to submit command buffer. Error: %s", vk::to_string(result).c_str());
 			return false;
 		}
 
 		result = m_device.waitIdle();
 		if (result != vk::Result::eSuccess) {
-			printf("Vulkan: Failed to wait idle. Error code: %d", result);
+			printf("Vulkan: Failed to wait idle. Error: %s", vk::to_string(result).c_str());
 			return false;
 		}
 
@@ -226,7 +229,10 @@ bool Visualizer::Init(int width, int height) {
 }
 
 void Visualizer::Shutdown() {
-	m_device.waitIdle();
+	vk::Result result = m_device.waitIdle();
+	if (result != vk::Result::eSuccess) {
+		printf("Vulkan: Failed to wait for device idle in preparation for shutdown. Error: %s", vk::to_string(result).c_str());
+	}
 
 	ImGui_ImplVulkan_Shutdown();
 	ImGui_ImplGlfw_Shutdown();
@@ -316,7 +322,7 @@ bool Visualizer::RenderFrame() {
 
 	vk::Result result = m_device.acquireNextImageKHR(m_swapchain, UINT64_MAX, imageAcquiredSemaphore, vk::Fence(nullptr), &m_frameIndex);
 	if (result != vk::Result::eSuccess) {
-		printf("Vulkan: Failed to acquire next image. Error code: %d", result);
+		printf("Vulkan: Failed to acquire next image. Error: %s", vk::to_string(result).c_str());
 		return false;
 	}
 
@@ -325,18 +331,18 @@ bool Visualizer::RenderFrame() {
 	// Wait for the frame data to be free, then clear it
 	result = m_device.waitForFences(1, &frame->submitFinished, VK_TRUE, UINT64_MAX);
 	if (result != vk::Result::eSuccess) {
-		printf("Vulkan: Failed to wait for fence. Error code: %d", result);
+		printf("Vulkan: Failed to wait for fence. Error: %s", vk::to_string(result).c_str());
 		return false;
 	}
 
 	result = m_device.resetFences(1, &frame->submitFinished);
 	if (result != vk::Result::eSuccess) {
-		printf("Vulkan: Failed to wait for fence. Error code: %d", result);
+		printf("Vulkan: Failed to wait for fence. Error: %s", vk::to_string(result).c_str());
 		return false;
 	}
 	result = m_device.resetCommandPool(frame->commandPool, {});
 	if (result != vk::Result::eSuccess) {
-		printf("Vulkan: Failed to reset command pool. Error code: %d", result);
+		printf("Vulkan: Failed to reset command pool. Error: %s", vk::to_string(result).c_str());
 		return false;
 	}
 
@@ -390,7 +396,7 @@ bool Visualizer::RenderFrame() {
 
 		result = frame->commandBuffer.begin(&beginInfo);
 		if (result != vk::Result::eSuccess) {
-			printf("Vulkan: Failed to begin command buffer. Error code: %d", result);
+			printf("Vulkan: Failed to begin command buffer. Error: %s", vk::to_string(result).c_str());
 			return false;
 		}
 	}
@@ -416,13 +422,13 @@ bool Visualizer::RenderFrame() {
 
 		result = frame->commandBuffer.end();
 		if (result != vk::Result::eSuccess) {
-			printf("Vulkan: Failed to end command buffer. Error code: %d", result);
+			printf("Vulkan: Failed to end command buffer. Error: %s", vk::to_string(result).c_str());
 			return false;
 		}
 
-		m_graphicsQueue.submit(1, &info, frame->submitFinished);
+		result = m_graphicsQueue.submit(1, &info, frame->submitFinished);
 		if (result != vk::Result::eSuccess) {
-			printf("Vulkan: Failed to submit command buffer. Error code: %d", result);
+			printf("Vulkan: Failed to submit command buffer. Error: %s", vk::to_string(result).c_str());
 			return false;
 		}
 	}
@@ -436,7 +442,7 @@ bool Visualizer::RenderFrame() {
 
 	result = m_graphicsQueue.presentKHR(&info);
 	if (result != vk::Result::eSuccess) {
-		printf("Vulkan: Failed to present. Error code: %d", result);
+		printf("Vulkan: Failed to present. Error: %s", vk::to_string(result).c_str());
 		return false;
 	}
 
@@ -514,7 +520,7 @@ bool Visualizer::InitVulkan() {
 
 		result = vk::createInstance(&instanceCreateInfo, nullptr, &m_instance);
 		if (result != vk::Result::eSuccess) {
-			printf("Vulkan: Failed to create Vulkan Instance. Error code: %d", result);
+			printf("Vulkan: Failed to create Vulkan Instance. Error: %s", vk::to_string(result).c_str());
 			return false;
 		}
 
@@ -524,7 +530,7 @@ bool Visualizer::InitVulkan() {
 
 		result = m_instance.createDebugReportCallbackEXT(&debugInfo, nullptr, &m_debugCallback);
 		if (result != vk::Result::eSuccess) {
-			printf("Vulkan: Failed to set debug callbacks. Error code: %d", result);
+			printf("Vulkan: Failed to set debug callbacks. Error: %s", vk::to_string(result).c_str());
 			return false;
 		}
 	}
@@ -590,7 +596,7 @@ bool Visualizer::InitVulkan() {
 
 		result = m_physicalDevice.createDevice(&deviceCreateInfo, nullptr, &m_device);
 		if (result != vk::Result::eSuccess) {
-			printf("Vulkan: Failed to create logical device. Error code: %d", result);
+			printf("Vulkan: Failed to create logical device. Error: %s", vk::to_string(result).c_str());
 			return false;
 		}
 
@@ -621,7 +627,7 @@ bool Visualizer::InitVulkan() {
 
 		result = m_device.createDescriptorPool(&createInfo, nullptr, &m_descriptorPool);
 		if (result != vk::Result::eSuccess) {
-			printf("Vulkan: Failed to create descriptor pool. Error code: %d", result);
+			printf("Vulkan: Failed to create descriptor pool. Error: %s", vk::to_string(result).c_str());
 			return false;
 		}
 	}
@@ -642,7 +648,7 @@ bool Visualizer::InitVulkanWindow(int width, int height) {
 		vk::Bool32 supported = false;
 		result = m_physicalDevice.getSurfaceSupportKHR(m_graphicsQueueFamilyIndex, m_surface, &supported);
 		if (result != vk::Result::eSuccess) {
-			printf("Vulkan: Failed to query for surface support - Error code: %d", result);
+			printf("Vulkan: Failed to query for surface support - Error: %s", vk::to_string(result).c_str());
 			return false;
 		}
 		if (supported != VK_TRUE) {
@@ -691,7 +697,7 @@ bool Visualizer::InitVulkanWindow(int width, int height) {
 
 				result = m_device.createCommandPool(&info, nullptr, &m_vulkanFrameData[i].commandPool);
 				if (result != vk::Result::eSuccess) {
-					printf("Vulkan: Failed to create command pool. Error code: %d", result);
+					printf("Vulkan: Failed to create command pool. Error: %s", vk::to_string(result).c_str());
 					return false;
 				}
 			}
@@ -704,7 +710,7 @@ bool Visualizer::InitVulkanWindow(int width, int height) {
 
 				result = m_device.allocateCommandBuffers(&info, &m_vulkanFrameData[i].commandBuffer);
 				if (result != vk::Result::eSuccess) {
-					printf("Vulkan: Failed to create command buffer. Error code: %d", result);
+					printf("Vulkan: Failed to create command buffer. Error: %s", vk::to_string(result).c_str());
 					return false;
 				}
 			}
@@ -715,7 +721,7 @@ bool Visualizer::InitVulkanWindow(int width, int height) {
 
 				result = m_device.createFence(&info, nullptr, &m_vulkanFrameData[i].submitFinished);
 				if (result != vk::Result::eSuccess) {
-					printf("Vulkan: Failed to create fence. Error code: %d", result);
+					printf("Vulkan: Failed to create fence. Error: %s", vk::to_string(result).c_str());
 					return false;
 				}
 			}
@@ -725,13 +731,13 @@ bool Visualizer::InitVulkanWindow(int width, int height) {
 
 				result = m_device.createSemaphore(&info, nullptr, &m_vulkanFrameData[i].imageAcquired);
 				if (result != vk::Result::eSuccess) {
-					printf("Vulkan: Failed to create imageAcquired semaphore. Error code: %d", result);
+					printf("Vulkan: Failed to create imageAcquired semaphore. Error: %s", vk::to_string(result).c_str());
 					return false;
 				}
 
 				result = m_device.createSemaphore(&info, nullptr, &m_vulkanFrameData[i].imguiRenderCompleted);
 				if (result != vk::Result::eSuccess) {
-					printf("Vulkan: Failed to create renderCompleted semaphore. Error code: %d", result);
+					printf("Vulkan: Failed to create renderCompleted semaphore. Error: %s", vk::to_string(result).c_str());
 					return false;
 				}
 			}
@@ -787,7 +793,7 @@ bool Visualizer::InitVulkanWindow(int width, int height) {
 
 		result = m_device.createRenderPass(&info, nullptr, &m_mainRenderPass);
 		if (result != vk::Result::eSuccess) {
-			printf("Vulkan: Failed to create render pass. Error code: %d", result);
+			printf("Vulkan: Failed to create render pass. Error: %s", vk::to_string(result).c_str());
 			return false;
 		}
 	}
@@ -832,7 +838,7 @@ bool Visualizer::InitVulkanWindow(int width, int height) {
 
 		result = m_device.createRenderPass(&info, nullptr, &m_imguiRenderPass);
 		if (result != vk::Result::eSuccess) {
-			printf("Vulkan: Failed to create render pass. Error code: %d", result);
+			printf("Vulkan: Failed to create render pass. Error: %s", vk::to_string(result).c_str());
 			return false;
 		}
 	}
@@ -845,7 +851,7 @@ bool Visualizer::InitVulkanWindow(int width, int height) {
 
 		result = m_device.createShaderModule(&info, nullptr, &m_vertexShader);
 		if (result != vk::Result::eSuccess) {
-			printf("Vulkan: Failed to load vertex shader. Error code: %d", result);
+			printf("Vulkan: Failed to load vertex shader. Error: %s", vk::to_string(result).c_str());
 			return false;
 		}
 	}
@@ -856,7 +862,7 @@ bool Visualizer::InitVulkanWindow(int width, int height) {
 
 		result = m_device.createShaderModule(&info, nullptr, &m_pixelShader);
 		if (result != vk::Result::eSuccess) {
-			printf("Vulkan: Failed to load vertex shader. Error code: %d", result);
+			printf("Vulkan: Failed to load vertex shader. Error: %s", vk::to_string(result).c_str());
 			return false;
 		}
 	}
@@ -884,7 +890,7 @@ bool Visualizer::InitVulkanWindow(int width, int height) {
 			info.image = m_vulkanFrameData[i].backbuffer;
 			result = m_device.createImageView(&info, nullptr, &m_vulkanFrameData[i].backbufferView);
 			if (result != vk::Result::eSuccess) {
-				printf("Vulkan: Failed to create backbuffer image view. Error code: %d", result);
+				printf("Vulkan: Failed to create backbuffer image view. Error: %s", vk::to_string(result).c_str());
 				return false;
 			}
 		}
@@ -904,7 +910,7 @@ bool Visualizer::InitVulkanWindow(int width, int height) {
 			info.pAttachments = &m_vulkanFrameData[i].backbufferView;
 			result = m_device.createFramebuffer(&info, nullptr, &m_vulkanFrameData[i].frameBuffer);
 			if (result != vk::Result::eSuccess) {
-				printf("Vulkan: Failed to create framebuffer. Error code: %d", result);
+				printf("Vulkan: Failed to create framebuffer. Error: %s", vk::to_string(result).c_str());
 				return false;
 			}
 		}
@@ -930,7 +936,7 @@ bool Visualizer::InitVulkanWindow(int width, int height) {
 
 		result = m_device.createSampler(&info, nullptr, &m_sampler);
 		if (result != vk::Result::eSuccess) {
-			printf("Vulkan: Failed to create texture sampler. Error code: %d", result);
+			printf("Vulkan: Failed to create texture sampler. Error: %s", vk::to_string(result).c_str());
 			return false;
 		}
 	}
@@ -950,7 +956,7 @@ bool Visualizer::InitVulkanWindow(int width, int height) {
 
 		result = m_device.createDescriptorSetLayout(&info, nullptr, &m_descriptorSetLayout);
 		if (result != vk::Result::eSuccess) {
-			printf("Vulkan: Failed to create descriptor set layout. Error code: %d", result);
+			printf("Vulkan: Failed to create descriptor set layout. Error: %s", vk::to_string(result).c_str());
 			return false;
 		}
 	}
@@ -967,7 +973,7 @@ bool Visualizer::InitVulkanWindow(int width, int height) {
 
 		result = m_device.allocateDescriptorSets(&allocInfo, descriptorSets.data());
 		if (result != vk::Result::eSuccess) {
-			printf("Vulkan: Failed to create descriptor sets. Error code: %d", result);
+			printf("Vulkan: Failed to create descriptor sets. Error: %s", vk::to_string(result).c_str());
 			return false;
 		}
 	}
@@ -1005,7 +1011,7 @@ bool Visualizer::InitVulkanWindow(int width, int height) {
 
 				result = frame->commandBuffer.begin(&beginInfo);
 				if (result != vk::Result::eSuccess) {
-					printf("Vulkan: Failed to begin command buffer. Error code: %d", result);
+					printf("Vulkan: Failed to begin command buffer. Error: %s", vk::to_string(result).c_str());
 					return false;
 				}
 
@@ -1037,14 +1043,26 @@ bool Visualizer::InitVulkanWindow(int width, int height) {
 				    &barrier                                    // pImageMemoryBarriers
 				);
 
-				frame->commandBuffer.end();
+				result = frame->commandBuffer.end();
+				if (result != vk::Result::eSuccess) {
+					printf("Vulkan: Failed to finish frame command buffer. Error: %s", vk::to_string(result).c_str());
+					return false;
+				}
 
 				vk::SubmitInfo submitInfo;
 				submitInfo.commandBufferCount = 1;
 				submitInfo.pCommandBuffers = &frame->commandBuffer;
 
-				m_graphicsQueue.submit(1, &submitInfo, vk::Fence());
-				m_graphicsQueue.waitIdle();
+				result = m_graphicsQueue.submit(1, &submitInfo, vk::Fence());
+				if (result != vk::Result::eSuccess) {
+					printf("Vulkan: Failed to submit to graphics queue. Error: %s", vk::to_string(result).c_str());
+					return false;
+				}
+				result = m_graphicsQueue.waitIdle();
+				if (result != vk::Result::eSuccess) {
+					printf("Vulkan: Failed to wait on graphics queue. Error: %s", vk::to_string(result).c_str());
+					return false;
+				}
 			}
 
 			// Create image view
@@ -1061,7 +1079,7 @@ bool Visualizer::InitVulkanWindow(int width, int height) {
 
 				result = m_device.createImageView(&info, nullptr, &frame->stagingImageView);
 				if (result != vk::Result::eSuccess) {
-					printf("Vulkan: Failed to create staging buffer image view. Error code: %d", result);
+					printf("Vulkan: Failed to create staging buffer image view. Error: %s", vk::to_string(result).c_str());
 					return false;
 				}
 			}
@@ -1156,7 +1174,7 @@ bool Visualizer::InitVulkanWindow(int width, int height) {
 
 		result = m_device.createPipelineLayout(&pipelineLayoutInfo, nullptr, &m_mainPipelineLayout);
 		if (result != vk::Result::eSuccess) {
-			printf("Vulkan: Failed to create main pipeline layout. Error code: %d", result);
+			printf("Vulkan: Failed to create main pipeline layout. Error: %s", vk::to_string(result).c_str());
 			return false;
 		}
 
@@ -1187,7 +1205,7 @@ bool Visualizer::InitVulkanWindow(int width, int height) {
 
 		result = m_device.createGraphicsPipelines(vk::PipelineCache(), 1, &pipelineInfo, nullptr, &m_mainPipeline);
 		if (result != vk::Result::eSuccess) {
-			printf("Vulkan: Failed to create main pipeline. Error code: %d", result);
+			printf("Vulkan: Failed to create main pipeline. Error: %s", vk::to_string(result).c_str());
 			return false;
 		}
 	}
@@ -1226,7 +1244,7 @@ bool Visualizer::CreateSwapChain(int width, int height) {
 	vk::SurfaceCapabilitiesKHR capabilities;
 	vk::Result result = m_physicalDevice.getSurfaceCapabilitiesKHR(m_surface, &capabilities);
 	if (result != vk::Result::eSuccess) {
-		printf("Vulkan: Failed to fetch surface capabilities. Error code: %d", result);
+		printf("Vulkan: Failed to fetch surface capabilities. Error: %s", vk::to_string(result).c_str());
 		return false;
 	}
 
@@ -1248,13 +1266,13 @@ bool Visualizer::CreateSwapChain(int width, int height) {
 
 	result = m_device.createSwapchainKHR(&info, nullptr, &m_swapchain);
 	if (result != vk::Result::eSuccess) {
-		printf("Vulkan: Failed to create swapchain. Error code: %d", result);
+		printf("Vulkan: Failed to create swapchain. Error: %s", vk::to_string(result).c_str());
 		return false;
 	}
 
 	result = m_device.getSwapchainImagesKHR(m_swapchain, &m_frameBufferCount, (vk::Image *)nullptr);
 	if (result != vk::Result::eSuccess) {
-		printf("Vulkan: Failed to get swapchain image count. Error code: %d", result);
+		printf("Vulkan: Failed to get swapchain image count. Error: %s", vk::to_string(result).c_str());
 		return false;
 	}
 
@@ -1262,7 +1280,7 @@ bool Visualizer::CreateSwapChain(int width, int height) {
 
 	auto resultValue = m_device.getSwapchainImagesKHR(m_swapchain);
 	if (resultValue.result != vk::Result::eSuccess) {
-		printf("Vulkan: Failed to get swapchain images. Error code: %d", resultValue.result);
+		printf("Vulkan: Failed to get swapchain images. Error: %s", vk::to_string(resultValue.result).c_str());
 		return false;
 	}
 	for (uint32_t i = 0; i < m_frameBufferCount; ++i) {
