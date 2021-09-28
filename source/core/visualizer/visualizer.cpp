@@ -300,10 +300,10 @@ bool Visualizer::RenderFrame() {
 			const uint32_t offset = y * m_currentIntegrationFrameData->Width;
 			for (uint32_t x = 0; x < m_currentIntegrationFrameData->Width; ++x) {
 				const uint32_t index = offset + x;
-				m_accumulationBuffer.ColorData[index] = m_currentIntegrationFrameData->ColorData[index];
-				m_accumulationBuffer.AlbedoData[index] = m_currentIntegrationFrameData->AlbedoData[index];
-				m_accumulationBuffer.NormalData[index] = m_currentIntegrationFrameData->NormalData[index];
-				m_accumulationBuffer.SampleCount[index] = m_currentIntegrationFrameData->SampleCount[index];
+				m_accumulationBuffer.ColorData[index] += m_currentIntegrationFrameData->ColorData[index];
+				m_accumulationBuffer.AlbedoData[index] += m_currentIntegrationFrameData->AlbedoData[index];
+				m_accumulationBuffer.NormalData[index] += m_currentIntegrationFrameData->NormalData[index];
+				m_accumulationBuffer.SampleCount[index] += m_currentIntegrationFrameData->SampleCount[index];
 			}
 		}
 		m_currentIntegrationFrameData->Reset();
@@ -349,14 +349,15 @@ bool Visualizer::RenderFrame() {
 				const uint32_t frameBufferIndex = offset + x;
 				const uint32_t mappedDataIndex = frameBufferIndex * 4;
 
-				const float3 &color = m_accumulationBuffer.ColorData[frameBufferIndex];
+				float3 color = m_accumulationBuffer.ColorData[frameBufferIndex];
 				const uint32_t sampleCount = m_accumulationBuffer.SampleCount[frameBufferIndex];
+				color /= sampleCount;
 
 				// Color data
-				mappedData[mappedDataIndex + 0] = color.x / sampleCount; // Red
-				mappedData[mappedDataIndex + 1] = color.y / sampleCount; // Green
-				mappedData[mappedDataIndex + 2] = color.z / sampleCount; // Blue
-				mappedData[mappedDataIndex + 3] = 1.0f;                  // Alpha
+				mappedData[mappedDataIndex + 0] = color.x; // Red
+				mappedData[mappedDataIndex + 1] = color.y; // Green
+				mappedData[mappedDataIndex + 2] = color.z; // Blue
+				mappedData[mappedDataIndex + 3] = 1.0f;    // Alpha
 
 				// TODO: normal and albedo
 			}

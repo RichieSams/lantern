@@ -34,8 +34,6 @@ Integrator::Integrator(FrameData *startingFrameData, std::atomic<FrameData *> *s
 }
 
 void Integrator::RenderOneFrame() {
-	static unsigned frameNumber = 0;
-
 	m_currentFrameData = std::atomic_exchange(m_swapFrameData, m_currentFrameData);
 	m_currentFrameData->Empty = false;
 
@@ -46,19 +44,14 @@ void Integrator::RenderOneFrame() {
 	for (uint32_t y = 0; y < height; ++y) {
 		const uint32_t offset = y * width;
 		for (uint32_t x = 0; x < width; ++x) {
-			// Shift x down by the frame offset
-			uint32_t offsetX = x + frameNumber;
-
-			uint32_t xColorIndex = offsetX / 32;
+			uint32_t xColorIndex = x / 32;
 			uint32_t yColorIndex = y / 32;
 
 			const float3 color = palette[(xColorIndex + yColorIndex) % 16];
-			m_currentFrameData->ColorData[offset + x] = color;
-			m_currentFrameData->SampleCount[offset + x] = 1;
+			m_currentFrameData->ColorData[offset + x] += color;
+			m_currentFrameData->SampleCount[offset + x] += 1;
 		}
 	}
-
-	++frameNumber;
 }
 
 } // namespace lantern
