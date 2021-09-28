@@ -10,6 +10,7 @@
 using namespace linalg::aliases;
 
 #include <mutex>
+#include <string.h>
 
 namespace lantern {
 

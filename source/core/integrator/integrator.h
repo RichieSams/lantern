@@ -8,6 +8,8 @@
 
 #include "frame_data/frame_data.h"
 
+#include <atomic>
+
 namespace lantern {
 
 class Integrator {
