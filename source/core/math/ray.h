@@ -11,17 +11,17 @@ using namespace linalg::aliases;
 
 namespace lantern {
 
-class Ray {
+struct Ray {
 public:
 	Ray() = default;
 	Ray(float3 origin, float3 direction)
-	        : m_origin(origin),
-	          m_direction(direction) {
+	        : Origin(origin),
+	          Direction(direction) {
 	}
 
-private:
-	float3 m_origin;
-	float3 m_direction;
+public:
+	float3 Origin;
+	float3 Direction;
 };
 
 } // namespace lantern

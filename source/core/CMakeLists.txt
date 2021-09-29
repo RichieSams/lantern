@@ -1,8 +1,9 @@
 find_package(Vulkan REQUIRED)
 
 
-set(LANTERN_CORE_FRAME_DATA
-	frame_data/frame_data.h
+set(LANTERN_CORE_CAMERA
+	camera/frame_data.h
+	camera/pinhole_camera.h
 )
 
 set(LANTERN_CORE_INTEGRATOR
@@ -11,6 +12,7 @@ set(LANTERN_CORE_INTEGRATOR
 )
 
 set(LANTERN_CORE_MATH
+	math/constants.h
 	math/ray.h
 )
 

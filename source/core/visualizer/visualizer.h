@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "frame_data/frame_data.h"
+#include "camera/frame_data.h"
 
 #include "imgui.h"
 #include "imgui_impl_glfw.h"

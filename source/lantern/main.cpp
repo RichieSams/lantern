@@ -4,7 +4,7 @@
 * Copyright Adrian Astley 2015 - 2016
 */
 
-#include "frame_data/frame_data.h"
+#include "camera/frame_data.h"
 
 #include "visualizer/visualizer.h"
 

@@ -6,7 +6,8 @@
 
 #pragma once
 
-#include "frame_data/frame_data.h"
+#include "camera/frame_data.h"
+#include "camera/pinhole_camera.h"
 
 #include <atomic>
 
@@ -19,6 +20,7 @@ public:
 private:
 	FrameData *m_currentFrameData;
 	std::atomic<FrameData *> *m_swapFrameData;
+	PinholeCamera m_camera;
 
 public:
 	void RenderOneFrame();

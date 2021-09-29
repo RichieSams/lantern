@@ -6,6 +6,8 @@
 
 #include "integrator/integrator.h"
 
+#include <thread>
+
 namespace lantern {
 
 // 16 color palette
@@ -30,7 +32,8 @@ float3 palette[] = {
 
 Integrator::Integrator(FrameData *startingFrameData, std::atomic<FrameData *> *swapFrameData)
         : m_currentFrameData(startingFrameData),
-          m_swapFrameData(swapFrameData) {
+          m_swapFrameData(swapFrameData),
+          m_camera(m_currentFrameData->Width, m_currentFrameData->Height, 90.0f) {
 }
 
 void Integrator::RenderOneFrame() {
@@ -44,10 +47,9 @@ void Integrator::RenderOneFrame() {
 	for (uint32_t y = 0; y < height; ++y) {
 		const uint32_t offset = y * width;
 		for (uint32_t x = 0; x < width; ++x) {
-			uint32_t xColorIndex = x / 32;
-			uint32_t yColorIndex = y / 32;
+			Ray ray = m_camera.GetRay(x, y);
+			float3 color = (normalize(ray.Direction) + 1.0f) * 0.5f;
 
-			const float3 color = palette[(xColorIndex + yColorIndex) % 16];
 			m_currentFrameData->ColorData[offset + x] += color;
 			m_currentFrameData->SampleCount[offset + x] += 1;
 		}
