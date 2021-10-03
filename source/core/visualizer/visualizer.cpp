@@ -372,9 +372,8 @@ bool Visualizer::RenderFrame() {
 		}
 	}
 
-	ImGui::SetNextWindowPos(ImVec2(0, 50));
-	ImGui::Begin("Frame Buffer", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse);
-	{
+	ImGui::SetNextWindowPos(ImVec2(0, 50), ImGuiCond_Once);
+	if (ImGui::Begin("Frame Buffer", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
 		ImGui::Image((ImTextureID)frame->descriptorSet, ImVec2(1280 * 0.5, 720 * 0.5));
 	}
 	ImGui::End();
