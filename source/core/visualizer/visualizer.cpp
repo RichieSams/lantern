@@ -129,6 +129,10 @@ bool Visualizer::Init(int width, int height) {
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
 
+	ImGuiIO &io = ImGui::GetIO();
+	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+	io.ConfigWindowsMoveFromTitleBarOnly = true;
+
 	// Setup GLFW binding
 	ImGui_ImplGlfw_InitForVulkan(window, true);
 
