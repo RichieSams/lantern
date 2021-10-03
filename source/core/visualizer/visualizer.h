@@ -106,12 +106,6 @@ public:
 	void Run();
 	void Shutdown();
 
-	static void MouseButtonCallback(GLFWwindow *window, int button, int action, int mods);
-	static void CursorPosCallback(GLFWwindow *window, double xpos, double ypos);
-	static void ScrollCallback(GLFWwindow *window, double xoffset, double yoffset);
-	static void KeyCallback(GLFWwindow *window, int key, int scancode, int action, int mods);
-	static void CharCallback(GLFWwindow *window, unsigned c);
-
 private:
 	bool RenderFrame();
 

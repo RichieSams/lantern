@@ -84,21 +84,6 @@ void Visualizer::Run() {
 	}
 }
 
-void Visualizer::MouseButtonCallback(GLFWwindow *window, int button, int action, int mods) {
-}
-
-void Visualizer::CursorPosCallback(GLFWwindow *window, double xpos, double ypos) {
-}
-
-void Visualizer::ScrollCallback(GLFWwindow *window, double xoffset, double yoffset) {
-}
-
-void Visualizer::KeyCallback(GLFWwindow *window, int key, int scancode, int action, int mods) {
-}
-
-void Visualizer::CharCallback(GLFWwindow *window, unsigned c) {
-}
-
 bool Visualizer::Init(int width, int height) {
 	// Setup window
 	glfwSetErrorCallback(ErrorCallback);
