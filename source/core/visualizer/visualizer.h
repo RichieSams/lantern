@@ -6,8 +6,6 @@
 
 #pragma once
 
-#include "camera/frame_data.h"
-
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_vulkan.h"
@@ -24,10 +22,11 @@ struct GLFWwindow;
 namespace lantern {
 
 class Scene;
+struct PresentationBuffer;
 
 class Visualizer {
 public:
-	Visualizer(FrameData *startingFrameData, std::atomic<FrameData *> *swapFrameData);
+	Visualizer(PresentationBuffer *startingPresentationBuffer, std::atomic<uint64_t> *renderHostGenerationNumber, std::atomic<PresentationBuffer *> *swapPresentationBuffer);
 	~Visualizer();
 
 private:
@@ -69,6 +68,7 @@ private:
 		vk::Framebuffer frameBuffer;
 
 		vk::Image stagingImage;
+		uint64_t stagingImagePitch;
 		vk::ImageView stagingImageView;
 		VmaAllocation stagingBufferAllocation;
 		VmaAllocationInfo stagingBufferAllocInfo;
@@ -91,10 +91,11 @@ private:
 	vk::RenderPass m_mainRenderPass;
 	vk::RenderPass m_imguiRenderPass;
 
-	// Data from integrator
-	FrameData m_accumulationBuffer;
-	FrameData *m_currentIntegrationFrameData;
-	std::atomic<FrameData *> *m_swapIntegrationFrameData;
+	// Data from render host
+	PresentationBuffer *m_currentPresentationBuffer;
+	uint64_t m_presentationBufferGeneration;
+	std::atomic<uint64_t> *m_renderHostGenerationNumber;
+	std::atomic<PresentationBuffer *> *m_swapPresentationBuffer;
 
 	// GUI variables
 	float m_frameTime[32];

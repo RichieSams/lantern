@@ -6,24 +6,23 @@
 
 #pragma once
 
-#include "camera/frame_data.h"
 #include "camera/pinhole_camera.h"
 
 #include <atomic>
 
 namespace lantern {
 
+struct FrameData;
+
 class Integrator {
 public:
-	Integrator(FrameData *startingFrameData, std::atomic<FrameData *> *swapFrameData);
+	Integrator(uint32_t width, uint32_t height);
 
 private:
-	FrameData *m_currentFrameData;
-	std::atomic<FrameData *> *m_swapFrameData;
 	PinholeCamera m_camera;
 
 public:
-	void RenderOneFrame();
+	void RenderOneFrame(FrameData *dest);
 };
 
 } // namespace lantern

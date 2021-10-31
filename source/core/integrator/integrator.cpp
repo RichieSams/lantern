@@ -6,7 +6,7 @@
 
 #include "integrator/integrator.h"
 
-#include <thread>
+#include "camera/frame_data.h"
 
 namespace lantern {
 
@@ -30,18 +30,13 @@ float3 palette[] = {
     {0.000f, 0.000f, 0.000f}, // Black
 };
 
-Integrator::Integrator(FrameData *startingFrameData, std::atomic<FrameData *> *swapFrameData)
-        : m_currentFrameData(startingFrameData),
-          m_swapFrameData(swapFrameData),
-          m_camera(m_currentFrameData->Width, m_currentFrameData->Height, 90.0f) {
+Integrator::Integrator(uint32_t width, uint32_t height)
+        : m_camera(width, height, 90.0f) {
 }
 
-void Integrator::RenderOneFrame() {
-	m_currentFrameData = std::atomic_exchange(m_swapFrameData, m_currentFrameData);
-	m_currentFrameData->Empty = false;
-
-	const uint32_t width = m_currentFrameData->Width;
-	const uint32_t height = m_currentFrameData->Height;
+void Integrator::RenderOneFrame(FrameData *dest) {
+	const uint32_t width = dest->Width;
+	const uint32_t height = dest->Height;
 
 	// "Render" a frame
 	for (uint32_t y = 0; y < height; ++y) {
@@ -50,8 +45,8 @@ void Integrator::RenderOneFrame() {
 			Ray ray = m_camera.GetRay(x, y);
 			float3 color = (normalize(ray.Direction) + 1.0f) * 0.5f;
 
-			m_currentFrameData->ColorData[offset + x] += color;
-			m_currentFrameData->SampleCount[offset + x] += 1;
+			dest->ColorData[offset + x] += color;
+			dest->SampleCount[offset + x] += 1;
 		}
 	}
 }

@@ -40,7 +40,7 @@ public:
 		// Homogenous coordinates go from -1,-1 in the bottom-left to 1,1 in the top-right
 		float xHomogenous = (((float)x + 0.5f) / (float)m_width) - 0.5f;
 		// yHomogenous is inverted, because of the direction flip going from screen coordinates to homogenous
-		float yHomogenous = -((((float)y + 0.5f) / (float)m_height) - 0.5);
+		float yHomogenous = -((((float)y + 0.5f) / (float)m_height) - 0.5f);
 
 		// We assume a focal plane distance of 1.0f for convenience
 		// xViewSpace = focalPlaneDist * xHomogenous * (tan(FOVx) / 2)

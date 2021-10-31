@@ -1,10 +1,11 @@
 /* Lantern - A path tracer
-*
-* Lantern is the legal property of Adrian Astley
-* Copyright Adrian Astley 2015 - 2016
-*/
+ *
+ * Lantern is the legal property of Adrian Astley
+ * Copyright Adrian Astley 2015 - 2016
+ */
 
-#include "camera/frame_data.h"
+#include "render_host/presentation_buffer.h"
+#include "render_host/render_host.h"
 
 #include "visualizer/visualizer.h"
 
@@ -18,28 +19,26 @@ int main(int argc, const char *argv[]) {
 	const uint32_t width = 1280;
 	const uint32_t height = 720;
 
-	lantern::FrameData transferFrames[3] = {
-	    lantern::FrameData(width, height),
-	    lantern::FrameData(width, height),
-	    lantern::FrameData(width, height)};
-	std::atomic<lantern::FrameData *> swapBuffer(&transferFrames[1]);
+	lantern::PresentationBuffer transferFrames[3] = {
+	    lantern::PresentationBuffer(width, height),
+	    lantern::PresentationBuffer(width, height),
+	    lantern::PresentationBuffer(width, height)};
+	std::atomic<lantern::PresentationBuffer *> swapBuffer(&transferFrames[1]);
 
-	lantern::Visualizer visualizer(&transferFrames[0], &swapBuffer);
-	if (!visualizer.Init(1280, 720)) {
+	lantern::Integrator integrator(width, height);
+
+	lantern::RenderHost renderHost(&integrator, &transferFrames[0], &swapBuffer);
+
+	lantern::Visualizer visualizer(&transferFrames[2], &renderHost.GenerationNumber, &swapBuffer);
+	if (!visualizer.Init(width, height)) {
 		return -1;
 	}
 
-	lantern::Integrator integrator(&transferFrames[2], &swapBuffer);
-
 	std::atomic_bool quit(false);
 	std::thread rendererThread(
-	    [](lantern::Integrator *_integrator, std::atomic_bool *_quit) {
-		    while (!_quit->load(std::memory_order_relaxed)) {
-			    _integrator->RenderOneFrame();
-		    }
-	    },
-	    &integrator,
-	    &quit);
+	    [&renderHost, &quit]() {
+		    renderHost.Run(&quit);
+	    });
 
 	visualizer.Run();
 	visualizer.Shutdown();

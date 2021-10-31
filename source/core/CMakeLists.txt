@@ -16,6 +16,11 @@ set(LANTERN_CORE_MATH
 	math/ray.h
 )
 
+set(LANTERN_CORE_RENDER_HOST
+	render_host/render_host.cpp
+	render_host/render_host.h
+)
+
 set(LANTERN_CORE_VISUALIZER
 	visualizer/visualizer.h
 	visualizer/visualizer.cpp
@@ -37,6 +42,7 @@ set(LANTERN_CORE_SRC
 	${LANTERN_CORE_FRAME_DATA}
 	${LANTERN_CORE_MATH}
 	${LANTERN_CORE_INTEGRATOR}
+	${LANTERN_CORE_RENDER_HOST}
 	${LANTERN_CORE_VISUALIZER}
 	${LANTERN_CORE_VISUALIZER_SHADERS}
 )
