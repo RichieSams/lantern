@@ -2,16 +2,21 @@
 
 all: build
 
-generate_debug: source/core/visualizer/shaders/fullscreen_triangle_vs.spv.cpp source/core/visualizer/shaders/final_resolve_ps.spv.cpp
-	mkdir -p build/debug
-	cmake -B build/debug -DCMAKE_BUILD_TYPE=Debug ./
+DOCKER_IMAGE=quay.io/richiesams/docker_gcc:9
 
-generate_release: source/core/visualizer/shaders/fullscreen_triangle_vs.spv.cpp source/core/visualizer/shaders/final_resolve_ps.spv.cpp
-	mkdir -p build/release
-	cmake -B build/release -DCMAKE_BUILD_TYPE=RelWithDebInfo ./
+ifeq ($(OS),Windows_NT)
+CMD=cmd.exe
+MKDIR=docker run --rm -v $(CURDIR):/app -w /app $(DOCKER_IMAGE) mkdir -p
+RM_RECURSIVE=docker run --rm -v $(CURDIR):/app -w /app $(DOCKER_IMAGE) rm -rf
+RM=docker run --rm -v $(CURDIR):/app -w /app $(DOCKER_IMAGE) rm -f
+else
+MKDIR=mkdir -p
+RM_RECURSIVE=rm -rf
+RM=rm -f
+endif
 
 build/shaders/fullscreen_triangle_vs.spv: source/core/visualizer/shaders/fullscreen_triangle_vs.glsl
-	mkdir -p build/shaders
+	$(MKDIR) build/shaders
 	glslangValidator -V -o $@ -S vert $<
 
 source/core/visualizer/shaders/fullscreen_triangle_vs.spv.cpp: build/shaders/fullscreen_triangle_vs.spv
@@ -20,7 +25,7 @@ source/core/visualizer/shaders/fullscreen_triangle_vs.spv.cpp: build/shaders/ful
 	cd build/shaders && xxd -i fullscreen_triangle_vs.spv >> ../../$@
 
 build/shaders/final_resolve_ps.spv: source/core/visualizer/shaders/final_resolve_ps.glsl
-	mkdir -p build/shaders
+	$(MKDIR) build/shaders
 	glslangValidator -V -o $@ -S frag $<
 
 source/core/visualizer/shaders/final_resolve_ps.spv.cpp: build/shaders/final_resolve_ps.spv
@@ -29,11 +34,33 @@ source/core/visualizer/shaders/final_resolve_ps.spv.cpp: build/shaders/final_res
 	cd build/shaders && xxd -i final_resolve_ps.spv >> ../../$@
 
 
+build_shaders:
+ifeq ($(OS),Windows_NT)
+	make CROSS_RULE="source/core/visualizer/shaders/fullscreen_triangle_vs.spv.cpp source/core/visualizer/shaders/final_resolve_ps.spv.cpp" cross
+else
+	make source/core/visualizer/shaders/fullscreen_triangle_vs.spv.cpp source/core/visualizer/shaders/final_resolve_ps.spv.cpp
+endif
+
+cross:
+	docker run --rm -v $(CURDIR):/app -w /app $(DOCKER_IMAGE) make $(CROSS_RULE)
+
+clean_shaders:
+	$(RM) source/core/visualizer/shaders/fullscreen_triangle_vs.spv.cpp
+	$(RM) source/core/visualizer/shaders/final_resolve_ps.spv.cpp
+
+generate_debug: build_shaders
+	$(MKDIR) build/debug
+	cmake -B build/debug -DCMAKE_BUILD_TYPE=Debug ./
+
+generate_release: build_shaders
+	$(MKDIR) build/release
+	cmake -B build/release -DCMAKE_BUILD_TYPE=RelWithDebInfo ./
+
 build_debug: generate_debug
-	$(MAKE) -C build/debug -j
+	make -C build/debug -j
 
 build_release: generate_release
-	$(MAKE) -C build/release -j
+	make -C build/release -j
 
 build: build_release
 
@@ -45,7 +72,5 @@ run_release: build_release
 
 run: run_release
 
-clean:
-	rm -rf ./build
-	rm -f source/core/visualizer/shaders/fullscreen_triangle_vs.spv.cpp
-	rm -f source/core/visualizer/shaders/final_resolve_ps.spv.cpp
+clean: clean_shaders
+	$(RM_RECURSIVE) build
