@@ -31,6 +31,7 @@ int main(int argc, const char *argv[]) {
 
 	lantern::Sphere sceneSpheres[] = {
 	    lantern::Sphere(float3(0.0f, 0.0f, -5.0f), 0.5f),
+	    lantern::Sphere(float3(0.0f, -100.5f, -1.0f), 100.0f),
 	};
 	lantern::Scene scene(sceneSpheres, lantern::ArraySize(sceneSpheres));
 

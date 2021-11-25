@@ -15,6 +15,7 @@ set(LANTERN_CORE_INTEGRATOR
 set(LANTERN_CORE_MATH
 	math/constants.h
 	math/ray.h
+	math/uniform_sampler.h
 )
 
 set(LANTERN_CORE_RENDER_HOST

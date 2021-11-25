@@ -10,6 +10,8 @@
 
 #include "integrator/surface_interaction.h"
 
+#include "math/uniform_sampler.h"
+
 namespace lantern {
 
 // 16 color palette
@@ -41,17 +43,22 @@ void Integrator::RenderOneFrame(FrameData *dest) {
 	const uint32_t width = dest->Width;
 	const uint32_t height = dest->Height;
 
+	UniformSampler sampler(0, 0);
+
 	// "Render" a frame
 	for (uint32_t y = 0; y < height; ++y) {
 		const uint32_t offset = y * width;
 		for (uint32_t x = 0; x < width; ++x) {
-			Ray ray = m_camera.GetRay(x, y);
-			float3 color = (normalize(ray.Direction) + 1.0f) * 0.5f;
+			// Ray ray = m_camera.GetRay(x, y);
+			// float3 color = 0.5f * (normalize(ray.Direction) + 1.0f);
 
-			SurfaceInteraction interaction;
-			if (m_scene->Interesect(ray, 0, kInfinity, &interaction)) {
-				color = (normalize(interaction.Normal) + 1.0f) * 0.5f;
-			}
+			// SurfaceInteraction interaction;
+			// if (m_scene->Interesect(ray, 0, kInfinity, &interaction)) {
+			// 	color = 0.5f * (normalize(interaction.Normal) + 1.0f);
+			// }
+			float sample = sampler.NextFloat();
+
+			float3 color = float3(sample);
 
 			dest->ColorData[offset + x] += color;
 			dest->SampleCount[offset + x] += 1;
