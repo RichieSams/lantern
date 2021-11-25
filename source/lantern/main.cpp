@@ -7,9 +7,13 @@
 #include "render_host/presentation_buffer.h"
 #include "render_host/render_host.h"
 
+#include "scene/scene.h"
+
 #include "visualizer/visualizer.h"
 
 #include "integrator/integrator.h"
+
+#include "math/array.h"
 
 #include "argparse.h"
 
@@ -25,7 +29,12 @@ int main(int argc, const char *argv[]) {
 	    lantern::PresentationBuffer(width, height)};
 	std::atomic<lantern::PresentationBuffer *> swapBuffer(&transferFrames[1]);
 
-	lantern::Integrator integrator(width, height);
+	lantern::Sphere sceneSpheres[] = {
+	    lantern::Sphere(float3(0.0f, 0.0f, -5.0f), 0.5f),
+	};
+	lantern::Scene scene(sceneSpheres, lantern::ArraySize(sceneSpheres));
+
+	lantern::Integrator integrator(width, height, &scene);
 
 	lantern::RenderHost renderHost(&integrator, &transferFrames[0], &swapBuffer);
 

@@ -9,6 +9,7 @@ set(LANTERN_CORE_CAMERA
 set(LANTERN_CORE_INTEGRATOR
 	integrator/integrator.cpp
 	integrator/integrator.h
+	integrator/surface_interaction.h
 )
 
 set(LANTERN_CORE_MATH
@@ -19,6 +20,13 @@ set(LANTERN_CORE_MATH
 set(LANTERN_CORE_RENDER_HOST
 	render_host/render_host.cpp
 	render_host/render_host.h
+)
+
+set(LANTERN_CORE_SCENE
+	scene/scene.cpp
+	scene/scene.h
+	scene/sphere.cpp
+	scene/sphere.h
 )
 
 set(LANTERN_CORE_VISUALIZER
@@ -39,10 +47,12 @@ set(LANTERN_CORE_VISUALIZER_SHADERS
 
 # Link all the sources into one
 set(LANTERN_CORE_SRC
-	${LANTERN_CORE_FRAME_DATA}
+	${LANTERN_CORE_CAMERA}
+	${LANTERN_CORE_INTEGRATOR}
 	${LANTERN_CORE_MATH}
 	${LANTERN_CORE_INTEGRATOR}
 	${LANTERN_CORE_RENDER_HOST}
+	${LANTERN_CORE_SCENE}
 	${LANTERN_CORE_VISUALIZER}
 	${LANTERN_CORE_VISUALIZER_SHADERS}
 )

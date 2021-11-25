@@ -8,6 +8,8 @@
 
 #include "camera/frame_data.h"
 
+#include "integrator/surface_interaction.h"
+
 namespace lantern {
 
 // 16 color palette
@@ -30,8 +32,9 @@ float3 palette[] = {
     {0.000f, 0.000f, 0.000f}, // Black
 };
 
-Integrator::Integrator(uint32_t width, uint32_t height)
-        : m_camera(width, height, 90.0f) {
+Integrator::Integrator(uint32_t width, uint32_t height, Scene *scene)
+        : m_camera(width, height, 90.0f),
+          m_scene(scene) {
 }
 
 void Integrator::RenderOneFrame(FrameData *dest) {
@@ -44,6 +47,11 @@ void Integrator::RenderOneFrame(FrameData *dest) {
 		for (uint32_t x = 0; x < width; ++x) {
 			Ray ray = m_camera.GetRay(x, y);
 			float3 color = (normalize(ray.Direction) + 1.0f) * 0.5f;
+
+			SurfaceInteraction interaction;
+			if (m_scene->Interesect(ray, 0, kInfinity, &interaction)) {
+				color = (normalize(interaction.Normal) + 1.0f) * 0.5f;
+			}
 
 			dest->ColorData[offset + x] += color;
 			dest->SampleCount[offset + x] += 1;

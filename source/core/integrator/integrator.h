@@ -8,6 +8,8 @@
 
 #include "camera/pinhole_camera.h"
 
+#include "scene/scene.h"
+
 #include <atomic>
 
 namespace lantern {
@@ -16,9 +18,10 @@ struct FrameData;
 
 class Integrator {
 public:
-	Integrator(uint32_t width, uint32_t height);
+	Integrator(uint32_t width, uint32_t height, Scene *scene);
 
 private:
+	Scene *m_scene;
 	PinholeCamera m_camera;
 
 public:
