@@ -35,7 +35,7 @@ float3 palette[] = {
 };
 
 Integrator::Integrator(uint32_t width, uint32_t height, Scene *scene)
-        : m_camera(width, height, 90.0f),
+        : m_camera(width, height, 60.0f),
           m_scene(scene) {
 }
 
@@ -49,16 +49,14 @@ void Integrator::RenderOneFrame(FrameData *dest) {
 	for (uint32_t y = 0; y < height; ++y) {
 		const uint32_t offset = y * width;
 		for (uint32_t x = 0; x < width; ++x) {
-			// Ray ray = m_camera.GetRay(x, y);
-			// float3 color = 0.5f * (normalize(ray.Direction) + 1.0f);
+			Ray ray = m_camera.GetRay(x, y);
+			float t = 0.5f * (ray.Direction.y + 1.0f);
+			float3 color = (1.0f - t) * float3(1.0f) + t * float3(0.5f, 0.7, 1.0f);
 
-			// SurfaceInteraction interaction;
-			// if (m_scene->Interesect(ray, 0, kInfinity, &interaction)) {
-			// 	color = 0.5f * (normalize(interaction.Normal) + 1.0f);
-			// }
-			float sample = sampler.NextFloat();
-
-			float3 color = float3(sample);
+			SurfaceInteraction interaction;
+			if (m_scene->Interesect(ray, 0, kInfinity, &interaction)) {
+				color = 0.5f * (normalize(interaction.Normal) + 1.0f);
+			}
 
 			dest->ColorData[offset + x] += color;
 			dest->SampleCount[offset + x] += 1;

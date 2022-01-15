@@ -16,6 +16,8 @@
 #define GLFW_INCLUDE_VULKAN
 #include "GLFW/glfw3.h"
 
+#include "stb_image_write.h"
+
 #include <algorithm>
 #include <array>
 #include <chrono>
@@ -297,6 +299,23 @@ bool Visualizer::RenderFrame() {
 		m_currentPresentationBuffer = std::atomic_exchange(m_swapPresentationBuffer, m_currentPresentationBuffer);
 		m_presentationBufferGeneration = newGenerationNumber;
 	}
+
+	ImGui::SetNextWindowPos(ImVec2(1100, 0));
+	ImGui::Begin("Output", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoCollapse);
+	if (ImGui::Button("Save Image")) {
+		char *buffer = (char *)malloc(m_currentPresentationBuffer->Width * m_currentPresentationBuffer->Height * 3);
+		for (size_t y = 0; y < m_currentPresentationBuffer->Height; ++y) {
+			size_t offset = y * m_currentPresentationBuffer->Width * 3;
+
+			for (size_t x = 0; x < m_currentPresentationBuffer->Width * 3; ++x) {
+				buffer[offset + x] = (char)(m_currentPresentationBuffer->ResolvedData[offset + x] * 255.0f);
+			}
+		}
+
+		stbi_write_png("image.png", m_currentPresentationBuffer->Width, m_currentPresentationBuffer->Height, 3, buffer, m_currentPresentationBuffer->Width * 3);
+		free(buffer);
+	}
+	ImGui::End();
 
 	// Acquire the next Vulkan image to render to
 	// We always use the semaphore of the "last" index, since there's no way to know the current index without supplying a semaphore

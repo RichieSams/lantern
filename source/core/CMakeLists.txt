@@ -60,5 +60,5 @@ set(LANTERN_CORE_SRC
 
 # Create lib
 add_library(lantern_core STATIC ${LANTERN_CORE_SRC})
-target_link_libraries(lantern_core glfw ${Vulkan_LIBRARIES} imgui VulkanMemoryAllocator linalg)
+target_link_libraries(lantern_core glfw ${Vulkan_LIBRARIES} imgui VulkanMemoryAllocator linalg stb)
 target_include_directories(lantern_core PUBLIC ${Vulkan_INCLUDE_DIRS})

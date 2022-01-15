@@ -11,3 +11,5 @@ add_subdirectory(imgui)
 add_subdirectory(linalg)
 
 add_subdirectory(vk_mem_alloc)
+
+add_subdirectory(stb)
