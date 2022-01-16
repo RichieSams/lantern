@@ -215,8 +215,11 @@ bool Visualizer::Init(int width, int height) {
 	}
 
 	// Set up GUI variables
+	memset(m_renderTime, 0, sizeof(m_renderTime[0]) * SizeOfArray(m_renderTime));
+	m_renderTimeBin = 0;
+	m_renderTimeStart = std::chrono::high_resolution_clock::now();
+
 	memset(m_frameTime, 0, sizeof(m_frameTime[0]) * SizeOfArray(m_frameTime));
-	m_frameTimeSum = 0.0f;
 	m_frameTimeBin = 0;
 
 	return true;
@@ -283,7 +286,12 @@ bool Visualizer::RenderFrame() {
 	ImGui::SetNextWindowPos(ImVec2(0, 0));
 	ImGui::Begin("Visualizer Stats", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoCollapse);
 	{
-		const float frameTime = m_frameTimeSum / SizeOfArray(m_frameTime);
+		float frameTimeSum = 0.0f;
+		for (size_t i = 0; i < SizeOfArray(m_frameTime); ++i) {
+			frameTimeSum += m_frameTime[i];
+		}
+
+		const float frameTime = frameTimeSum / SizeOfArray(m_frameTime);
 		const float fps = 1000.0f / frameTime;
 
 		ImGui::Text("%.1f ms/frame (%.0f FPS)", frameTime, fps);
@@ -297,8 +305,33 @@ bool Visualizer::RenderFrame() {
 	const uint64_t newGenerationNumber = m_renderHostGenerationNumber->load(std::memory_order_acquire);
 	if (newGenerationNumber > m_presentationBufferGeneration) {
 		m_currentPresentationBuffer = std::atomic_exchange(m_swapPresentationBuffer, m_currentPresentationBuffer);
+
+		const uint64_t numGenerations = newGenerationNumber - m_presentationBufferGeneration;
 		m_presentationBufferGeneration = newGenerationNumber;
+
+		auto end = std::chrono::high_resolution_clock::now();
+		float diff = std::chrono::duration<float, std::milli>(end - m_renderTimeStart).count();
+		m_renderTimeStart = end;
+
+		size_t index = m_renderTimeBin & (SizeOfArray(m_renderTime) - 1);
+		m_renderTime[index] = diff / (float)numGenerations;
+		++m_renderTimeBin;
 	}
+
+	ImGui::SetNextWindowPos(ImVec2(200, 0));
+	ImGui::Begin("Integrator Stats", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoCollapse);
+	{
+		float renderTimeSum = 0.0f;
+		for (size_t i = 0; i < SizeOfArray(m_renderTime); ++i) {
+			renderTimeSum += m_renderTime[i];
+		}
+
+		const float renderTime = renderTimeSum / SizeOfArray(m_renderTime);
+		const float fps = 1000.0f / renderTime;
+
+		ImGui::Text("%.1f ms/frame (%.0f FPS)", renderTime, fps);
+	}
+	ImGui::End();
 
 	ImGui::SetNextWindowPos(ImVec2(1100, 0));
 	ImGui::Begin("Output", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoCollapse);
@@ -435,9 +468,7 @@ bool Visualizer::RenderFrame() {
 	float diff = std::chrono::duration<float, std::milli>(end - start).count();
 
 	size_t index = m_frameTimeBin & (SizeOfArray(m_frameTime) - 1);
-	m_frameTimeSum -= m_frameTime[index];
 	m_frameTime[index] = diff;
-	m_frameTimeSum += diff;
 	++m_frameTimeBin;
 
 	return true;

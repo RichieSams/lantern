@@ -16,6 +16,7 @@
 #include "vk_mem_alloc.h"
 
 #include <atomic>
+#include <chrono>
 
 struct GLFWwindow;
 
@@ -97,10 +98,14 @@ private:
 	std::atomic<uint64_t> *m_renderHostGenerationNumber;
 	std::atomic<PresentationBuffer *> *m_swapPresentationBuffer;
 
+	// Render host GUI variables
+	float m_renderTime[32];
+	std::chrono::high_resolution_clock::time_point m_renderTimeStart;
+	size_t m_renderTimeBin;
+
 	// GUI variables
 	float m_frameTime[32];
 	size_t m_frameTimeBin;
-	float m_frameTimeSum;
 
 public:
 	bool Init(int width, int height);
