@@ -38,7 +38,9 @@ export void RenderOneFrame(uniform Scene * uniform scene, uniform FrameData * un
         }
 
         int offset = y * width;
-        frameData->ColorData[offset + x] += color;
+        frameData->ColorDataR[offset + x] += color.x;
+        frameData->ColorDataG[offset + x] += color.y;
+        frameData->ColorDataB[offset + x] += color.z;
         frameData->SampleCount[offset + x] += 1;
     }
 }

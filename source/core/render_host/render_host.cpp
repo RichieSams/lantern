@@ -35,13 +35,12 @@ void RenderHost::Run(std::atomic<bool> *quit) {
 				const uint32_t frameBufferIndex = offset + x;
 				const uint32_t resolvedDataIndex = frameBufferIndex * 3;
 
-				float3 color = m_accumulationBuffer.ColorData[frameBufferIndex];
 				const uint32_t sampleCount = m_accumulationBuffer.SampleCount[frameBufferIndex];
 
 				// Color data
-				m_currentPresentationBuffer->ResolvedData[resolvedDataIndex + 0] = color.x / sampleCount; // Red
-				m_currentPresentationBuffer->ResolvedData[resolvedDataIndex + 1] = color.y / sampleCount; // Green
-				m_currentPresentationBuffer->ResolvedData[resolvedDataIndex + 2] = color.z / sampleCount; // Blue
+				m_currentPresentationBuffer->ResolvedData[resolvedDataIndex + 0] = m_accumulationBuffer.ColorDataR[frameBufferIndex] / sampleCount; // Red
+				m_currentPresentationBuffer->ResolvedData[resolvedDataIndex + 1] = m_accumulationBuffer.ColorDataG[frameBufferIndex] / sampleCount; // Green
+				m_currentPresentationBuffer->ResolvedData[resolvedDataIndex + 2] = m_accumulationBuffer.ColorDataB[frameBufferIndex] / sampleCount; // Blue
 
 				// TODO: normal and albedo
 			}
