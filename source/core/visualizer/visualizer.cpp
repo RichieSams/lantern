@@ -387,7 +387,7 @@ bool Visualizer::RenderFrame() {
 			const size_t presentationOffset = y * m_currentPresentationBuffer->Width * 3;
 			const size_t stagingOffset = y * frame->stagingImagePitch;
 
-			memcpy(mappedData + stagingOffset, m_currentPresentationBuffer->ResolvedData + presentationOffset, m_currentPresentationBuffer->Width * sizeof(float3));
+			memcpy(mappedData + stagingOffset, m_currentPresentationBuffer->ResolvedData + presentationOffset, m_currentPresentationBuffer->Width * sizeof(float) * 3);
 		}
 
 		// Flush to GPU

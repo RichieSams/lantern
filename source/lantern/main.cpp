@@ -11,7 +11,7 @@
 
 #include "visualizer/visualizer.h"
 
-#include "integrator/integrator.h"
+#include "camera/pinhole_camera.h"
 
 #include "math/array.h"
 
@@ -29,15 +29,16 @@ int main(int argc, const char *argv[]) {
 	    lantern::PresentationBuffer(width, height)};
 	std::atomic<lantern::PresentationBuffer *> swapBuffer(&transferFrames[1]);
 
-	lantern::Sphere sceneSpheres[] = {
-	    lantern::Sphere(float3(0.0f, 0.0f, -5.0f), 0.5f),
-	    lantern::Sphere(float3(0.0f, -100.5f, -1.0f), 100.0f),
+	PinholeCamera camera;
+	PinholeCameraInit(&camera, width, height, 60.0f);
+
+	Sphere sceneSpheres[] = {
+	    MakeSphere({0.0f, 0.0f, -5.0f}, 0.5f),
+	    MakeSphere({0.0f, -100.5f, -1.0f}, 100.0f),
 	};
-	lantern::Scene scene(sceneSpheres, lantern::ArraySize(sceneSpheres));
+	Scene scene = {sceneSpheres, lantern::ArraySize(sceneSpheres), &camera};
 
-	lantern::Integrator integrator(width, height, &scene);
-
-	lantern::RenderHost renderHost(&integrator, &transferFrames[0], &swapBuffer);
+	lantern::RenderHost renderHost(&scene, &transferFrames[0], &swapBuffer);
 
 	lantern::Visualizer visualizer(&transferFrames[2], &renderHost.GenerationNumber, &swapBuffer);
 	if (!visualizer.Init(width, height)) {

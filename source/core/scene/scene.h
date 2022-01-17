@@ -8,22 +8,15 @@
 
 #include "scene/sphere.h"
 
-namespace lantern {
-
 struct SurfaceInteraction;
+struct PinholeCamera;
 
-class Scene {
-public:
-	Scene(Sphere *hittables, size_t hittablesLen)
-	        : m_hittables(hittables), m_hittablesLen(hittablesLen) {
-	}
+extern "C" {
 
-private:
-	Sphere *m_hittables;
-	size_t m_hittablesLen;
+struct Scene {
+	Sphere *Hittables;
+	size_t HittablesLen;
 
-public:
-	bool Interesect(Ray &ray, float minDistance, float maxDistance, SurfaceInteraction *surfaceInteraction);
+	PinholeCamera *Camera;
 };
-
-} // End of namespace lantern
+}

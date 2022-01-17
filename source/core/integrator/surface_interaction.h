@@ -6,21 +6,19 @@
 
 #pragma once
 
-#include "linalg.h"
-using namespace linalg::aliases;
+#include "math/types.h"
 
-namespace lantern {
+extern "C" {
 
 struct SurfaceInteraction {
-	float3 Position = float3(0.0f);
-	float3 Normal = float3(0.0f);
-	float2 TexCoord = float2(0.0f);
+	float3 Position;
+	float3 Normal;
+	float2 TexCoord;
 
 	struct {
 		float3 Normal;
 	} Shading;
 
-	float3 OutputDirection = float3(0.0f);
+	float3 OutputDirection;
 };
-
-} // namespace lantern
+} // extern C

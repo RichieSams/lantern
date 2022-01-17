@@ -6,8 +6,7 @@
 
 #pragma once
 
-#include "linalg.h"
-using namespace linalg::aliases;
+#include "math/types.h"
 
 #include <inttypes.h>
 

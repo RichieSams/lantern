@@ -4,10 +4,12 @@ find_package(Vulkan REQUIRED)
 set(LANTERN_CORE_CAMERA
 	camera/frame_data.h
 	camera/pinhole_camera.h
+	camera/pinhole_camera.ispc
 )
 
 set(LANTERN_CORE_INTEGRATOR
 	integrator/integrator.cpp
+	integrator/integrator.ispc
 	integrator/integrator.h
 	integrator/surface_interaction.h
 )
@@ -24,10 +26,12 @@ set(LANTERN_CORE_RENDER_HOST
 )
 
 set(LANTERN_CORE_SCENE
-	scene/scene.cpp
 	scene/scene.h
-	scene/sphere.cpp
+	scene/scene.ispc
+	scene/scene.isph
 	scene/sphere.h
+	scene/sphere.ispc
+	scene/sphere.isph
 )
 
 set(LANTERN_CORE_VISUALIZER
@@ -60,5 +64,10 @@ set(LANTERN_CORE_SRC
 
 # Create lib
 add_library(lantern_core STATIC ${LANTERN_CORE_SRC})
-target_link_libraries(lantern_core glfw ${Vulkan_LIBRARIES} imgui VulkanMemoryAllocator linalg stb)
+target_link_libraries(lantern_core glfw ${Vulkan_LIBRARIES} imgui VulkanMemoryAllocator stb)
 target_include_directories(lantern_core PUBLIC ${Vulkan_INCLUDE_DIRS})
+
+# Set ISPC settings
+set_property(TARGET lantern_core PROPERTY ISPC_INSTRUCTION_SETS "${LATERN_ISPC_TARGET}")
+target_compile_options(lantern_core PRIVATE $<$<COMPILE_LANGUAGE:ISPC>:${LANTERN_ISPC_FLAGS}>)
+target_compile_options(lantern_core PRIVATE $<$<COMPILE_LANGUAGE:ISPC>:--arch=${LATERN_ISPC_ARCH}>)

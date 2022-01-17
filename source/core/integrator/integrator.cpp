@@ -4,13 +4,7 @@
  * Copyright Adrian Astley 2015 - 2016
  */
 
-#include "integrator/integrator.h"
-
-#include "camera/frame_data.h"
-
-#include "integrator/surface_interaction.h"
-
-#include "math/uniform_sampler.h"
+#include "math/types.h"
 
 namespace lantern {
 
@@ -33,35 +27,5 @@ float3 palette[] = {
     {0.251f, 0.251f, 0.251f}, // Dark Gray - #404040
     {0.000f, 0.000f, 0.000f}, // Black
 };
-
-Integrator::Integrator(uint32_t width, uint32_t height, Scene *scene)
-        : m_camera(width, height, 60.0f),
-          m_scene(scene) {
-}
-
-void Integrator::RenderOneFrame(FrameData *dest) {
-	const uint32_t width = dest->Width;
-	const uint32_t height = dest->Height;
-
-	UniformSampler sampler(0, 0);
-
-	// "Render" a frame
-	for (uint32_t y = 0; y < height; ++y) {
-		const uint32_t offset = y * width;
-		for (uint32_t x = 0; x < width; ++x) {
-			Ray ray = m_camera.GetRay(x, y);
-			float t = 0.5f * (ray.Direction.y + 1.0f);
-			float3 color = (1.0f - t) * float3(1.0f) + t * float3(0.5f, 0.7f, 1.0f);
-
-			SurfaceInteraction interaction;
-			if (m_scene->Interesect(ray, 0, kInfinity, &interaction)) {
-				color = 0.5f * (normalize(interaction.Normal) + 1.0f);
-			}
-
-			dest->ColorData[offset + x] += color;
-			dest->SampleCount[offset + x] += 1;
-		}
-	}
-}
 
 } // namespace lantern

@@ -6,12 +6,7 @@
 
 #pragma once
 
-#include "math/types.h"
 
-extern "C" {
+struct PinholeCamera;
 
-struct Ray {
-	float3 Origin;
-	float3 Direction;
-};
-} // extern C
+varying Ray GenerateCameraRay(uniform PinholeCamera * uniform camera, varying int x, varying int y);

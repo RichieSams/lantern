@@ -6,23 +6,22 @@
 
 #include "scene/scene.h"
 
-#include "integrator/surface_interaction.h"
-
 #include "math/constants.h"
 #include "math/ray.h"
 
-#include <string.h>
+#include "integrator/surface_interaction.h"
 
-namespace lantern {
+#include "scene/sphere.isph"
 
-bool Scene::Interesect(Ray &ray, float minDistance, float maxDistance, SurfaceInteraction *surfaceInteraction) {
-	float distance = kInfinity;
-	float3 normal;
 
-	for (size_t i = 0; i < m_hittablesLen; ++i) {
+varying bool IntersectScene(uniform Scene * uniform scene, varying Ray &ray, varying float minDistance, varying float maxDistance, varying SurfaceInteraction * varying surfaceInteraction) {
+	varying float distance = kInfinity;
+	varying float3 normal = {0.0f, 0.0f, 0.0f};
+
+	for (uniform size_t i = 0; i < scene->HittablesLen; ++i) {
 		float newDistance;
 		float3 newNormal;
-		if (m_hittables[i].Interesect(ray, minDistance, maxDistance, &newDistance, &newNormal)) {
+		if (InteresectSphere(&scene->Hittables[i], ray, minDistance, maxDistance, &newDistance, &newNormal)) {
 			if (newDistance < distance) {
 				distance = newDistance;
 				normal = newNormal;
@@ -36,7 +35,6 @@ bool Scene::Interesect(Ray &ray, float minDistance, float maxDistance, SurfaceIn
 
 	surfaceInteraction->Position = ray.Origin + (ray.Direction * distance);
 	surfaceInteraction->Normal = normal;
+
 	return true;
 }
-
-} // End of namespace lantern

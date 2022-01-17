@@ -11,20 +11,22 @@
 #include <atomic>
 #include <stdint.h>
 
+struct Scene;
+
 namespace lantern {
 
-class Integrator;
 struct PresentationBuffer;
 
 class RenderHost {
 public:
-	explicit RenderHost(Integrator *integrator, PresentationBuffer *startingPresentationBuffer, std::atomic<PresentationBuffer *> *swapPresentationBuffer);
+	explicit RenderHost(Scene *scene, PresentationBuffer *startingPresentationBuffer, std::atomic<PresentationBuffer *> *swapPresentationBuffer);
+	~RenderHost();
 
 public:
 	std::atomic<uint64_t> GenerationNumber;
 
 private:
-	Integrator *m_integrator;
+	Scene *m_scene;
 
 	FrameData m_accumulationBuffer;
 	PresentationBuffer *m_currentPresentationBuffer;

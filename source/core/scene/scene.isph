@@ -1,0 +1,13 @@
+/* Lantern - A path tracer
+ *
+ * Lantern is the legal property of Adrian Astley
+ * Copyright Adrian Astley 2015 - 2016
+ */
+
+#pragma once
+
+struct Scene;
+struct Ray;
+struct SurfaceInteraction;
+
+varying bool IntersectScene(uniform Scene * uniform scene, varying Ray &ray, varying float minDistance, varying float maxDistance, varying SurfaceInteraction * varying surfaceInteraction);

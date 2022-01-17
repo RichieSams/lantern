@@ -5,23 +5,22 @@
  */
 
 #include "scene/sphere.h"
+#include "scene/sphere.isph"
 
 #include "math/ray.h"
 
-namespace lantern {
-
-bool Sphere::Interesect(Ray &ray, float minDistance, float maxDistance, float *distance, float3 *normal) {
-	float3 oc = ray.Origin - Origin;
+varying bool InteresectSphere(uniform Sphere * uniform sphere, varying Ray &ray, varying float minDistance, varying float maxDistance, varying float * uniform distance, varying float3 * uniform normal) {
+	float3 oc = ray.Origin - sphere->Origin;
 	float a = length2(ray.Direction);
 	float halfB = dot(oc, ray.Direction);
-	float c = length2(oc) - RadiusSquared;
+	float c = length2(oc) - sphere->RadiusSquared;
 
 	float discriminant = halfB * halfB - a * c;
 	if (discriminant < 0) {
 		return false;
 	}
 
-	float sqrtDiscrim = sqrtf(discriminant);
+	float sqrtDiscrim = sqrt(discriminant);
 
 	// Find th enearest root that lies in the acceptable range
 	float root = (-halfB - sqrtDiscrim) / a;
@@ -34,9 +33,7 @@ bool Sphere::Interesect(Ray &ray, float minDistance, float maxDistance, float *d
 
 	*distance = root;
 	float3 position = ray.Origin + (ray.Direction * root);
-	*normal = normalize(position - Origin);
+	*normal = normalize(position - sphere->Origin);
 
 	return true;
 }
-
-} // End of namespace lantern

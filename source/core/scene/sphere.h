@@ -6,26 +6,22 @@
 
 #pragma once
 
-#include "linalg.h"
-using namespace linalg::aliases;
-
-namespace lantern {
+#include "math/types.h"
 
 struct Ray;
 
-struct Sphere {
-public:
-	Sphere(float3 origin, float radius)
-	        : Origin(origin),
-	          RadiusSquared(radius * radius) {
-	}
+extern "C" {
 
-public:
+struct Sphere {
 	float3 Origin;
 	float RadiusSquared;
-
-public:
-	bool Interesect(Ray &ray, float minDistance, float maxDistance, float *distance, float3 *normal);
 };
+}
 
-} // End of namespace lantern
+inline Sphere MakeSphere(float3 origin, float radius) {
+	Sphere ret = {
+	    origin,
+	    radius * radius,
+	};
+	return ret;
+}
