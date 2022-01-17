@@ -9,7 +9,7 @@
 
 #include "math/ray.h"
 
-varying bool InteresectSphere(uniform Sphere * uniform sphere, varying Ray &ray, varying float minDistance, varying float maxDistance, varying float * uniform distance, varying float3 * uniform normal) {
+varying bool InteresectSphere(uniform Sphere *uniform sphere, varying Ray &ray, varying float minDistance, varying float maxDistance, varying float *uniform distance, varying float3 *uniform normal) {
 	float3 oc = ray.Origin - sphere->Origin;
 	float a = length2(ray.Direction);
 	float halfB = dot(oc, ray.Direction);

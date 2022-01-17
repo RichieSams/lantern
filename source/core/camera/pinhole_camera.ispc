@@ -7,8 +7,7 @@
 #include "camera/pinhole_camera.h"
 #include "camera/pinhole_camera.isph"
 
-
-varying Ray GenerateCameraRay(uniform PinholeCamera * uniform camera, varying int x, varying int y) {
+varying Ray GenerateCameraRay(uniform PinholeCamera *uniform camera, varying int x, varying int y) {
 	// Shoot rays through the center of the pixel (aka 0.5 vs 0.0)
 	//
 	// First convert x/y to homogenous coordinates
@@ -25,6 +24,6 @@ varying Ray GenerateCameraRay(uniform PinholeCamera * uniform camera, varying in
 
 	float3 direction = {xViewSpace, yViewSpace, -1.0f};
 
-    Ray ret = {{0.0f, 0.0f, 0.0f}, direction};
-    return ret;
+	Ray ret = {{0.0f, 0.0f, 0.0f}, direction};
+	return ret;
 }

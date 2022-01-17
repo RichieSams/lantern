@@ -13,8 +13,7 @@
 
 #include "scene/sphere.isph"
 
-
-varying bool IntersectScene(uniform Scene * uniform scene, varying Ray &ray, varying float minDistance, varying float maxDistance, varying SurfaceInteraction * uniform surfaceInteraction) {
+varying bool IntersectScene(uniform Scene *uniform scene, varying Ray &ray, varying float minDistance, varying float maxDistance, varying SurfaceInteraction *uniform surfaceInteraction) {
 	varying float distance = kInfinity;
 	varying float3 normal = {0.0f, 0.0f, 0.0f};
 
