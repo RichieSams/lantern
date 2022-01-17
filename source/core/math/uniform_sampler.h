@@ -1,8 +1,8 @@
 /* Lantern - A path tracer
-*
-* Lantern is the legal property of Adrian Astley
-* Copyright Adrian Astley 2015 - 2016
-*/
+ *
+ * Lantern is the legal property of Adrian Astley
+ * Copyright Adrian Astley 2015 - 2016
+ */
 
 #pragma once
 
@@ -53,8 +53,8 @@ public:
 		return float2(NextFloat(), NextFloat());
 	}
 
-	uint NextDiscrete(uint range) {
-		return (uint)(range * NextFloat());
+	uint32_t NextDiscrete(uint32_t range) {
+		return (uint32_t)(range * NextFloat());
 	}
 
 private:

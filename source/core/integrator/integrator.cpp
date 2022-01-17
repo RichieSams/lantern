@@ -51,7 +51,7 @@ void Integrator::RenderOneFrame(FrameData *dest) {
 		for (uint32_t x = 0; x < width; ++x) {
 			Ray ray = m_camera.GetRay(x, y);
 			float t = 0.5f * (ray.Direction.y + 1.0f);
-			float3 color = (1.0f - t) * float3(1.0f) + t * float3(0.5f, 0.7, 1.0f);
+			float3 color = (1.0f - t) * float3(1.0f) + t * float3(0.5f, 0.7f, 1.0f);
 
 			SurfaceInteraction interaction;
 			if (m_scene->Interesect(ray, 0, kInfinity, &interaction)) {
