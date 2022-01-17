@@ -10,4 +10,4 @@ struct Scene;
 struct Ray;
 struct SurfaceInteraction;
 
-varying bool IntersectScene(uniform Scene * uniform scene, varying Ray &ray, varying float minDistance, varying float maxDistance, varying SurfaceInteraction * varying surfaceInteraction);
+varying bool IntersectScene(uniform Scene * uniform scene, varying Ray &ray, varying float minDistance, varying float maxDistance, varying SurfaceInteraction * uniform surfaceInteraction);
