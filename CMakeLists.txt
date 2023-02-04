@@ -4,7 +4,6 @@ project(lantern CXX ISPC)
 # Options
 set(ISPC_VALID_TARGETS sse2-i32x4 sse2-i32x8 sse4-i8x16 sse4-i16x8 sse4-i32x4 sse4-i32x8 avx1-i32x4 avx1-i32x8 avx1-i32x16 avx1-i64x4 avx2-i8x32 avx2-i16x16 avx2-i32x4 avx2-i32x8 avx2-i32x16 avx2-i64x4 avx512knl-i32x16 avx512skx-i32x8 avx512skx-i32x16 avx512skx-i8x64 avx512skx-i16x32 neon-i8x16 neon-i16x8 neon-i32x4 neon-i32x8 genx-x8 genx-x16)
 set(LATERN_ISPC_TARGET avx2-i32x8 CACHE STRING "ISPC Target instruction set")
-set_property(CACHE LATERN_ISPC_TARGET PROPERTY STRINGS ${trafficLightColors})
 set(LANTERN_ISPC_EXTRA_FLAGS "" CACHE STRING "Additional args to use with ISPC")
 
 set(CMAKE_CXX_STANDARD 17) # C++17...

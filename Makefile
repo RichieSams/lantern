@@ -9,10 +9,14 @@ CMD=cmd.exe
 MKDIR=docker run --rm -v $(CURDIR):/app -w /app $(DOCKER_IMAGE) mkdir -p
 RM_RECURSIVE=docker run --rm -v $(CURDIR):/app -w /app $(DOCKER_IMAGE) rm -rf
 RM=docker run --rm -v $(CURDIR):/app -w /app $(DOCKER_IMAGE) rm -f
+CMAKE_PRESET?=Win_x64_Release
+PATH_SEP=\\
 else
 MKDIR=mkdir -p
 RM_RECURSIVE=rm -rf
 RM=rm -f
+CMAKE_PRESET?=Linux_x64_Release
+PATH_SEP=/
 endif
 
 build/shaders/fullscreen_triangle_vs.spv: source/core/visualizer/shaders/fullscreen_triangle_vs.glsl
@@ -48,27 +52,17 @@ clean_shaders:
 	$(RM) source/core/visualizer/shaders/fullscreen_triangle_vs.spv.cpp
 	$(RM) source/core/visualizer/shaders/final_resolve_ps.spv.cpp
 
-generate_debug: build_shaders
-	$(MKDIR) build/debug
-	cmake -B build/debug -DCMAKE_BUILD_TYPE=Debug ./
+generate: build_shaders
+	cmake --preset $(CMAKE_PRESET) ./
 
-generate_release: build_shaders
-	$(MKDIR) build/release
-	cmake -B build/release -DCMAKE_BUILD_TYPE=RelWithDebInfo ./
+build: generate
+	cmake --build $(CMAKE_PRESET)
 
-build_debug: generate_debug
-	make -C build/debug -j
+run_debug:
+	cd build/Debug/source/lantern/ && .$(PATH_SEP)lantern
 
-build_release: generate_release
-	make -C build/release -j
-
-build: build_release
-
-run_debug: build_debug
-	cd build/debug/source/lantern/ && ./lantern
-
-run_release: build_release
-	cd build/release/source/lantern/ && ./lantern
+run_release:
+	cd build/RelWithDebInfo/source/lantern/ && .$(PATH_SEP)lantern
 
 run: run_release
 

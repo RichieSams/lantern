@@ -65,7 +65,8 @@ set(LANTERN_CORE_SRC
 # Create lib
 add_library(lantern_core STATIC ${LANTERN_CORE_SRC})
 target_link_libraries(lantern_core glfw ${Vulkan_LIBRARIES} imgui VulkanMemoryAllocator stb)
-target_include_directories(lantern_core PUBLIC ${Vulkan_INCLUDE_DIRS})
+target_include_directories(lantern_core PRIVATE ${Vulkan_INCLUDE_DIRS})
+target_include_directories(lantern_core PUBLIC ./)
 
 # Set ISPC settings
 set_property(TARGET lantern_core PROPERTY ISPC_INSTRUCTION_SETS "${LATERN_ISPC_TARGET}")
