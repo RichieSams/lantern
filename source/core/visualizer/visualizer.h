@@ -107,6 +107,9 @@ private:
 	float m_frameTime[32];
 	size_t m_frameTimeBin;
 
+	// Viewport variables
+	float m_viewportZoom;
+
 public:
 	bool Init(int width, int height);
 	void Run();
@@ -121,6 +124,7 @@ private:
 	bool InitVulkan();
 	bool InitVulkanWindow(int width, int height);
 	bool CreateSwapChain(int width, int height);
+	bool CreateFrameStructs(int width, int height);
 };
 
 } // End of namespace lantern

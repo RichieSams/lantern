@@ -18,6 +18,8 @@
 
 #include "stb_image_write.h"
 
+#include "imgui_internal.h"
+
 #include <algorithm>
 #include <array>
 #include <chrono>
@@ -98,7 +100,6 @@ bool Visualizer::Init(int width, int height) {
 	}
 
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-	glfwWindowHint(GLFW_RESIZABLE, 0);
 	GLFWwindow *window = glfwCreateWindow(width, height, "Lantern", nullptr, nullptr);
 	if (window == nullptr) {
 		printf("Failed to create GLFW windows");
@@ -135,8 +136,9 @@ bool Visualizer::Init(int width, int height) {
 	ImGui::CreateContext();
 
 	ImGuiIO &io = ImGui::GetIO();
-	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-	io.ConfigWindowsMoveFromTitleBarOnly = true;
+	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard | ImGuiConfigFlags_DockingEnable;
+	// io.ConfigWindowsMoveFromTitleBarOnly = true;
+	io.ConfigWindowsResizeFromEdges = true;
 
 	// Setup GLFW binding
 	ImGui_ImplGlfw_InitForVulkan(window, true);
@@ -222,6 +224,9 @@ bool Visualizer::Init(int width, int height) {
 	memset(m_frameTime, 0, sizeof(m_frameTime[0]) * SizeOfArray(m_frameTime));
 	m_frameTimeBin = 0;
 
+	// Set up the viewport variables
+	m_viewportZoom = 1.0f;
+
 	return true;
 }
 
@@ -283,19 +288,50 @@ bool Visualizer::RenderFrame() {
 	ImGui_ImplGlfw_NewFrame();
 	ImGui::NewFrame();
 
-	ImGui::SetNextWindowPos(ImVec2(0, 0));
-	ImGui::Begin("Visualizer Stats", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoCollapse);
+	// Create the "root" window
 	{
-		float frameTimeSum = 0.0f;
-		for (size_t i = 0; i < SizeOfArray(m_frameTime); ++i) {
-			frameTimeSum += m_frameTime[i];
-		}
+		const ImGuiViewport *viewport = ImGui::GetMainViewport();
+		ImGui::SetNextWindowPos(viewport->WorkPos);
+		ImGui::SetNextWindowSize(viewport->WorkSize);
+		ImGui::SetNextWindowViewport(viewport->ID);
 
-		const float frameTime = frameTimeSum / SizeOfArray(m_frameTime);
-		const float fps = 1000.0f / frameTime;
+		ImGuiWindowFlags windowFlags = ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking;
+		windowFlags |= ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
+		windowFlags |= ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
 
-		ImGui::Text("%.1f ms/frame (%.0f FPS)", frameTime, fps);
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+		ImGui::Begin("RootWindow", nullptr, windowFlags);
+		ImGui::PopStyleVar(3);
 	}
+
+	// Now set up the dock
+
+	// Only set the initial docking locations if someone hasn't already loaded them
+	if (ImGui::DockBuilderGetNode(ImGui::GetID("RootDock")) == nullptr) {
+		ImGuiID dockspaceID = ImGui::GetID("RootDock");
+		ImGuiViewport *viewport = ImGui::GetMainViewport();
+		ImGui::DockBuilderRemoveNode(dockspaceID);                            // Clear out existing layout
+		ImGui::DockBuilderAddNode(dockspaceID, ImGuiDockNodeFlags_DockSpace); // Add empty node
+
+		ImGuiID remaining;
+		ImGuiID bottomDockID = ImGui::DockBuilderSplitNode(dockspaceID, ImGuiDir_Down, 0.20f, nullptr, &remaining);
+		ImGuiID propertiesDockID = ImGui::DockBuilderSplitNode(remaining, ImGuiDir_Right, 0.20f, nullptr, &remaining);
+		ImGuiID viewportDockID = remaining;
+
+		ImGui::DockBuilderDockWindow("Viewport", viewportDockID);
+		ImGui::DockBuilderDockWindow("Console", bottomDockID);
+		ImGui::DockBuilderDockWindow("Properties", propertiesDockID);
+		ImGui::DockBuilderFinish(dockspaceID);
+	}
+
+	// Create the docking
+	ImGuiID dockspaceID = ImGui::GetID("RootDock");
+	ImGui::DockSpace(dockspaceID, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_None);
+
+	// We can close the main window now
+	// Since all other windows we create will be already inside that window (via the dock setup we just created), or floating
 	ImGui::End();
 
 	// Rendering
@@ -317,38 +353,6 @@ bool Visualizer::RenderFrame() {
 		m_renderTime[index] = diff / (float)numGenerations;
 		++m_renderTimeBin;
 	}
-
-	ImGui::SetNextWindowPos(ImVec2(200, 0));
-	ImGui::Begin("Integrator Stats", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoCollapse);
-	{
-		float renderTimeSum = 0.0f;
-		for (size_t i = 0; i < SizeOfArray(m_renderTime); ++i) {
-			renderTimeSum += m_renderTime[i];
-		}
-
-		const float renderTime = renderTimeSum / SizeOfArray(m_renderTime);
-		const float fps = 1000.0f / renderTime;
-
-		ImGui::Text("%.1f ms/frame (%.0f FPS)", renderTime, fps);
-	}
-	ImGui::End();
-
-	ImGui::SetNextWindowPos(ImVec2(1100, 0));
-	ImGui::Begin("Output", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoCollapse);
-	if (ImGui::Button("Save Image")) {
-		char *buffer = (char *)malloc(m_currentPresentationBuffer->Width * m_currentPresentationBuffer->Height * 3);
-		for (size_t y = 0; y < m_currentPresentationBuffer->Height; ++y) {
-			size_t offset = y * m_currentPresentationBuffer->Width * 3;
-
-			for (size_t x = 0; x < m_currentPresentationBuffer->Width * 3; ++x) {
-				buffer[offset + x] = (char)(m_currentPresentationBuffer->ResolvedData[offset + x] * 255.0f);
-			}
-		}
-
-		stbi_write_png("image.png", m_currentPresentationBuffer->Width, m_currentPresentationBuffer->Height, 3, buffer, m_currentPresentationBuffer->Width * 3);
-		free(buffer);
-	}
-	ImGui::End();
 
 	// Acquire the next Vulkan image to render to
 	// We always use the semaphore of the "last" index, since there's no way to know the current index without supplying a semaphore
@@ -402,12 +406,6 @@ bool Visualizer::RenderFrame() {
 		}
 	}
 
-	ImGui::SetNextWindowPos(ImVec2(0, 50), ImGuiCond_Once);
-	if (ImGui::Begin("Frame Buffer", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-		ImGui::Image((ImTextureID)frame->descriptorSet, ImVec2(1280 * 0.5, 720 * 0.5));
-	}
-	ImGui::End();
-
 	{
 		vk::CommandBufferBeginInfo beginInfo;
 		beginInfo.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit;
@@ -420,6 +418,71 @@ bool Visualizer::RenderFrame() {
 	}
 
 	RenderImage(frame);
+
+	// Show the image in the ImGui Viewport
+	if (ImGui::Begin("Viewport")) {
+		ImVec2 min = ImGui::GetWindowContentRegionMin();
+		ImVec2 max = ImGui::GetWindowContentRegionMax();
+
+		float xRange = max.x - min.x;
+		float yRange = max.y - min.y;
+
+		// Keep the same aspect ratio
+		float imageScale = std::min(xRange / m_currentPresentationBuffer->Width, yRange / m_currentPresentationBuffer->Height);
+
+		// ImGui::Image((ImTextureID)frame->descriptorSet, ImVec2(m_currentPresentationBuffer->Width * imageScale * m_viewportZoom, m_currentPresentationBuffer->Height * imageScale * m_viewportZoom));
+	}
+	ImGui::End();
+
+	// Fill in the properties panel
+	if (ImGui::Begin("Properties")) {
+		ImGui::Text("Visualizer Stats");
+		{
+			float frameTimeSum = 0.0f;
+			for (size_t i = 0; i < SizeOfArray(m_frameTime); ++i) {
+				frameTimeSum += m_frameTime[i];
+			}
+
+			const float frameTime = frameTimeSum / SizeOfArray(m_frameTime);
+			const float fps = 1000.0f / frameTime;
+
+			ImGui::Text("%.1f ms/frame (%.0f FPS)", frameTime, fps);
+		}
+		ImGui::Separator();
+
+		ImGui::Text("Integrator Stats");
+		{
+			float renderTimeSum = 0.0f;
+			for (size_t i = 0; i < SizeOfArray(m_renderTime); ++i) {
+				renderTimeSum += m_renderTime[i];
+			}
+
+			const float renderTime = renderTimeSum / SizeOfArray(m_renderTime);
+			const float fps = 1000.0f / renderTime;
+
+			ImGui::Text("%.1f ms/frame (%.0f FPS)", renderTime, fps);
+		}
+		ImGui::Separator();
+
+		if (ImGui::Button("Save Image")) {
+			char *buffer = (char *)malloc(m_currentPresentationBuffer->Width * m_currentPresentationBuffer->Height * 3);
+			for (size_t y = 0; y < m_currentPresentationBuffer->Height; ++y) {
+				size_t offset = y * m_currentPresentationBuffer->Width * 3;
+
+				for (size_t x = 0; x < m_currentPresentationBuffer->Width * 3; ++x) {
+					buffer[offset + x] = (char)(m_currentPresentationBuffer->ResolvedData[offset + x] * 255.0f);
+				}
+			}
+
+			stbi_write_png("image.png", m_currentPresentationBuffer->Width, m_currentPresentationBuffer->Height, 3, buffer, m_currentPresentationBuffer->Width * 3);
+			free(buffer);
+		}
+	}
+	ImGui::End();
+
+	if (ImGui::Begin("Console")) {
+	}
+	ImGui::End();
 
 	// End the ImGUI frame and record the commands to the command buffer
 	ImGui::Render();
