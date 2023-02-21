@@ -107,6 +107,13 @@ bool Visualizer::Init(int width, int height) {
 	}
 	m_window = window;
 
+	glfwSetWindowUserPointer(m_window, this);
+	// Preemptively signal swapchain re-creation
+	glfwSetFramebufferSizeCallback(m_window, [](GLFWwindow *window_, int width, int height) {
+		Visualizer *visualizer = reinterpret_cast<Visualizer *>(glfwGetWindowUserPointer(window_));
+		visualizer->m_frameBufferResized = true;
+	});
+
 	if (!glfwVulkanSupported()) {
 		printf("GLFW: Vulkan not supported");
 		return false;
@@ -529,7 +536,8 @@ bool Visualizer::RenderFrame() {
 	info.pImageIndices = &imageIndex;
 
 	result = m_graphicsQueue.presentKHR(&info);
-	if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR) {
+	if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR || m_frameBufferResized) {
+		m_frameBufferResized = false;
 		if (!RecreateSwapChain()) {
 			printf("Vulkan: Failed to re-create swap chain");
 			return false;
@@ -970,6 +978,7 @@ bool Visualizer::InitVulkanWindow() {
 	}
 
 	m_currentFrameIndex = 0;
+	m_frameBufferResized = false;
 
 	// Create texture sampler
 	{
@@ -1397,6 +1406,14 @@ bool Visualizer::CreateFrameBufferAndViews() {
 }
 
 bool Visualizer::RecreateSwapChain() {
+	// Handle minimize or zero size windows
+	int width = 0, height = 0;
+	glfwGetFramebufferSize(m_window, &width, &height);
+	while (width == 0 || height == 0) {
+		glfwGetFramebufferSize(m_window, &width, &height);
+		glfwWaitEvents();
+	}
+
 	auto resultValue = m_device.waitIdle();
 	if (resultValue != vk::Result::eSuccess) {
 		printf("Vulkan: Failed to wait for device idle during swapchain recreation - Error: %s", vk::to_string(resultValue).c_str());

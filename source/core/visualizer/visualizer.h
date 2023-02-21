@@ -82,6 +82,7 @@ private:
 	VulkanBackBufferData *m_vulkanBackBufferData;
 
 	uint32_t m_currentFrameIndex;
+	bool m_frameBufferResized;
 
 	vk::ShaderModule m_vertexShader;
 	vk::ShaderModule m_pixelShader;
