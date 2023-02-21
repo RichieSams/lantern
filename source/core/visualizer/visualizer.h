@@ -64,10 +64,6 @@ private:
 		vk::Semaphore imageAcquired;
 		vk::Semaphore imguiRenderCompleted;
 
-		vk::Image backbuffer;
-		vk::ImageView backbufferView;
-		vk::Framebuffer frameBuffer;
-
 		vk::Image stagingImage;
 		uint64_t stagingImagePitch;
 		vk::ImageView stagingImageView;
@@ -78,7 +74,14 @@ private:
 	};
 	VulkanFrameData *m_vulkanFrameData;
 
-	uint32_t m_frameIndex;
+	struct VulkanBackBufferData {
+		vk::Image backbuffer;
+		vk::ImageView backbufferView;
+		vk::Framebuffer frameBuffer;
+	};
+	VulkanBackBufferData *m_vulkanBackBufferData;
+
+	uint32_t m_currentFrameIndex;
 
 	vk::ShaderModule m_vertexShader;
 	vk::ShaderModule m_pixelShader;
@@ -118,13 +121,15 @@ public:
 private:
 	bool RenderFrame();
 
-	bool RenderImage(VulkanFrameData *frame);
-	bool RenderImGui(VulkanFrameData *frame);
+	bool RenderImage(VulkanFrameData *frame, VulkanBackBufferData *backBuffer);
+	bool RenderImGui(VulkanFrameData *frame, VulkanBackBufferData *backBuffer);
 
 	bool InitVulkan();
-	bool InitVulkanWindow(int width, int height);
-	bool CreateSwapChain(int width, int height);
-	bool CreateFrameStructs(int width, int height);
+	bool InitVulkanWindow();
+	bool CreateSwapChain();
+	bool CreateFrameBufferAndViews();
+	bool RecreateSwapChain();
+	void CleanupSwapChain();
 };
 
 } // End of namespace lantern

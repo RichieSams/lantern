@@ -123,11 +123,7 @@ bool Visualizer::Init(int width, int height) {
 		return false;
 	}
 
-	int actualWidth;
-	int actualHeight;
-	glfwGetFramebufferSize(window, &actualWidth, &actualHeight);
-
-	if (!InitVulkanWindow(actualWidth, actualHeight)) {
+	if (!InitVulkanWindow()) {
 		return false;
 	}
 
@@ -255,8 +251,6 @@ void Visualizer::Shutdown() {
 	for (uint32_t i = 0; i < m_frameBufferCount; ++i) {
 		VulkanFrameData *data = &m_vulkanFrameData[i];
 
-		m_device.destroyFramebuffer(data->frameBuffer, nullptr);
-		m_device.destroyImageView(data->backbufferView, nullptr);
 		m_device.destroyFence(data->submitFinished, nullptr);
 		m_device.destroySemaphore(data->imageAcquired, nullptr);
 		m_device.destroySemaphore(data->imguiRenderCompleted, nullptr);
@@ -270,7 +264,9 @@ void Visualizer::Shutdown() {
 	vmaDestroyAllocator(m_allocator);
 
 	m_device.destroyDescriptorPool(m_descriptorPool, nullptr);
-	m_device.destroySwapchainKHR(m_swapchain, nullptr);
+
+	CleanupSwapChain();
+
 	m_device.destroy(nullptr);
 	m_instance.destroyDebugReportCallbackEXT(m_debugCallback, nullptr);
 	m_instance.destroySurfaceKHR(m_surface, nullptr);
@@ -354,25 +350,35 @@ bool Visualizer::RenderFrame() {
 		++m_renderTimeBin;
 	}
 
-	// Acquire the next Vulkan image to render to
-	// We always use the semaphore of the "last" index, since there's no way to know the current index without supplying a semaphore
-	vk::Semaphore imageAcquiredSemaphore = m_vulkanFrameData[m_frameIndex].imageAcquired;
+	VulkanFrameData *frame = &m_vulkanFrameData[m_currentFrameIndex];
 
-	vk::Result result = m_device.acquireNextImageKHR(m_swapchain, UINT64_MAX, imageAcquiredSemaphore, vk::Fence(nullptr), &m_frameIndex);
-	if (result != vk::Result::eSuccess) {
-		printf("Vulkan: Failed to acquire next image. Error: %s", vk::to_string(result).c_str());
-		return false;
-	}
-
-	VulkanFrameData *frame = &m_vulkanFrameData[m_frameIndex];
-
-	// Wait for the frame data to be free, then clear it
-	result = m_device.waitForFences(1, &frame->submitFinished, VK_TRUE, UINT64_MAX);
+	// Wait for the frame data to be free
+	vk::Result result = m_device.waitForFences(1, &frame->submitFinished, VK_TRUE, UINT64_MAX);
 	if (result != vk::Result::eSuccess) {
 		printf("Vulkan: Failed to wait for fence. Error: %s", vk::to_string(result).c_str());
 		return false;
 	}
 
+	// Acquire the next Vulkan image to render to
+	uint32_t imageIndex;
+	result = m_device.acquireNextImageKHR(m_swapchain, UINT64_MAX, frame->imageAcquired, vk::Fence(nullptr), &imageIndex);
+	if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR) {
+		if (!RecreateSwapChain()) {
+			printf("Vulkan: Failed to re-create swap chain");
+			return false;
+		}
+
+		// Finish the ImGUI frame, so it doesn't get confused
+		ImGui::Render();
+
+		// And just return for the next frame to be called
+		return true;
+	} else if (result != vk::Result::eSuccess) {
+		printf("Vulkan: Failed to acquire next image. Error: %s", vk::to_string(result).c_str());
+		return false;
+	}
+
+	// Reset
 	result = m_device.resetFences(1, &frame->submitFinished);
 	if (result != vk::Result::eSuccess) {
 		printf("Vulkan: Failed to wait for fence. Error: %s", vk::to_string(result).c_str());
@@ -417,7 +423,8 @@ bool Visualizer::RenderFrame() {
 		}
 	}
 
-	RenderImage(frame);
+	VulkanBackBufferData *backBuffer = &m_vulkanBackBufferData[imageIndex];
+	RenderImage(frame, backBuffer);
 
 	// Show the image in the ImGui Viewport
 	if (ImGui::Begin("Viewport")) {
@@ -486,7 +493,7 @@ bool Visualizer::RenderFrame() {
 
 	// End the ImGUI frame and record the commands to the command buffer
 	ImGui::Render();
-	RenderImGui(frame);
+	RenderImGui(frame, backBuffer);
 
 	// End and submit command buffer
 	{
@@ -494,7 +501,7 @@ bool Visualizer::RenderFrame() {
 
 		vk::SubmitInfo info;
 		info.waitSemaphoreCount = 1;
-		info.pWaitSemaphores = &imageAcquiredSemaphore;
+		info.pWaitSemaphores = &frame->imageAcquired;
 		info.pWaitDstStageMask = &waitStage;
 		info.commandBufferCount = 1;
 		info.pCommandBuffers = &frame->commandBuffer;
@@ -516,13 +523,20 @@ bool Visualizer::RenderFrame() {
 
 	vk::PresentInfoKHR info;
 	info.waitSemaphoreCount = 1;
-	info.pWaitSemaphores = &m_vulkanFrameData[m_frameIndex].imguiRenderCompleted;
+	info.pWaitSemaphores = &m_vulkanFrameData[m_currentFrameIndex].imguiRenderCompleted;
 	info.swapchainCount = 1;
 	info.pSwapchains = &m_swapchain;
-	info.pImageIndices = &m_frameIndex;
+	info.pImageIndices = &imageIndex;
 
 	result = m_graphicsQueue.presentKHR(&info);
-	if (result != vk::Result::eSuccess) {
+	if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR) {
+		if (!RecreateSwapChain()) {
+			printf("Vulkan: Failed to re-create swap chain");
+			return false;
+		}
+
+		// Fall through
+	} else if (result != vk::Result::eSuccess) {
 		printf("Vulkan: Failed to present. Error: %s", vk::to_string(result).c_str());
 		return false;
 	}
@@ -533,6 +547,8 @@ bool Visualizer::RenderFrame() {
 	size_t index = m_frameTimeBin & (SizeOfArray(m_frameTime) - 1);
 	m_frameTime[index] = diff;
 	++m_frameTimeBin;
+
+	m_currentFrameIndex = (m_currentFrameIndex + 1) % m_frameBufferCount;
 
 	return true;
 }
@@ -719,7 +735,7 @@ struct PushConstants {
 	float Exposure;
 };
 
-bool Visualizer::InitVulkanWindow(int width, int height) {
+bool Visualizer::InitVulkanWindow() {
 	vk::Result result;
 
 	// Check for WSI support
@@ -763,9 +779,12 @@ bool Visualizer::InitVulkanWindow(int width, int height) {
 	vmaCreateAllocator(&allocatorCreateInfo, &m_allocator);
 
 	// Create swapchain
-	CreateSwapChain(width, height);
+	if (!CreateSwapChain()) {
+		return false;
+	}
 
 	// Create per frame data structures
+	m_vulkanFrameData = new VulkanFrameData[m_frameBufferCount];
 	{
 		for (uint32_t i = 0; i < m_frameBufferCount; i++) {
 			// Create Command pool
@@ -946,56 +965,11 @@ bool Visualizer::InitVulkanWindow(int width, int height) {
 		}
 	}
 
-	// Create the backbuffer Views
-	{
-		vk::ImageViewCreateInfo info;
-		info.viewType = vk::ImageViewType::e2D;
-		info.format = m_surfaceFormat.format;
-		info.components.r = vk::ComponentSwizzle::eR;
-		info.components.g = vk::ComponentSwizzle::eG;
-		info.components.b = vk::ComponentSwizzle::eB;
-		info.components.a = vk::ComponentSwizzle::eA;
-
-		vk::ImageSubresourceRange imageRange;
-		imageRange.aspectMask = vk::ImageAspectFlagBits::eColor;
-		imageRange.baseMipLevel = 0;
-		imageRange.levelCount = 1;
-		imageRange.baseArrayLayer = 0;
-		imageRange.layerCount = 1;
-
-		info.subresourceRange = imageRange;
-
-		for (uint32_t i = 0; i < m_frameBufferCount; ++i) {
-			info.image = m_vulkanFrameData[i].backbuffer;
-			result = m_device.createImageView(&info, nullptr, &m_vulkanFrameData[i].backbufferView);
-			if (result != vk::Result::eSuccess) {
-				printf("Vulkan: Failed to create backbuffer image view. Error: %s", vk::to_string(result).c_str());
-				return false;
-			}
-		}
+	if (!CreateFrameBufferAndViews()) {
+		return false;
 	}
 
-	// Create framebuffers
-	{
-		vk::FramebufferCreateInfo info;
-		info.renderPass = m_mainRenderPass;
-		info.attachmentCount = 1;
-		// info.pAttachements is set in the for loop below
-		info.width = width;
-		info.height = height;
-		info.layers = 1;
-
-		for (uint32_t i = 0; i < m_frameBufferCount; i++) {
-			info.pAttachments = &m_vulkanFrameData[i].backbufferView;
-			result = m_device.createFramebuffer(&info, nullptr, &m_vulkanFrameData[i].frameBuffer);
-			if (result != vk::Result::eSuccess) {
-				printf("Vulkan: Failed to create framebuffer. Error: %s", vk::to_string(result).c_str());
-				return false;
-			}
-		}
-	}
-
-	m_frameIndex = 0;
+	m_currentFrameIndex = 0;
 
 	// Create texture sampler
 	{
@@ -1306,9 +1280,7 @@ static int GetMinImageCount(vk::PresentModeKHR mode) {
 	return 1;
 }
 
-bool Visualizer::CreateSwapChain(int width, int height) {
-	vk::SwapchainKHR oldSwapchain = m_swapchain;
-
+bool Visualizer::CreateSwapChain() {
 	vk::SwapchainCreateInfoKHR info;
 	info.surface = m_surface;
 	info.minImageCount = GetMinImageCount(m_presentMode);
@@ -1321,7 +1293,7 @@ bool Visualizer::CreateSwapChain(int width, int height) {
 	info.compositeAlpha = vk::CompositeAlphaFlagBitsKHR::eOpaque;
 	info.presentMode = m_presentMode;
 	info.clipped = VK_TRUE;
-	info.oldSwapchain = m_swapchain;
+	info.oldSwapchain = nullptr;
 
 	vk::SurfaceCapabilitiesKHR capabilities;
 	vk::Result result = m_physicalDevice.getSurfaceCapabilitiesKHR(m_surface, &capabilities);
@@ -1330,18 +1302,17 @@ bool Visualizer::CreateSwapChain(int width, int height) {
 		return false;
 	}
 
-	if (info.minImageCount < capabilities.minImageCount) {
-		info.minImageCount = capabilities.minImageCount;
-	} else if (capabilities.maxImageCount != 0 && info.minImageCount > capabilities.maxImageCount) {
-		info.minImageCount = capabilities.maxImageCount;
-	}
-
-	if (capabilities.currentExtent.width == 0xffffffff) {
-		info.imageExtent.width = width;
-		info.imageExtent.height = height;
+	if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
+		info.imageExtent = capabilities.currentExtent;
 	} else {
-		info.imageExtent.width = capabilities.currentExtent.width;
-		info.imageExtent.height = capabilities.currentExtent.height;
+		int width, height;
+		glfwGetFramebufferSize(m_window, &width, &height);
+
+		VkExtent2D actualExtent = {static_cast<uint32_t>(width), static_cast<uint32_t>(height)};
+		actualExtent.width = std::clamp(actualExtent.width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width);
+		actualExtent.height = std::clamp(actualExtent.height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
+
+		info.imageExtent = actualExtent;
 	}
 
 	m_swapchainExtent = info.imageExtent;
@@ -1358,7 +1329,11 @@ bool Visualizer::CreateSwapChain(int width, int height) {
 		return false;
 	}
 
-	m_vulkanFrameData = new VulkanFrameData[m_frameBufferCount];
+	return true;
+}
+
+bool Visualizer::CreateFrameBufferAndViews() {
+	m_vulkanBackBufferData = new VulkanBackBufferData[m_frameBufferCount];
 
 	auto resultValue = m_device.getSwapchainImagesKHR(m_swapchain);
 	if (resultValue.result != vk::Result::eSuccess) {
@@ -1366,23 +1341,92 @@ bool Visualizer::CreateSwapChain(int width, int height) {
 		return false;
 	}
 	for (uint32_t i = 0; i < m_frameBufferCount; ++i) {
-		m_vulkanFrameData[i].backbuffer = resultValue.value[i];
+		m_vulkanBackBufferData[i].backbuffer = resultValue.value[i];
 	}
 
-	if (oldSwapchain) {
-		m_device.destroySwapchainKHR(oldSwapchain, nullptr);
+	// Create the backbuffer Views
+	{
+		vk::ImageViewCreateInfo info;
+		info.viewType = vk::ImageViewType::e2D;
+		info.format = m_surfaceFormat.format;
+		info.components.r = vk::ComponentSwizzle::eR;
+		info.components.g = vk::ComponentSwizzle::eG;
+		info.components.b = vk::ComponentSwizzle::eB;
+		info.components.a = vk::ComponentSwizzle::eA;
+
+		vk::ImageSubresourceRange imageRange;
+		imageRange.aspectMask = vk::ImageAspectFlagBits::eColor;
+		imageRange.baseMipLevel = 0;
+		imageRange.levelCount = 1;
+		imageRange.baseArrayLayer = 0;
+		imageRange.layerCount = 1;
+
+		info.subresourceRange = imageRange;
+
+		for (uint32_t i = 0; i < m_frameBufferCount; ++i) {
+			info.image = m_vulkanBackBufferData[i].backbuffer;
+			vk::Result result = m_device.createImageView(&info, nullptr, &m_vulkanBackBufferData[i].backbufferView);
+			if (result != vk::Result::eSuccess) {
+				printf("Vulkan: Failed to create backbuffer image view. Error: %s", vk::to_string(result).c_str());
+				return false;
+			}
+		}
+	}
+
+	// Create framebuffers
+	{
+		vk::FramebufferCreateInfo info;
+		info.renderPass = m_mainRenderPass;
+		info.attachmentCount = 1;
+		// info.pAttachements is set in the for loop below
+		info.width = m_swapchainExtent.width;
+		info.height = m_swapchainExtent.height;
+		info.layers = 1;
+
+		for (uint32_t i = 0; i < m_frameBufferCount; i++) {
+			info.pAttachments = &m_vulkanBackBufferData[i].backbufferView;
+			vk::Result result = m_device.createFramebuffer(&info, nullptr, &m_vulkanBackBufferData[i].frameBuffer);
+			if (result != vk::Result::eSuccess) {
+				printf("Vulkan: Failed to create framebuffer. Error: %s", vk::to_string(result).c_str());
+				return false;
+			}
+		}
 	}
 
 	return true;
 }
 
-bool Visualizer::RenderImage(VulkanFrameData *frame) {
+bool Visualizer::RecreateSwapChain() {
+	auto resultValue = m_device.waitIdle();
+	if (resultValue != vk::Result::eSuccess) {
+		printf("Vulkan: Failed to wait for device idle during swapchain recreation - Error: %s", vk::to_string(resultValue).c_str());
+		return false;
+	}
+
+	CleanupSwapChain();
+
+	if (!CreateSwapChain()) {
+		return false;
+	}
+	return CreateFrameBufferAndViews();
+}
+
+void Visualizer::CleanupSwapChain() {
+	for (uint32_t i = 0; i < m_frameBufferCount; i++) {
+		m_device.destroyFramebuffer(m_vulkanBackBufferData[i].frameBuffer);
+		m_device.destroyImageView(m_vulkanBackBufferData[i].backbufferView);
+	}
+
+	m_device.destroySwapchainKHR(m_swapchain);
+}
+
+bool Visualizer::RenderImage(VulkanFrameData *frame, VulkanBackBufferData *backBuffer) {
 	{
 		vk::ClearValue clearValue(vk::ClearColorValue{std::array<float, 4>({0.846f, 0.933f, 0.949f, 1.0f})});
 
 		vk::RenderPassBeginInfo beginInfo;
 		beginInfo.renderPass = m_mainRenderPass;
-		beginInfo.framebuffer = frame->frameBuffer;
+		beginInfo.framebuffer = backBuffer->frameBuffer;
 		beginInfo.renderArea.extent = m_swapchainExtent;
 		beginInfo.clearValueCount = 1;
 		beginInfo.pClearValues = &clearValue;
@@ -1395,11 +1439,11 @@ bool Visualizer::RenderImage(VulkanFrameData *frame) {
 	return true;
 }
 
-bool Visualizer::RenderImGui(VulkanFrameData *frame) {
+bool Visualizer::RenderImGui(VulkanFrameData *frame, VulkanBackBufferData *backBuffer) {
 	{
 		vk::RenderPassBeginInfo beginInfo;
 		beginInfo.renderPass = m_imguiRenderPass;
-		beginInfo.framebuffer = frame->frameBuffer;
+		beginInfo.framebuffer = backBuffer->frameBuffer;
 		beginInfo.renderArea.extent = m_swapchainExtent;
 		beginInfo.clearValueCount = 0;
 		beginInfo.pClearValues = nullptr;
