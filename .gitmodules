@@ -3,7 +3,7 @@
 	url = git@github.com:glfw/glfw.git
 [submodule "third_party/imgui"]
 	path = third_party/imgui
-	url = git@github.com:ocornut/imgui.git
+	url = git@github.com:RichieSams/imgui.git
 [submodule "third_party/imgui_tex_inspect"]
 	path = third_party/imgui_tex_inspect
 	url = git@github.com:andyborrell/imgui_tex_inspect.git
