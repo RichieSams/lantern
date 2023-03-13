@@ -56,7 +56,7 @@ generate: build_shaders
 	cmake --preset $(CMAKE_PRESET) ./
 
 build: generate
-	cmake --build $(CMAKE_PRESET)
+	cmake --build --preset $(CMAKE_PRESET) -j
 
 run_debug:
 	cd build/Debug/source/lantern/ && .$(PATH_SEP)lantern
