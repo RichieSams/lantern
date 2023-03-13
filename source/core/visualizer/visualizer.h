@@ -77,7 +77,8 @@ private:
 	struct VulkanBackBufferData {
 		vk::Image backbuffer;
 		vk::ImageView backbufferView;
-		vk::Framebuffer frameBuffer;
+		vk::Framebuffer mainFrameBuffer;
+		vk::Framebuffer imguiFrameBuffer;
 	};
 	VulkanBackBufferData *m_vulkanBackBufferData;
 

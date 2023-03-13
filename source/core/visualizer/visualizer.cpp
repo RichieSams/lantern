@@ -1324,6 +1324,11 @@ bool Visualizer::CreateSwapChain() {
 		info.imageExtent = actualExtent;
 	}
 
+	info.minImageCount = std::max(capabilities.minImageCount, info.minImageCount);
+	if (capabilities.maxImageCount > 0 && info.minImageCount > capabilities.maxImageCount) {
+		info.minImageCount = capabilities.maxImageCount;
+	}
+
 	m_swapchainExtent = info.imageExtent;
 
 	result = m_device.createSwapchainKHR(&info, nullptr, &m_swapchain);
@@ -1382,7 +1387,7 @@ bool Visualizer::CreateFrameBufferAndViews() {
 		}
 	}
 
-	// Create framebuffers
+	// Create main renderpass framebuffers
 	{
 		vk::FramebufferCreateInfo info;
 		info.renderPass = m_mainRenderPass;
@@ -1394,7 +1399,26 @@ bool Visualizer::CreateFrameBufferAndViews() {
 
 		for (uint32_t i = 0; i < m_frameBufferCount; i++) {
 			info.pAttachments = &m_vulkanBackBufferData[i].backbufferView;
-			vk::Result result = m_device.createFramebuffer(&info, nullptr, &m_vulkanBackBufferData[i].frameBuffer);
+			vk::Result result = m_device.createFramebuffer(&info, nullptr, &m_vulkanBackBufferData[i].mainFrameBuffer);
+			if (result != vk::Result::eSuccess) {
+				printf("Vulkan: Failed to create framebuffer. Error: %s", vk::to_string(result).c_str());
+				return false;
+			}
+		}
+	}
+	// Create imgui renderpass framebuffers
+	{
+		vk::FramebufferCreateInfo info;
+		info.renderPass = m_imguiRenderPass;
+		info.attachmentCount = 1;
+		// info.pAttachements is set in the for loop below
+		info.width = m_swapchainExtent.width;
+		info.height = m_swapchainExtent.height;
+		info.layers = 1;
+
+		for (uint32_t i = 0; i < m_frameBufferCount; i++) {
+			info.pAttachments = &m_vulkanBackBufferData[i].backbufferView;
+			vk::Result result = m_device.createFramebuffer(&info, nullptr, &m_vulkanBackBufferData[i].imguiFrameBuffer);
 			if (result != vk::Result::eSuccess) {
 				printf("Vulkan: Failed to create framebuffer. Error: %s", vk::to_string(result).c_str());
 				return false;
@@ -1430,7 +1454,8 @@ bool Visualizer::RecreateSwapChain() {
 
 void Visualizer::CleanupSwapChain() {
 	for (uint32_t i = 0; i < m_frameBufferCount; i++) {
-		m_device.destroyFramebuffer(m_vulkanBackBufferData[i].frameBuffer);
+		m_device.destroyFramebuffer(m_vulkanBackBufferData[i].imguiFrameBuffer);
+		m_device.destroyFramebuffer(m_vulkanBackBufferData[i].mainFrameBuffer);
 		m_device.destroyImageView(m_vulkanBackBufferData[i].backbufferView);
 	}
 
@@ -1443,7 +1468,7 @@ bool Visualizer::RenderImage(VulkanFrameData *frame, VulkanBackBufferData *backB
 
 		vk::RenderPassBeginInfo beginInfo;
 		beginInfo.renderPass = m_mainRenderPass;
-		beginInfo.framebuffer = backBuffer->frameBuffer;
+		beginInfo.framebuffer = backBuffer->mainFrameBuffer;
 		beginInfo.renderArea.extent = m_swapchainExtent;
 		beginInfo.clearValueCount = 1;
 		beginInfo.pClearValues = &clearValue;
@@ -1460,7 +1485,7 @@ bool Visualizer::RenderImGui(VulkanFrameData *frame, VulkanBackBufferData *backB
 	{
 		vk::RenderPassBeginInfo beginInfo;
 		beginInfo.renderPass = m_imguiRenderPass;
-		beginInfo.framebuffer = backBuffer->frameBuffer;
+		beginInfo.framebuffer = backBuffer->imguiFrameBuffer;
 		beginInfo.renderArea.extent = m_swapchainExtent;
 		beginInfo.clearValueCount = 0;
 		beginInfo.pClearValues = nullptr;
