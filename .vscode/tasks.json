@@ -6,12 +6,12 @@
         {
             "label": "build-debug",
             "type": "shell",
-            "command": "make build_debug"
+            "command": "make CMAKE_PRESET=Linux_x64_Debug build"
         },
         {
             "label": "build-release",
             "type": "shell",
-            "command": "make build_release"
+            "command": "make CMAKE_PRESET=Linux_x64_Release build"
         }
     ]
 }
