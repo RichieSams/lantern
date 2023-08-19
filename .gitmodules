@@ -7,3 +7,6 @@
 [submodule "third_party/imgui_tex_inspect"]
 	path = third_party/imgui_tex_inspect
 	url = git@github.com:andyborrell/imgui_tex_inspect.git
+[submodule "third_party/gl3w"]
+	path = third_party/gl3w
+	url = git@github.com:RichieSams/gl3w.git
