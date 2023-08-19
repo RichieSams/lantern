@@ -1,53 +1,6 @@
 TODO List
 ====================
 
-- ~~**Re-add support for specular materials - Medium**~~ - Added in [20f4b81](https://github.com/RichieSams/lantern/commit/20f4b81b26f4b158c43da0a1e277cc7e40caf66b)
-- **Create a OpenGL renderer view - Easy/Medium**
-	- Start with just being able to switch between path tracing and OpenGL
-	- Need to decide whether to use "modern" OpenGL, or fixed pipeline
-		- Leaning towards modern, since custom shaders might be useful in the future
-		- In addition, I am more familiar with the modern model, since it is more similar to DX11
-- **Be able to debug parts of the render - Hard**
-	- I'm envisioning something like RenderDoc
-	- So you press a button to "Record the next frame". 
-	- Then it records all the rays that are shot, etc.
-		- This will be diffucult to cleanly implement
-			- We will need to come up with a way to serialize different types of 'events'
-				- Perhaps some kind of polymorphism
-				- With base member values, like pixel pos, and path number, to help sort/bin the events
-		- Since it will somehow require instrumenting a lot of the code base, and passing around a 'logger' object, (per thread)
-		- If possible, I would prefer if the instrumentation could be compiled out with pre-processor type logic
-			- So in full release builds, the logging code doesn't exist
-		- Initial ideas:
-			- Pass the logger in as a dependency for functions
-			- Surround logger code with a macro or #ifdef guards
-			- If logging is disabled, the logger dependency might be removed in dead code elimination
-				- It wouldn't be the end of the world if it didn't, since the logger param will just be a pointer
-	- After the record, it switches to OpenGL view, where you can view the results
-		- The interface for this is going to be one of the hardest parts
-		- I would like it to be something like RenderDoc, where you can 'pick' a pixel, and see all the paths drawn
-		- It would be very nice to be able to visualize the sampling. 
-			- For example, to draw the disc and ray chosen for general area light shapes
-- **Implement other BRDFs - Medium**
-- ~~**Implement normal/UV interpolation - Easy**~~ - Added in [6735168](https://github.com/RichieSams/lantern/commit/673516887c3ca1ae4f2e22ac48415cb68f62365f), [2c92ec3](https://github.com/RichieSams/lantern/commit/2c92ec3fc15b59980dfbf510d4b3dc1cde922a6d), [25a16f2](https://github.com/RichieSams/lantern/commit/25a16f2bf398ed80bfce7bf7b1affd47157ebc91)
-- ~~**Implement JSON scene loading - Medium**~~ Added in [b021497](https://github.com/RichieSams/lantern/commit/b021497cd2033e1bfc8e104555f76038a12e6a5f), [1f03f32](https://github.com/RichieSams/lantern/commit/1f03f32332692ea46f8f5ddfd38b5a4418ba4b55), [c762815](https://github.com/RichieSams/lantern/commit/c762815fefbec78ced5e3f1edefc214e6297adf9)
-- **Implement using textures for material properties - Medium**
-	- First, implement UV interpolation
-	- Then using that to get real triangle UVs, implement the others
-	- https://github.com/syoyo/tinyexr and/or https://github.com/nothings/stb/blob/master/stb_image.h could be really nice drop-ins for the actual reading of the texture data
-- **Create a nice test render scene - Medium/Hard**
-	- Start purusing some free 3D model sites
-	- And free PBR texture sites
-		- https://forums.unrealengine.com/showthread.php?90245-Free-PBR-Texture-Vol-01
-		- http://opengameart.org/content/yughues-free-pbr-metal-plates
-		- http://freepbr.com/
-	- I have access to Quixel Suite, but I won't be able to re-distribute them
-	- But, on that note, I probably won't share the scenes in git, since they will be quite large
-		- Perhaps, for the scenes that *are* redistributable, I can upload them to my site
-- **Implement transmissive materials - Medium**
-	- ~~Implement ideal specular refraction and transmission~~ - Added in [4feb070](https://github.com/RichieSams/lantern/commit/4feb07069a95c1175402552432e4e81f36489521)
-	- ~~Implement isotropic scattering media~~ - Added in [eff77d8](https://github.com/RichieSams/lantern/commit/eff77d848a511656ba0196a60332b6685688c788)
-	- Implement non-isotripic scattering media (Henyey-Greenstein, Raleigh, etc.)
-- **Have a framebuffer / visualization that shows how many bounces each pixel is averaging**
-	- Heatmap??
-- **Update camera to full cartesian**
+* NanoGUI ?
+	* https://github.com/wjakob/nanogui/tree/master
+* http://www.songho.ca/opengl/gl_pbo.html#unpack
