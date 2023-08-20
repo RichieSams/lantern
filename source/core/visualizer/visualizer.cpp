@@ -14,12 +14,14 @@
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
+#include "imgui_internal.h"
+
+#include "imgui_tex_inspect.h"
+#include "tex_inspect_opengl.h"
 
 #include "GLFW/glfw3.h"
 
 #include "stb_image_write.h"
-
-#include "imgui_internal.h"
 
 #include <algorithm>
 #include <array>
@@ -100,6 +102,9 @@ bool Visualizer::Init(int width, int height) {
 	glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GL_TRUE);
 #endif
 
+	// Suggest we start maximized
+	glfwWindowHint(GLFW_MAXIMIZED, 1);
+
 	GLFWwindow *window = glfwCreateWindow(width, height, "Lantern", nullptr, nullptr);
 	if (window == nullptr) {
 		printf("Failed to create GLFW windows");
@@ -130,6 +135,11 @@ bool Visualizer::Init(int width, int height) {
 	// Setup Platform/Renderer backends
 	ImGui_ImplGlfw_InitForOpenGL(window, true);
 	ImGui_ImplOpenGL3_Init(glslVersion);
+	ImGuiTexInspect::ImplOpenGL3_Init(glslVersion);
+
+	// Initialize the TexInspect plugin
+	ImGuiTexInspect::Init();
+	ImGuiTexInspect::CreateContext();
 
 	// Setup style
 	ImGui::StyleColorsDark();
@@ -166,6 +176,13 @@ bool Visualizer::Init(int width, int height) {
 }
 
 void Visualizer::Shutdown() {
+	glDeleteBuffers(2, m_renderPBOs);
+	glDeleteTextures(1, &m_renderTexture);
+
+	ImGuiTexInspect::DestroyContext(nullptr);
+	ImGuiTexInspect::Shutdown();
+
+	ImGuiTexInspect::ImplOpenGl3_Shutdown();
 	ImGui_ImplOpenGL3_Shutdown();
 	ImGui_ImplGlfw_Shutdown();
 	ImGui::DestroyContext();
@@ -287,7 +304,15 @@ bool Visualizer::RenderFrame() {
 
 	// Show the image in the ImGui Viewport
 	if (ImGui::Begin("Viewport")) {
-		ImGui::Image((ImTextureID)(uintptr_t)m_renderTexture, ImVec2(m_currentPresentationBuffer->Width, m_currentPresentationBuffer->Height));
+		ImVec2 maxSize = ImGui::GetContentRegionAvail();
+
+		ImGuiTexInspect::BeginInspectorPanel(
+		    "ViewportTextureInspector",
+		    (ImTextureID)(uintptr_t)m_renderTexture,
+		    ImVec2(m_currentPresentationBuffer->Width, m_currentPresentationBuffer->Height),
+		    0,
+		    ImGuiTexInspect::SizeIncludingBorder(maxSize));
+		ImGuiTexInspect::EndInspectorPanel();
 	}
 	ImGui::End();
 

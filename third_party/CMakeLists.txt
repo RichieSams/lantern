@@ -10,4 +10,6 @@ add_subdirectory(glfw)
 
 add_subdirectory(imgui)
 
+add_subdirectory(imgui_tex_inspect)
+
 add_subdirectory(stb)

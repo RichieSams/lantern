@@ -49,7 +49,7 @@ set(LANTERN_CORE_SRC
 
 # Create lib
 add_library(lantern_core STATIC ${LANTERN_CORE_SRC})
-target_link_libraries(lantern_core gl3w glfw ${GLFW_LIBRARIES} imgui stb)
+target_link_libraries(lantern_core gl3w glfw ${GLFW_LIBRARIES} imgui imgui_tex_inspect stb)
 target_include_directories(lantern_core PRIVATE ${GLFW_INCLUDE_DIRS})
 target_include_directories(lantern_core PUBLIC ./)
 
