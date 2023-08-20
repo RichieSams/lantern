@@ -8,6 +8,7 @@
 
 #include "math/types.h"
 
+#include <stddef.h>
 #include <stdint.h>
 
 namespace lantern {
@@ -15,7 +16,8 @@ namespace lantern {
 struct PresentationBuffer {
 	PresentationBuffer(uint32_t width, uint32_t height)
 	        : Width(width), Height(height),
-	          ResolvedData(new float[width * height * 3]) {
+	          ResolvedData(new float[width * height * 3]),
+	          DataSize(width * height * 3) {
 	}
 	~PresentationBuffer() {
 		delete[] ResolvedData;
@@ -25,6 +27,7 @@ struct PresentationBuffer {
 	const uint32_t Height;
 
 	float *ResolvedData;
+	const size_t DataSize;
 };
 
 } // namespace lantern

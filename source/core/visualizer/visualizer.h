@@ -42,6 +42,11 @@ private:
 	// Viewport variables
 	float m_viewportZoom;
 
+	// Render texture variables
+	unsigned int m_renderTexture;
+	unsigned int m_renderPBOs[2];
+	uint32_t m_currentFrameIndex;
+
 public:
 	bool Init(int width, int height);
 	void Run();

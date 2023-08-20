@@ -28,6 +28,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#define OPENGL_DEBUG_PRINT 0
+
 namespace lantern {
 
 template <typename T, std::size_t N>
@@ -53,6 +55,12 @@ Visualizer::~Visualizer() {
 static void ErrorCallback(int error, const char *description) {
 	printf("Error %d: %s\n", error, description);
 }
+
+#if OPENGL_DEBUG_PRINT
+static void MessageCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar *message, const void *userParam) {
+	printf("Error %s\n", message);
+}
+#endif
 
 void Visualizer::Run() {
 	while (!glfwWindowShouldClose(m_window)) {
@@ -88,6 +96,10 @@ bool Visualizer::Init(int width, int height) {
 	// glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);            // 3.0+ only
 #endif
 
+#if OPENGL_DEBUG_PRINT
+	glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GL_TRUE);
+#endif
+
 	GLFWwindow *window = glfwCreateWindow(width, height, "Lantern", nullptr, nullptr);
 	if (window == nullptr) {
 		printf("Failed to create GLFW windows");
@@ -98,6 +110,10 @@ bool Visualizer::Init(int width, int height) {
 	glfwMakeContextCurrent(window);
 
 	gl3wInit();
+
+#if OPENGL_DEBUG_PRINT
+	glDebugMessageCallback(MessageCallback, 0);
+#endif
 
 	// Enable vsync
 	glfwSwapInterval(1);
@@ -128,6 +144,23 @@ bool Visualizer::Init(int width, int height) {
 
 	// Set up the viewport variables
 	m_viewportZoom = 1.0f;
+
+	// Create render texture / copying buffers
+	glGenTextures(1, &m_renderTexture);
+	glBindTexture(GL_TEXTURE_2D, m_renderTexture);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, m_currentPresentationBuffer->Width, m_currentPresentationBuffer->Height, 0, GL_RGB, GL_FLOAT, nullptr);
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+	glGenBuffers(2, m_renderPBOs);
+	glBindBuffer(GL_PIXEL_UNPACK_BUFFER, m_renderPBOs[0]);
+	glBufferData(GL_PIXEL_UNPACK_BUFFER, m_currentPresentationBuffer->DataSize * sizeof(float), 0, GL_STREAM_DRAW);
+	glBindBuffer(GL_PIXEL_UNPACK_BUFFER, m_renderPBOs[1]);
+	glBufferData(GL_PIXEL_UNPACK_BUFFER, m_currentPresentationBuffer->DataSize * sizeof(float), 0, GL_STREAM_DRAW);
+	glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 
 	return true;
 }
@@ -215,55 +248,48 @@ bool Visualizer::RenderFrame() {
 		++m_renderTimeBin;
 	}
 
-	// // Copy presentation buffer data to the GPU
-	// {
-	// 	uint8_t *mappedData = (uint8_t *)frame->stagingBufferAllocInfo.pMappedData;
-	// 	for (uint32_t y = 0; y < m_currentPresentationBuffer->Height; ++y) {
-	// 		const size_t presentationOffset = y * m_currentPresentationBuffer->Width * 3;
-	// 		const size_t stagingOffset = y * frame->stagingImagePitch;
+	// Copy presentation buffer data to the GPU
+	{
+		m_currentFrameIndex = (m_currentFrameIndex + 1) % 2;
+		unsigned int nextFrameIndex = (m_currentFrameIndex + 1) % 2;
 
-	// 		memcpy(mappedData + stagingOffset, m_currentPresentationBuffer->ResolvedData + presentationOffset, m_currentPresentationBuffer->Width * sizeof(float) * 3);
-	// 	}
+		// bind the texture and PBO
+		glBindTexture(GL_TEXTURE_2D, m_renderTexture);
+		glBindBuffer(GL_PIXEL_UNPACK_BUFFER, m_renderPBOs[m_currentFrameIndex]);
 
-	// 	// Flush to GPU
-	// 	vk::MappedMemoryRange flushRange;
-	// 	flushRange.memory = (vk::DeviceMemory)frame->stagingBufferAllocInfo.deviceMemory;
-	// 	flushRange.offset = 0;
-	// 	flushRange.size = vk::DeviceSize(VK_WHOLE_SIZE);
+		// copy pixels from PBO to texture object
+		// Use offset instead of pointer.
+		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, m_currentPresentationBuffer->Width, m_currentPresentationBuffer->Height, GL_RGB, GL_FLOAT, nullptr);
 
-	// 	if (m_device.flushMappedMemoryRanges(flushRange) != vk::Result::eSuccess) {
-	// 		printf("Vulkan: Failed to flush staging buffer");
-	// 		return false;
-	// 	}
-	// }
+		// bind PBO to update texture source
+		glBindBuffer(GL_PIXEL_UNPACK_BUFFER, m_renderPBOs[nextFrameIndex]);
 
-	// {
-	// 	vk::CommandBufferBeginInfo beginInfo;
-	// 	beginInfo.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit;
+		// Note that glMapBuffer() causes sync issue.
+		// If GPU is working with this buffer, glMapBuffer() will wait(stall)
+		// until GPU to finish its job. To avoid waiting (idle), you can call
+		// first glBufferData() with NULL pointer before glMapBuffer().
+		// If you do that, the previous data in PBO will be discarded and
+		// glMapBuffer() returns a new allocated pointer immediately
+		// even if GPU is still working with the previous data.
+		glBufferData(GL_PIXEL_UNPACK_BUFFER, m_currentPresentationBuffer->DataSize * sizeof(float), 0, GL_STREAM_DRAW);
 
-	// 	result = frame->commandBuffer.begin(&beginInfo);
-	// 	if (result != vk::Result::eSuccess) {
-	// 		printf("Vulkan: Failed to begin command buffer. Error: %s", vk::to_string(result).c_str());
-	// 		return false;
-	// 	}
-	// }
+		// map the buffer object into client's memory
+		GLubyte *ptr = (GLubyte *)glMapBuffer(GL_PIXEL_UNPACK_BUFFER, GL_WRITE_ONLY);
+		if (ptr) {
+			memcpy(ptr, m_currentPresentationBuffer->ResolvedData, m_currentPresentationBuffer->DataSize * sizeof(float));
+			glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER); // release the mapped buffer
+		}
 
-	// RenderImage(frame, backBuffer);
+		// it is good idea to release PBOs with ID 0 after use.
+		// Once bound with 0, all pixel operations are back to normal ways.
+		glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+	}
 
-	// // Show the image in the ImGui Viewport
-	// if (ImGui::Begin("Viewport")) {
-	// 	ImVec2 min = ImGui::GetWindowContentRegionMin();
-	// 	ImVec2 max = ImGui::GetWindowContentRegionMax();
-
-	// 	float xRange = max.x - min.x;
-	// 	float yRange = max.y - min.y;
-
-	// 	// Keep the same aspect ratio
-	// 	float imageScale = std::min(xRange / m_currentPresentationBuffer->Width, yRange / m_currentPresentationBuffer->Height);
-
-	// 	ImGui::Image((ImTextureID)frame->descriptorSet, ImVec2(m_currentPresentationBuffer->Width * imageScale * m_viewportZoom, m_currentPresentationBuffer->Height * imageScale * m_viewportZoom));
-	// }
-	// ImGui::End();
+	// Show the image in the ImGui Viewport
+	if (ImGui::Begin("Viewport")) {
+		ImGui::Image((ImTextureID)(uintptr_t)m_renderTexture, ImVec2(m_currentPresentationBuffer->Width, m_currentPresentationBuffer->Height));
+	}
+	ImGui::End();
 
 	// Fill in the properties panel
 	if (ImGui::Begin("Properties")) {
@@ -296,7 +322,7 @@ bool Visualizer::RenderFrame() {
 		ImGui::Separator();
 
 		if (ImGui::Button("Save Image")) {
-			char *buffer = (char *)malloc(m_currentPresentationBuffer->Width * m_currentPresentationBuffer->Height * 3);
+			char *buffer = (char *)malloc(m_currentPresentationBuffer->DataSize * 3 * sizeof(float));
 			for (size_t y = 0; y < m_currentPresentationBuffer->Height; ++y) {
 				size_t offset = y * m_currentPresentationBuffer->Width * 3;
 
@@ -336,24 +362,5 @@ bool Visualizer::RenderFrame() {
 
 	return true;
 }
-
-// bool Visualizer::RenderImage(VulkanFrameData *frame, VulkanBackBufferData *backBuffer) {
-// 	{
-// 		vk::ClearValue clearValue(vk::ClearColorValue{std::array<float, 4>({0.846f, 0.933f, 0.949f, 1.0f})});
-
-// 		vk::RenderPassBeginInfo beginInfo;
-// 		beginInfo.renderPass = m_mainRenderPass;
-// 		beginInfo.framebuffer = backBuffer->mainFrameBuffer;
-// 		beginInfo.renderArea.extent = m_swapchainExtent;
-// 		beginInfo.clearValueCount = 1;
-// 		beginInfo.pClearValues = &clearValue;
-
-// 		frame->commandBuffer.beginRenderPass(&beginInfo, vk::SubpassContents::eInline);
-// 	}
-
-// 	frame->commandBuffer.endRenderPass();
-
-// 	return true;
-// }
 
 } // End of namespace lantern
