@@ -25,8 +25,10 @@ RenderHost::~RenderHost() {
 }
 
 void RenderHost::Run(std::atomic<bool> *quit) {
+	unsigned int frameNumber = 0;
+
 	while (!quit->load(std::memory_order_relaxed)) {
-		RenderOneFrame(m_scene, &m_accumulationBuffer);
+		RenderOneFrame(m_scene, &m_accumulationBuffer, frameNumber++);
 
 		// Now resolve the new data
 		for (uint32_t y = 0; y < m_accumulationBuffer.Height; ++y) {

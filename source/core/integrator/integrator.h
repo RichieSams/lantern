@@ -10,5 +10,5 @@ struct Scene;
 struct FrameData;
 
 extern "C" {
-void RenderOneFrame(Scene *scene, FrameData *frameData);
+void RenderOneFrame(Scene *scene, FrameData *frameData, unsigned int frameNumber);
 } // extern C

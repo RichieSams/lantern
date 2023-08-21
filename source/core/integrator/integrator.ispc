@@ -17,13 +17,39 @@
 #include "scene/scene.h"
 #include "scene/scene.isph"
 
-export void RenderOneFrame(uniform Scene *uniform scene, uniform FrameData *uniform frameData) {
+varying uint WangHash(varying uint a) {
+    a = (a ^ 61) ^ (a >> 16);
+    a = a + (a << 3);
+    a = a ^ (a >> 4);
+    a = a * 0x27d4eb2d;
+    a = a ^ (a >> 15);
+    return a;
+}
+
+uniform uint WangHashUniform(uniform uint a) {
+    a = (a ^ 61) ^ (a >> 16);
+    a = a + (a << 3);
+    a = a ^ (a >> 4);
+    a = a * 0x27d4eb2d;
+    a = a ^ (a >> 15);
+    return a;
+}
+
+export void RenderOneFrame(uniform Scene *uniform scene, uniform FrameData *uniform frameData, uniform uint frameNumber) {
 	uniform int width = frameData->Width;
-	uniform int height = frameData->Height;
+	uniform int height = frameData->Height;	
+
+	uniform uint frameNumHash = WangHashUniform(frameNumber);
 
 	// "Render" a frame
 	foreach (y = 0 ... height, x = 0 ... width) {
-		Ray ray = GenerateCameraRay(scene->Camera, x, y);
+		RNGState rngState;
+
+		uint pixelNumber = y * width + x;
+		uint seed = WangHash(WangHash(pixelNumber)+frameNumHash);
+		seed_rng(&rngState, seed);
+
+		Ray ray = GenerateCameraRay(scene->Camera, &rngState, x, y);
 
 		// Calculate the background color
 		float t = 0.5f * (ray.Direction.y + 1.0f);
@@ -35,6 +61,8 @@ export void RenderOneFrame(uniform Scene *uniform scene, uniform FrameData *unif
 		if (IntersectScene(scene, ray, 0, kInfinity, &interaction)) {
 			color = 0.5f * (normalize(interaction.Normal) + 1.0f);
 		}
+
+		float randVal = frandom(&rngState);
 
 		int offset = y * width;
 		frameData->ColorDataR[offset + x] += color.x;
