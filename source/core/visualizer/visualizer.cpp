@@ -221,10 +221,13 @@ bool Visualizer::RenderFrame() {
 
 	// Only set the initial docking locations if someone hasn't already loaded them
 	if (ImGui::DockBuilderGetNode(ImGui::GetID("RootDock")) == nullptr) {
+		const ImVec2 dockspaceSize = ImGui::GetContentRegionAvail();
+
 		ImGuiID dockspaceID = ImGui::GetID("RootDock");
 		ImGuiViewport *viewport = ImGui::GetMainViewport();
-		ImGui::DockBuilderRemoveNode(dockspaceID);                            // Clear out existing layout
-		ImGui::DockBuilderAddNode(dockspaceID, ImGuiDockNodeFlags_DockSpace); // Add empty node
+		ImGui::DockBuilderRemoveNode(dockspaceID);                       // Clear out existing layout
+		ImGui::DockBuilderAddNode(dockspaceID, ImGuiDockNodeFlags_None); // Add empty node
+		ImGui::DockBuilderSetNodeSize(dockspaceID, dockspaceSize);
 
 		ImGuiID remaining;
 		ImGuiID bottomDockID = ImGui::DockBuilderSplitNode(dockspaceID, ImGuiDir_Down, 0.20f, nullptr, &remaining);
