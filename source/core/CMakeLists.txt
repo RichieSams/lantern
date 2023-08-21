@@ -12,8 +12,11 @@ set(LANTERN_CORE_INTEGRATOR
 )
 
 set(LANTERN_CORE_MATH
+	math/array.h
 	math/constants.h
 	math/ray.h
+	math/sampling.isph
+	math/types.h
 	math/uniform_sampler.h
 )
 

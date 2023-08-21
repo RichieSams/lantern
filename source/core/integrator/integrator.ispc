@@ -11,6 +11,7 @@
 #include "camera/pinhole_camera.isph"
 
 #include "math/ray.h"
+#include "math/sampling.isph"
 
 #include "integrator/surface_interaction.h"
 
@@ -35,6 +36,28 @@ uniform uint WangHashUniform(uniform uint a) {
     return a;
 }
 
+varying float3 RayColor(uniform Scene *uniform scene, varying RNGState * uniform rngState, varying Ray &ray, int depth) {
+	if (depth <= 0) {
+		float3 ret = {0.0f, 0.0f, 0.0f};
+		return ret;
+	}
+	
+	SurfaceInteraction interaction;
+	if (IntersectScene(scene, ray, 0.001, kInfinity, &interaction)) {
+		float3 direction = UniformSampleHemisphere(normalize(interaction.Normal), rngState);
+		Ray newRay = {interaction.Position, direction};
+
+		return 0.5 * RayColor(scene, rngState, newRay, depth-1);
+	}
+
+
+	// Calculate the background color
+	float t = 0.5f * (ray.Direction.y + 1.0f);
+	const float3 skyWhite = {1.0f, 1.0f, 1.0f};
+	const float3 skyColor = {0.5f, 0.7f, 1.0f};
+	return (1.0f - t) * skyWhite + t * skyColor;
+}
+
 export void RenderOneFrame(uniform Scene *uniform scene, uniform FrameData *uniform frameData, uniform uint frameNumber) {
 	uniform int width = frameData->Width;
 	uniform int height = frameData->Height;	
@@ -51,18 +74,8 @@ export void RenderOneFrame(uniform Scene *uniform scene, uniform FrameData *unif
 
 		Ray ray = GenerateCameraRay(scene->Camera, &rngState, x, y);
 
-		// Calculate the background color
-		float t = 0.5f * (ray.Direction.y + 1.0f);
-		const float3 skyWhite = {1.0f, 1.0f, 1.0f};
-		const float3 skyColor = {0.5f, 0.7f, 1.0f};
-		float3 color = (1.0f - t) * skyWhite + t * skyColor;
-
-		SurfaceInteraction interaction;
-		if (IntersectScene(scene, ray, 0, kInfinity, &interaction)) {
-			color = 0.5f * (normalize(interaction.Normal) + 1.0f);
-		}
-
-		float randVal = frandom(&rngState);
+		int maxDepth = 10;
+		float3 color = RayColor(scene, &rngState, ray, maxDepth);
 
 		int offset = y * width;
 		frameData->ColorDataR[offset + x] += color.x;
