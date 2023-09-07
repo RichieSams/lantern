@@ -12,6 +12,8 @@
 
 #include "integrator/integrator.h"
 
+#include <math.h>
+
 namespace lantern {
 
 RenderHost::RenderHost(Scene *scene, PresentationBuffer *startingPresentationBuffer, std::atomic<PresentationBuffer *> *swapPresentationBuffer)
@@ -40,9 +42,11 @@ void RenderHost::Run(std::atomic<bool> *quit) {
 				const uint32_t sampleCount = m_accumulationBuffer.SampleCount[frameBufferIndex];
 
 				// Color data
-				m_currentPresentationBuffer->ResolvedData[resolvedDataIndex + 0] = m_accumulationBuffer.ColorDataR[frameBufferIndex] / sampleCount; // Red
-				m_currentPresentationBuffer->ResolvedData[resolvedDataIndex + 1] = m_accumulationBuffer.ColorDataG[frameBufferIndex] / sampleCount; // Green
-				m_currentPresentationBuffer->ResolvedData[resolvedDataIndex + 2] = m_accumulationBuffer.ColorDataB[frameBufferIndex] / sampleCount; // Blue
+
+				// "Gamma-correct" the color data by sqrt() it
+				m_currentPresentationBuffer->ResolvedData[resolvedDataIndex + 0] = sqrtf(m_accumulationBuffer.ColorDataR[frameBufferIndex] / sampleCount); // Red
+				m_currentPresentationBuffer->ResolvedData[resolvedDataIndex + 1] = sqrtf(m_accumulationBuffer.ColorDataG[frameBufferIndex] / sampleCount); // Green
+				m_currentPresentationBuffer->ResolvedData[resolvedDataIndex + 2] = sqrtf(m_accumulationBuffer.ColorDataB[frameBufferIndex] / sampleCount); // Blue
 
 				// TODO: normal and albedo
 			}
