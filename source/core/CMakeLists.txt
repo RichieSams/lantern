@@ -17,7 +17,6 @@ set(LANTERN_CORE_MATH
 	math/ray.h
 	math/sampling.isph
 	math/types.h
-	math/uniform_sampler.h
 )
 
 set(LANTERN_CORE_RENDER_HOST
