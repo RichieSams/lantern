@@ -4,4 +4,4 @@ set(LANTERN_ROOT
 
 # Create exe
 add_executable(lantern ${LANTERN_ROOT})
-target_link_libraries(lantern lantern_core argparse)
+target_link_libraries(lantern lantern_core)

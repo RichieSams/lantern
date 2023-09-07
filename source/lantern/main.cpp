@@ -15,8 +15,6 @@
 
 #include "math/array.h"
 
-#include "argparse.h"
-
 #include <thread>
 
 int main(int argc, const char *argv[]) {

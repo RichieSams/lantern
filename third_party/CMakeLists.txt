@@ -1,5 +1,3 @@
-add_subdirectory(argparse)
-
 add_subdirectory(gl3w)
 
 set( GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE )
