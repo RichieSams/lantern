@@ -7,7 +7,6 @@
 #pragma once
 
 #include "math/constants.h"
-#include "math/ray.h"
 
 extern "C" {
 struct PinholeCamera {

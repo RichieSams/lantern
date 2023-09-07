@@ -7,7 +7,7 @@
 #include "scene/sphere.h"
 #include "scene/sphere.isph"
 
-#include "math/ray.h"
+#include "math/ray.isph"
 
 varying bool InteresectSphere(uniform Sphere *uniform sphere, varying Ray &ray, varying float minDistance, varying float maxDistance, varying float *uniform distance, varying float3 *uniform normal) {
 	float3 oc = ray.Origin - sphere->Origin;

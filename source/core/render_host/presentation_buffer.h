@@ -6,8 +6,6 @@
 
 #pragma once
 
-#include "math/types.h"
-
 #include <stddef.h>
 #include <stdint.h>
 

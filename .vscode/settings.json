@@ -2,6 +2,7 @@
     "files.associations": {
         "limits": "cpp",
         "random": "cpp",
-        "*.tcc": "cpp"
+        "*.tcc": "cpp",
+        "*.isph": "ispc"
     }
 }

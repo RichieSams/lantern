@@ -6,8 +6,9 @@
 
 #pragma once
 
+#include "math/ray.isph"
 
 struct PinholeCamera;
 struct RNGState;
 
-varying Ray GenerateCameraRay(uniform PinholeCamera * uniform camera, varying RNGState * uniform rngState, varying int x, varying int y);
+varying Ray GenerateCameraRay(uniform PinholeCamera *uniform camera, varying RNGState *uniform rngState, varying int x, varying int y);

@@ -6,8 +6,7 @@
 
 #pragma once
 
-#include "math/types.h"
-
+#include "math/types.isph"
 
 float3x3 CreateCoordinateFrame(float3 &N) {
 	// [Duff et al. 17] Building An Orthonormal Basis, Revisited. JCGT. 2017.
@@ -15,17 +14,16 @@ float3x3 CreateCoordinateFrame(float3 &N) {
 	const float a = -1.0f / (sign + N.z);
 	const float b = N.x * N.y * a;
 	float3 tangent = {1.0f + sign * N.x * N.x * a, sign * b, -sign * N.x};
-	float3 bitangent= {b, sign + N.y * N.y * a, -N.y};
+	float3 bitangent = {b, sign + N.y * N.y * a, -N.y};
 
 	float3x3 ret = {
-		{tangent.x, bitangent.x, N.x},
-		{tangent.y, bitangent.y, N.y},
-		{tangent.z, bitangent.z, N.z}
-	};
+	    {tangent.x, bitangent.x, N.x},
+	    {tangent.y, bitangent.y, N.y},
+	    {tangent.z, bitangent.z, N.z}};
 	return ret;
 }
 
-inline float3 UniformSampleHemisphere(varying float3 &normal, varying RNGState * uniform rngState) {
+inline float3 UniformSampleHemisphere(varying float3 &normal, varying RNGState *uniform rngState) {
 	float cosPhi = frandom(rngState);
 	float sinPhi = sqrt(1.0f - cosPhi * cosPhi);
 	float theta = k2Pi * frandom(rngState);

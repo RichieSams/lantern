@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "math/types.h"
+#include "math/types.isph"
 
 struct Sphere;
 struct Ray;

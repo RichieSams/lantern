@@ -10,7 +10,7 @@
 #include "camera/pinhole_camera.h"
 #include "camera/pinhole_camera.isph"
 
-#include "math/ray.h"
+#include "math/ray.isph"
 #include "math/sampling.isph"
 
 #include "integrator/surface_interaction.h"
@@ -19,37 +19,36 @@
 #include "scene/scene.isph"
 
 varying uint WangHash(varying uint a) {
-    a = (a ^ 61) ^ (a >> 16);
-    a = a + (a << 3);
-    a = a ^ (a >> 4);
-    a = a * 0x27d4eb2d;
-    a = a ^ (a >> 15);
-    return a;
+	a = (a ^ 61) ^ (a >> 16);
+	a = a + (a << 3);
+	a = a ^ (a >> 4);
+	a = a * 0x27d4eb2d;
+	a = a ^ (a >> 15);
+	return a;
 }
 
 uniform uint WangHashUniform(uniform uint a) {
-    a = (a ^ 61) ^ (a >> 16);
-    a = a + (a << 3);
-    a = a ^ (a >> 4);
-    a = a * 0x27d4eb2d;
-    a = a ^ (a >> 15);
-    return a;
+	a = (a ^ 61) ^ (a >> 16);
+	a = a + (a << 3);
+	a = a ^ (a >> 4);
+	a = a * 0x27d4eb2d;
+	a = a ^ (a >> 15);
+	return a;
 }
 
-varying float3 RayColor(uniform Scene *uniform scene, varying RNGState * uniform rngState, varying Ray &ray, int depth) {
+varying float3 RayColor(uniform Scene *uniform scene, varying RNGState *uniform rngState, varying Ray &ray, int depth) {
 	if (depth <= 0) {
 		float3 ret = {0.0f, 0.0f, 0.0f};
 		return ret;
 	}
-	
+
 	SurfaceInteraction interaction;
 	if (IntersectScene(scene, ray, 0.001, kInfinity, &interaction)) {
 		float3 direction = UniformSampleHemisphere(normalize(interaction.Normal), rngState);
 		Ray newRay = {interaction.Position, direction};
 
-		return 0.5 * RayColor(scene, rngState, newRay, depth-1);
+		return 0.5 * RayColor(scene, rngState, newRay, depth - 1);
 	}
-
 
 	// Calculate the background color
 	float t = 0.5f * (ray.Direction.y + 1.0f);
@@ -60,7 +59,7 @@ varying float3 RayColor(uniform Scene *uniform scene, varying RNGState * uniform
 
 export void RenderOneFrame(uniform Scene *uniform scene, uniform FrameData *uniform frameData, uniform uint frameNumber) {
 	uniform int width = frameData->Width;
-	uniform int height = frameData->Height;	
+	uniform int height = frameData->Height;
 
 	uniform uint frameNumHash = WangHashUniform(frameNumber);
 
@@ -69,7 +68,7 @@ export void RenderOneFrame(uniform Scene *uniform scene, uniform FrameData *unif
 		RNGState rngState;
 
 		uint pixelNumber = y * width + x;
-		uint seed = WangHash(WangHash(pixelNumber)+frameNumHash);
+		uint seed = WangHash(WangHash(pixelNumber) + frameNumHash);
 		seed_rng(&rngState, seed);
 
 		Ray ray = GenerateCameraRay(scene->Camera, &rngState, x, y);

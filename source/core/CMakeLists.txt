@@ -2,21 +2,23 @@ set(LANTERN_CORE_CAMERA
 	camera/frame_data.h
 	camera/pinhole_camera.h
 	camera/pinhole_camera.ispc
+	camera/pinhole_camera.isph
 )
 
 set(LANTERN_CORE_INTEGRATOR
 	integrator/integrator.cpp
-	integrator/integrator.ispc
 	integrator/integrator.h
+	integrator/integrator.ispc
 	integrator/surface_interaction.h
 )
 
 set(LANTERN_CORE_MATH
 	math/array.h
 	math/constants.h
-	math/ray.h
+	math/ray.isph
 	math/sampling.isph
 	math/types.h
+	math/types.isph
 )
 
 set(LANTERN_CORE_RENDER_HOST
@@ -34,8 +36,8 @@ set(LANTERN_CORE_SCENE
 )
 
 set(LANTERN_CORE_VISUALIZER
-	visualizer/visualizer.h
 	visualizer/visualizer.cpp
+	visualizer/visualizer.h
 )
 
 # Link all the sources into one

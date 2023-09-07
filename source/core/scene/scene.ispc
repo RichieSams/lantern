@@ -7,7 +7,7 @@
 #include "scene/scene.h"
 
 #include "math/constants.h"
-#include "math/ray.h"
+#include "math/ray.isph"
 
 #include "integrator/surface_interaction.h"
 

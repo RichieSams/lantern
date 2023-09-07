@@ -8,8 +8,6 @@
 
 #include "math/types.h"
 
-struct Ray;
-
 extern "C" {
 
 struct Sphere {

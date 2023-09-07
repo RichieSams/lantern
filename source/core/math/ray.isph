@@ -8,10 +8,7 @@
 
 #include "math/types.h"
 
-extern "C" {
-
 struct Ray {
 	float3 Origin;
 	float3 Direction;
 };
-} // extern C

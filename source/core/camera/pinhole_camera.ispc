@@ -7,7 +7,9 @@
 #include "camera/pinhole_camera.h"
 #include "camera/pinhole_camera.isph"
 
-varying Ray GenerateCameraRay(uniform PinholeCamera *uniform camera, varying RNGState * uniform rngState, varying int x, varying int y) {
+#include "math/ray.isph"
+
+varying Ray GenerateCameraRay(uniform PinholeCamera *uniform camera, varying RNGState *uniform rngState, varying int x, varying int y) {
 	// Shoot rays through the center of the pixel (aka 0.5 vs 0.0)
 	// that said, multi-sample the primary rays by randomly jittering the ray around the pixel
 	float u = frandom(rngState);
