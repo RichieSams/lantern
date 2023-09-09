@@ -6,10 +6,7 @@
 
 #pragma once
 
-#include "math/types.h"
-
 extern "C" {
-
 struct FrameData {
 	int Width;
 	int Height;
@@ -20,56 +17,20 @@ struct FrameData {
 	float *ColorDataR;
 	float *ColorDataG;
 	float *ColorDataB;
-	float3 *AlbedoData;
-	float3 *NormalData;
-	uint *SampleCount;
+	float *AlbedoDataR;
+	float *AlbedoDataG;
+	float *AlbedoDataB;
+	float *NormalDataR;
+	float *NormalDataG;
+	float *NormalDataB;
+	unsigned int *SampleCount;
 };
+} // extern C
 
-// Only define the init functions for C
 #if !defined(ISPC)
-#	include <string.h>
 
-inline void FrameDataInit(FrameData *data, uint width, uint height) {
-	data->Width = width;
-	data->Height = height;
-	data->ColorDataR = new float[width * height];
-	data->ColorDataG = new float[width * height];
-	data->ColorDataB = new float[width * height];
-	data->AlbedoData = new float3[width * height];
-	data->NormalData = new float3[width * height];
-	data->SampleCount = new uint[width * height];
-}
-
-inline void FrameDataTerm(FrameData *data) {
-	delete[] data->ColorDataR;
-	delete[] data->ColorDataG;
-	delete[] data->ColorDataB;
-	delete[] data->AlbedoData;
-	delete[] data->NormalData;
-	delete[] data->SampleCount;
-
-	data->Width = 0;
-	data->Height = 0;
-	data->ColorDataR = NULL;
-	data->ColorDataG = NULL;
-	data->ColorDataB = NULL;
-	data->AlbedoData = NULL;
-	data->NormalData = NULL;
-	data->SampleCount = NULL;
-}
-
-inline void FrameDataReset(FrameData *data) {
-	// We rely on the fact that 0x0000 == 0.0f
-	memset(&data->ColorDataR[0], 0, data->Width * data->Height * sizeof(float));
-	memset(&data->ColorDataG[0], 0, data->Width * data->Height * sizeof(float));
-	memset(&data->ColorDataB[0], 0, data->Width * data->Height * sizeof(float));
-	memset(&data->AlbedoData[0], 0, data->Width * data->Height * sizeof(float3));
-	memset(&data->NormalData[0], 0, data->Width * data->Height * sizeof(float3));
-	memset(&data->SampleCount[0], 0, data->Width * data->Height * sizeof(uint));
-
-	data->Empty = true;
-}
+void FrameDataInit(FrameData *data, unsigned int width, unsigned int height);
+void FrameDataTerm(FrameData *data);
+void FrameDataReset(FrameData *data);
 
 #endif
-
-} // extern C

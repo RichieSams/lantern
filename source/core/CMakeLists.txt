@@ -1,4 +1,5 @@
 set(LANTERN_CORE_CAMERA
+	camera/frame_data.cpp
 	camera/frame_data.h
 	camera/pinhole_camera.h
 	camera/pinhole_camera.ispc
